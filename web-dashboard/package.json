@@ -1,0 +1,14 @@
+{
+  "name": "xora-agv-dashboard-bridge",
+  "version": "1.0.0",
+  "description": "MQTT-WebSocket bridge server for Xora Mini AGV Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "mqtt": "^5.3.4",
+    "ws": "^8.16.0"
+  }
+}

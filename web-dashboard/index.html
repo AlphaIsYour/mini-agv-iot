@@ -1,0 +1,1631 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>XORA — AGV Control Terminal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Syne:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* ─── Reset & Base ─────────────────────────────────────────────────────────── */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #07090f;
+        --bg2: #0c1118;
+        --bg3: #111820;
+        --border: #1a2535;
+        --border2: #243040;
+
+        --cyan: #00c8f0;
+        --cyan-dim: #005a70;
+        --cyan-glow: rgba(0, 200, 240, 0.15);
+
+        --amber: #ffaa00;
+        --amber-dim: #7a4f00;
+        --amber-glow: rgba(255, 170, 0, 0.15);
+
+        --green: #00e87a;
+        --green-dim: #004d28;
+        --green-glow: rgba(0, 232, 122, 0.12);
+
+        --red: #ff2d55;
+        --red-dim: #6b0020;
+        --red-glow: rgba(255, 45, 85, 0.15);
+
+        --text: #dce8f5;
+        --text-dim: #4a6580;
+        --text-mid: #7a9bb5;
+
+        --mono: "Share Tech Mono", monospace;
+        --sans: "Syne", sans-serif;
+
+        --radius: 4px;
+      }
+
+      html,
+      body {
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        font-size: 13px;
+        overflow: hidden;
+      }
+
+      /* ─── Scrollbar ─────────────────────────────────────────────────────────────── */
+      ::-webkit-scrollbar {
+        width: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--bg2);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border2);
+        border-radius: 2px;
+      }
+
+      /* ─── Layout ─────────────────────────────────────────────────────────────────── */
+      .terminal {
+        display: grid;
+        grid-template-rows: 52px 1fr;
+        grid-template-columns: 1fr;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* ─── Header ─────────────────────────────────────────────────────────────────── */
+      header {
+        grid-row: 1;
+        display: flex;
+        align-items: center;
+        padding: 0 18px;
+        background: var(--bg2);
+        border-bottom: 1px solid var(--border);
+        gap: 16px;
+        position: relative;
+        z-index: 10;
+      }
+
+      .header-brand {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        flex-shrink: 0;
+      }
+
+      .brand-name {
+        font-family: var(--mono);
+        font-size: 22px;
+        letter-spacing: 0.12em;
+        color: var(--cyan);
+        text-shadow: 0 0 20px var(--cyan);
+      }
+
+      .brand-sub {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        color: var(--text-dim);
+        text-transform: uppercase;
+      }
+
+      .header-sep {
+        width: 1px;
+        height: 24px;
+        background: var(--border2);
+      }
+
+      .header-status-row {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex: 1;
+      }
+
+      .status-pill {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-mid);
+      }
+
+      .status-pill .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--text-dim);
+        transition:
+          background 0.3s,
+          box-shadow 0.3s;
+      }
+
+      .status-pill.connected .dot {
+        background: var(--green);
+        box-shadow: 0 0 8px var(--green);
+        animation: pulse-dot 2s infinite;
+      }
+
+      .status-pill.disconnected .dot {
+        background: var(--red);
+      }
+
+      @keyframes pulse-dot {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+
+      .header-time {
+        margin-left: auto;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-dim);
+      }
+
+      #battery-display {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: var(--mono);
+        font-size: 11px;
+      }
+
+      .battery-bar-wrap {
+        width: 36px;
+        height: 12px;
+        border: 1px solid var(--border2);
+        border-radius: 2px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .battery-bar-fill {
+        height: 100%;
+        width: 100%;
+        background: var(--green);
+        transition:
+          width 0.5s,
+          background 0.5s;
+        border-radius: 1px;
+      }
+
+      /* ─── Main Grid ──────────────────────────────────────────────────────────────── */
+      .main-grid {
+        grid-row: 2;
+        display: grid;
+        grid-template-columns: 280px 1fr 240px;
+        grid-template-rows: 1fr 180px;
+        gap: 1px;
+        background: var(--border);
+        overflow: hidden;
+      }
+
+      .panel {
+        background: var(--bg2);
+        padding: 16px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .panel-title {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.25em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+
+      .panel-title::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border2);
+      }
+
+      /* ─── Panel: Arena ───────────────────────────────────────────────────────────── */
+      #panel-arena {
+        grid-column: 1;
+        grid-row: 1;
+        gap: 14px;
+      }
+
+      /* State Badge */
+      .state-badge {
+        background: var(--bg3);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        padding: 10px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      }
+
+      .state-label-sm {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        color: var(--text-dim);
+        text-transform: uppercase;
+      }
+
+      .state-value {
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--cyan);
+        text-align: right;
+        transition: color 0.3s;
+      }
+
+      .state-value[data-state="ERROR_STATE"] {
+        color: var(--red);
+      }
+      .state-value[data-state="IDLE"] {
+        color: var(--text-mid);
+      }
+      .state-value[data-state="ARRIVED_AT_DESTINATION"],
+      .state-value[data-state="LOAD_UNLOAD"] {
+        color: var(--green);
+      }
+      .state-value[data-state="MANUAL_OVERRIDE"] {
+        color: var(--amber);
+      }
+
+      /* Arena SVG */
+      .arena-wrap {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 0;
+      }
+
+      svg#arena-svg {
+        width: 100%;
+        max-width: 220px;
+        aspect-ratio: 1;
+        overflow: visible;
+      }
+
+      /* Mode pills */
+      .mode-row {
+        display: flex;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+
+      .mode-chip {
+        flex: 1;
+        padding: 5px;
+        text-align: center;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        color: var(--text-dim);
+        background: var(--bg3);
+        transition: all 0.2s;
+      }
+
+      .mode-chip.active {
+        border-color: var(--amber);
+        color: var(--amber);
+        background: var(--amber-glow);
+        box-shadow: 0 0 12px var(--amber-glow);
+      }
+
+      /* ─── Panel: Controls ────────────────────────────────────────────────────────── */
+      #panel-controls {
+        grid-column: 2;
+        grid-row: 1;
+        gap: 14px;
+      }
+
+      .controls-inner {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        justify-content: center;
+        align-items: center;
+        min-height: 0;
+      }
+
+      /* Destination Buttons */
+      .dest-section {
+        width: 100%;
+        text-align: center;
+      }
+      .dest-section-label {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.25em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        margin-bottom: 12px;
+      }
+
+      .dest-buttons {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+      }
+
+      .btn-dest {
+        width: 80px;
+        height: 80px;
+        background: var(--bg3);
+        border: 1px solid var(--border2);
+        border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        cursor: pointer;
+        transition: all 0.15s;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .btn-dest::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: var(--cyan-glow);
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+
+      .btn-dest:hover::before {
+        opacity: 1;
+      }
+      .btn-dest:hover {
+        border-color: var(--cyan);
+        box-shadow: 0 0 20px var(--cyan-glow);
+        transform: translateY(-2px);
+      }
+
+      .btn-dest:active {
+        transform: translateY(0);
+      }
+
+      .btn-dest.active {
+        border-color: var(--cyan);
+        background: var(--bg3);
+        box-shadow:
+          0 0 24px var(--cyan-glow),
+          inset 0 0 24px rgba(0, 200, 240, 0.05);
+      }
+
+      .btn-dest.active::before {
+        opacity: 1;
+      }
+
+      .btn-dest .dest-letter {
+        font-family: var(--mono);
+        font-size: 28px;
+        color: var(--text);
+        transition: color 0.2s;
+        position: relative;
+        z-index: 1;
+      }
+
+      .btn-dest.active .dest-letter {
+        color: var(--cyan);
+        text-shadow: 0 0 20px var(--cyan);
+      }
+
+      .btn-dest .dest-label {
+        font-size: 8px;
+        font-weight: 700;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        position: relative;
+        z-index: 1;
+      }
+
+      /* Base return button */
+      .btn-base {
+        padding: 10px 24px;
+        background: var(--bg3);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-mid);
+        cursor: pointer;
+        letter-spacing: 0.1em;
+        transition: all 0.15s;
+      }
+      .btn-base:hover {
+        border-color: var(--amber);
+        color: var(--amber);
+        box-shadow: 0 0 16px var(--amber-glow);
+      }
+
+      /* Mode toggles */
+      .mode-section {
+        width: 100%;
+      }
+      .mode-section-label {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.25em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        text-align: center;
+        margin-bottom: 10px;
+      }
+
+      .mode-buttons {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .btn-mode {
+        padding: 8px 16px;
+        background: var(--bg3);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+
+      .btn-mode:hover {
+        border-color: var(--text-mid);
+        color: var(--text);
+      }
+
+      .btn-mode.active {
+        border-color: var(--green);
+        color: var(--green);
+        background: var(--green-glow);
+        box-shadow: 0 0 14px var(--green-glow);
+      }
+
+      /* Emergency stop */
+      .btn-estop {
+        padding: 12px 32px;
+        background: var(--red-dim);
+        border: 1px solid var(--red);
+        border-radius: var(--radius);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--red);
+        cursor: pointer;
+        transition: all 0.15s;
+        box-shadow: 0 0 20px var(--red-glow);
+      }
+
+      .btn-estop:hover {
+        background: rgba(255, 45, 85, 0.25);
+        box-shadow: 0 0 30px rgba(255, 45, 85, 0.4);
+        transform: scale(1.02);
+      }
+
+      .btn-estop:active {
+        transform: scale(0.98);
+      }
+
+      /* ─── Panel: Sensors ─────────────────────────────────────────────────────────── */
+      #panel-sensors {
+        grid-column: 3;
+        grid-row: 1;
+      }
+
+      .sensor-card {
+        background: var(--bg3);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+
+      .sensor-name {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+      }
+
+      .sensor-value {
+        font-family: var(--mono);
+        font-size: 20px;
+        color: var(--text);
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+      }
+
+      .sensor-unit {
+        font-size: 11px;
+        color: var(--text-dim);
+      }
+
+      .sensor-bar {
+        height: 3px;
+        background: var(--border2);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      .sensor-bar-fill {
+        height: 100%;
+        background: var(--cyan);
+        border-radius: 2px;
+        transition: width 0.4s;
+      }
+
+      /* IR Array */
+      .ir-array {
+        display: flex;
+        gap: 4px;
+        margin-top: 2px;
+      }
+
+      .ir-dot {
+        flex: 1;
+        height: 10px;
+        border-radius: 2px;
+        background: var(--border2);
+        transition:
+          background 0.15s,
+          box-shadow 0.15s;
+      }
+
+      .ir-dot.active {
+        background: var(--amber);
+        box-shadow: 0 0 6px var(--amber);
+      }
+
+      /* Load cell status */
+      .load-status {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        padding: 2px 8px;
+        border-radius: 2px;
+        background: var(--border2);
+        color: var(--text-dim);
+        width: fit-content;
+        transition: all 0.3s;
+      }
+
+      .load-status.loaded {
+        background: var(--green-glow);
+        color: var(--green);
+        border: 1px solid var(--green-dim);
+      }
+
+      .load-status.empty {
+        background: var(--bg3);
+        color: var(--text-dim);
+        border: 1px solid var(--border);
+      }
+
+      /* Ultrasonic warning */
+      .obstacle-warn {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        transition: color 0.3s;
+      }
+
+      .obstacle-warn.alert {
+        color: var(--red);
+        animation: blink 0.5s step-end infinite;
+      }
+
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+
+      /* ─── Panel: Event Log ───────────────────────────────────────────────────────── */
+      #panel-log {
+        grid-column: 1 / 3;
+        grid-row: 2;
+        gap: 10px;
+      }
+
+      .log-list {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-height: 0;
+      }
+
+      .log-entry {
+        display: grid;
+        grid-template-columns: 85px 90px 1fr;
+        gap: 10px;
+        padding: 4px 8px;
+        border-radius: 2px;
+        font-family: var(--mono);
+        font-size: 10px;
+        background: var(--bg3);
+        border-left: 2px solid var(--border2);
+        transition: border-color 0.2s;
+        animation: log-in 0.3s ease;
+      }
+
+      @keyframes log-in {
+        from {
+          opacity: 0;
+          transform: translateX(-8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      .log-entry.source-esp32 {
+        border-left-color: var(--cyan-dim);
+      }
+      .log-entry.source-dashboard {
+        border-left-color: var(--amber-dim);
+      }
+      .log-entry.level-error {
+        border-left-color: var(--red);
+        background: rgba(255, 45, 85, 0.04);
+      }
+      .log-entry.level-warn {
+        border-left-color: var(--amber);
+      }
+      .log-entry.level-ok {
+        border-left-color: var(--green-dim);
+      }
+
+      .log-ts {
+        color: var(--text-dim);
+      }
+      .log-code {
+        color: var(--amber);
+        font-weight: 600;
+      }
+      .log-msg {
+        color: var(--text-mid);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* ─── Panel: Error / Event Panel ─────────────────────────────────────────────── */
+      #panel-events {
+        grid-column: 3;
+        grid-row: 2;
+        gap: 10px;
+      }
+
+      .event-code-display {
+        background: var(--bg3);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        padding: 12px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        justify-content: center;
+        min-height: 0;
+      }
+
+      .event-code {
+        font-family: var(--mono);
+        font-size: 14px;
+        color: var(--text-mid);
+        transition: color 0.3s;
+      }
+
+      .event-code.error {
+        color: var(--red);
+        text-shadow: 0 0 10px var(--red-glow);
+      }
+      .event-code.warn {
+        color: var(--amber);
+      }
+      .event-code.ok {
+        color: var(--green);
+      }
+
+      .event-msg {
+        font-size: 10px;
+        color: var(--text-dim);
+        line-height: 1.5;
+      }
+
+      .event-ts {
+        font-family: var(--mono);
+        font-size: 9px;
+        color: var(--text-dim);
+        opacity: 0.6;
+      }
+
+      /* ─── Connection overlay ─────────────────────────────────────────────────────── */
+      #ws-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(7, 9, 15, 0.92);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        gap: 20px;
+        backdrop-filter: blur(4px);
+        transition: opacity 0.4s;
+      }
+
+      #ws-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .overlay-spinner {
+        width: 40px;
+        height: 40px;
+        border: 2px solid var(--border2);
+        border-top-color: var(--cyan);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .overlay-text {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--text-dim);
+        letter-spacing: 0.1em;
+      }
+
+      .overlay-sub {
+        font-size: 10px;
+        color: var(--text-dim);
+        opacity: 0.5;
+        letter-spacing: 0.05em;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="ws-overlay">
+      <div class="overlay-spinner"></div>
+      <div class="overlay-text">CONNECTING TO BRIDGE SERVER</div>
+      <div class="overlay-sub">
+        ws://localhost:3001 — make sure server.js is running
+      </div>
+    </div>
+
+    <div class="terminal">
+      <!-- ── Header ─────────────────────────────────────────────────────────────── -->
+      <header>
+        <div class="header-brand">
+          <span class="brand-name">XORA</span>
+          <span class="brand-sub">AGV Control Terminal</span>
+        </div>
+
+        <div class="header-sep"></div>
+
+        <div class="header-status-row">
+          <div class="status-pill" id="ws-status-pill">
+            <div class="dot"></div>
+            <span id="ws-status-text">WS: —</span>
+          </div>
+
+          <div class="status-pill" id="mqtt-status-pill">
+            <div class="dot"></div>
+            <span id="mqtt-status-text">MQTT: —</span>
+          </div>
+
+          <div id="battery-display">
+            <span
+              style="
+                font-family: var(--mono);
+                font-size: 10px;
+                color: var(--text-dim);
+              "
+              >BAT</span
+            >
+            <div class="battery-bar-wrap">
+              <div
+                class="battery-bar-fill"
+                id="battery-fill"
+                style="width: 100%"
+              ></div>
+            </div>
+            <span
+              id="battery-pct"
+              style="font-family: var(--mono); font-size: 11px"
+              >—%</span
+            >
+          </div>
+        </div>
+
+        <div class="header-time" id="header-clock">—</div>
+      </header>
+
+      <!-- ── Main Grid ──────────────────────────────────────────────────────────── -->
+      <div class="main-grid">
+        <!-- Panel: Arena + State ─────────────────────────────────────────────── -->
+        <div class="panel" id="panel-arena">
+          <div class="panel-title">Arena Map</div>
+
+          <div class="state-badge">
+            <div>
+              <div class="state-label-sm">FSM State</div>
+              <div class="state-value" id="fsm-state" data-state="IDLE">
+                IDLE
+              </div>
+            </div>
+            <div style="text-align: right">
+              <div class="state-label-sm">Destination</div>
+              <div
+                class="state-value"
+                id="current-dest"
+                style="color: var(--amber)"
+              >
+                BASE
+              </div>
+            </div>
+          </div>
+
+          <div class="arena-wrap">
+            <svg
+              id="arena-svg"
+              viewBox="0 0 200 200"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <!-- Grid lines (subtle) -->
+              <rect
+                x="1"
+                y="1"
+                width="198"
+                height="198"
+                rx="3"
+                stroke="#1a2535"
+                stroke-width="1"
+              />
+              <!-- Track lines -->
+              <!-- Horizontal top -->
+              <line
+                x1="40"
+                y1="40"
+                x2="160"
+                y2="40"
+                stroke="#1e3550"
+                stroke-width="2"
+              />
+              <!-- Vertical left -->
+              <line
+                x1="40"
+                y1="40"
+                x2="40"
+                y2="160"
+                stroke="#1e3550"
+                stroke-width="2"
+              />
+              <!-- Vertical right -->
+              <line
+                x1="160"
+                y1="40"
+                x2="160"
+                y2="160"
+                stroke="#1e3550"
+                stroke-width="2"
+              />
+              <!-- Vertical center -->
+              <line
+                x1="100"
+                y1="40"
+                x2="100"
+                y2="160"
+                stroke="#1e3550"
+                stroke-width="2"
+              />
+              <!-- Horizontal base -->
+              <line
+                x1="40"
+                y1="160"
+                x2="160"
+                y2="160"
+                stroke="#1e3550"
+                stroke-width="2"
+              />
+
+              <!-- Node A -->
+              <circle
+                cx="40"
+                cy="40"
+                r="10"
+                fill="#0c1118"
+                stroke="#243040"
+                stroke-width="1.5"
+                id="node-A"
+              />
+              <text
+                x="40"
+                y="44"
+                text-anchor="middle"
+                font-family="Share Tech Mono"
+                font-size="10"
+                fill="#4a6580"
+                id="label-A"
+              >
+                A
+              </text>
+
+              <!-- Node B -->
+              <circle
+                cx="100"
+                cy="40"
+                r="10"
+                fill="#0c1118"
+                stroke="#243040"
+                stroke-width="1.5"
+                id="node-B"
+              />
+              <text
+                x="100"
+                y="44"
+                text-anchor="middle"
+                font-family="Share Tech Mono"
+                font-size="10"
+                fill="#4a6580"
+                id="label-B"
+              >
+                B
+              </text>
+
+              <!-- Node C -->
+              <circle
+                cx="160"
+                cy="40"
+                r="10"
+                fill="#0c1118"
+                stroke="#243040"
+                stroke-width="1.5"
+                id="node-C"
+              />
+              <text
+                x="160"
+                y="44"
+                text-anchor="middle"
+                font-family="Share Tech Mono"
+                font-size="10"
+                fill="#4a6580"
+                id="label-C"
+              >
+                C
+              </text>
+
+              <!-- Node BASE -->
+              <rect
+                x="82"
+                y="152"
+                width="36"
+                height="16"
+                rx="2"
+                fill="#0c1118"
+                stroke="#243040"
+                stroke-width="1.5"
+                id="node-BASE"
+              />
+              <text
+                x="100"
+                y="164"
+                text-anchor="middle"
+                font-family="Share Tech Mono"
+                font-size="8"
+                fill="#4a6580"
+                id="label-BASE"
+              >
+                BASE
+              </text>
+
+              <!-- AGV marker (starts at BASE) -->
+              <g id="agv-marker" transform="translate(100,160)">
+                <circle
+                  r="8"
+                  fill="#001820"
+                  stroke="#00c8f0"
+                  stroke-width="1.5"
+                />
+                <circle r="3" fill="#00c8f0" />
+                <!-- glow -->
+                <circle
+                  r="8"
+                  fill="none"
+                  stroke="#00c8f0"
+                  stroke-width="1"
+                  opacity="0.3"
+                >
+                  <animate
+                    attributeName="r"
+                    from="8"
+                    to="16"
+                    dur="1.5s"
+                    repeatCount="indefinite"
+                  />
+                  <animate
+                    attributeName="opacity"
+                    from="0.3"
+                    to="0"
+                    dur="1.5s"
+                    repeatCount="indefinite"
+                  />
+                </circle>
+              </g>
+            </svg>
+          </div>
+
+          <div class="mode-row" id="mode-chips">
+            <div class="mode-chip active" data-mode="AUTO">AUTO</div>
+            <div class="mode-chip" data-mode="MANUAL">MAN</div>
+            <div class="mode-chip" data-mode="VOICE">VOICE</div>
+            <div class="mode-chip" data-mode="PICKUP">PICK</div>
+          </div>
+        </div>
+
+        <!-- Panel: Controls ──────────────────────────────────────────────────── -->
+        <div class="panel" id="panel-controls">
+          <div class="panel-title">Command Interface</div>
+
+          <div class="controls-inner">
+            <div class="dest-section">
+              <div class="dest-section-label">Select Destination</div>
+              <div class="dest-buttons">
+                <button
+                  class="btn-dest"
+                  onclick="sendCommand('SET_DEST_A')"
+                  id="btn-A"
+                >
+                  <span class="dest-letter">A</span>
+                  <span class="dest-label">Zone A</span>
+                </button>
+                <button
+                  class="btn-dest"
+                  onclick="sendCommand('SET_DEST_B')"
+                  id="btn-B"
+                >
+                  <span class="dest-letter">B</span>
+                  <span class="dest-label">Zone B</span>
+                </button>
+                <button
+                  class="btn-dest"
+                  onclick="sendCommand('SET_DEST_C')"
+                  id="btn-C"
+                >
+                  <span class="dest-letter">C</span>
+                  <span class="dest-label">Zone C</span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <button class="btn-base" onclick="sendCommand('RETURN_BASE')">
+                ↩ Return to BASE
+              </button>
+            </div>
+
+            <div class="mode-section">
+              <div class="mode-section-label">Mode Override</div>
+              <div class="mode-buttons">
+                <button
+                  class="btn-mode active"
+                  onclick="sendCommand('SET_MODE_AUTO')"
+                  id="mode-btn-auto"
+                >
+                  AUTO
+                </button>
+                <button
+                  class="btn-mode"
+                  onclick="sendCommand('SET_MODE_MANUAL')"
+                  id="mode-btn-manual"
+                >
+                  MANUAL
+                </button>
+                <button
+                  class="btn-mode"
+                  onclick="sendCommand('SET_MODE_PICKUP')"
+                  id="mode-btn-pickup"
+                >
+                  PICKUP
+                </button>
+              </div>
+            </div>
+
+            <button class="btn-estop" onclick="sendCommand('EMERGENCY_STOP')">
+              ⬛ EMERGENCY STOP
+            </button>
+          </div>
+        </div>
+
+        <!-- Panel: Sensors ───────────────────────────────────────────────────── -->
+        <div class="panel" id="panel-sensors">
+          <div class="panel-title">Sensor Monitor</div>
+
+          <!-- Ultrasonic -->
+          <div class="sensor-card">
+            <div class="sensor-name">Ultrasonic HC-SR04</div>
+            <div class="sensor-value">
+              <span id="ultrasonic-val">—</span>
+              <span class="sensor-unit">cm</span>
+            </div>
+            <div class="sensor-bar">
+              <div
+                class="sensor-bar-fill"
+                id="ultrasonic-bar"
+                style="width: 50%; background: var(--cyan)"
+              ></div>
+            </div>
+            <div class="obstacle-warn" id="obstacle-warn">CLEAR</div>
+          </div>
+
+          <!-- Load Cell -->
+          <div class="sensor-card">
+            <div class="sensor-name">Load Cell / HX711</div>
+            <div class="sensor-value">
+              <span id="loadcell-val">—</span>
+              <span class="sensor-unit">g</span>
+            </div>
+            <div class="sensor-bar">
+              <div
+                class="sensor-bar-fill"
+                id="loadcell-bar"
+                style="width: 0%; background: var(--green)"
+              ></div>
+            </div>
+            <div class="load-status empty" id="load-status">NO LOAD</div>
+          </div>
+
+          <!-- IR Array -->
+          <div class="sensor-card">
+            <div class="sensor-name">IR Line Follower</div>
+            <div class="ir-array" id="ir-array">
+              <div class="ir-dot" id="ir-s1"></div>
+              <div class="ir-dot" id="ir-s2"></div>
+              <div class="ir-dot" id="ir-s3"></div>
+              <div class="ir-dot" id="ir-s4"></div>
+              <div class="ir-dot" id="ir-s5"></div>
+            </div>
+            <div
+              style="
+                font-family: var(--mono);
+                font-size: 9px;
+                color: var(--text-dim);
+                margin-top: 4px;
+              "
+              id="ir-pattern"
+            >
+              S1·S2·S3·S4·S5
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel: Activity Log ──────────────────────────────────────────────── -->
+        <div class="panel" id="panel-log">
+          <div class="panel-title">Activity Log</div>
+          <div class="log-list" id="log-list">
+            <!-- entries injected by JS -->
+          </div>
+        </div>
+
+        <!-- Panel: Last Event ────────────────────────────────────────────────── -->
+        <div class="panel" id="panel-events">
+          <div class="panel-title">Last Event</div>
+          <div class="event-code-display">
+            <div class="event-code" id="event-code">—</div>
+            <div class="event-msg" id="event-msg">Waiting for events...</div>
+            <div class="event-ts" id="event-ts">—</div>
+          </div>
+        </div>
+      </div>
+      <!-- /.main-grid -->
+    </div>
+    <!-- /.terminal -->
+
+    <script>
+      // ─── Config ──────────────────────────────────────────────────────────────────
+      const WS_URL = "ws://localhost:3001";
+      const RECONNECT_MS = 3000;
+
+      // ─── DOM Refs ─────────────────────────────────────────────────────────────────
+      const $ = (id) => document.getElementById(id);
+
+      // ─── Arena node positions (for AGV marker) ───────────────────────────────────
+      const arenaPos = {
+        BASE: { x: 100, y: 160 },
+        A: { x: 40, y: 40 },
+        B: { x: 100, y: 40 },
+        C: { x: 160, y: 40 },
+      };
+
+      // ─── State ────────────────────────────────────────────────────────────────────
+      let ws = null;
+      let reconnectTimer = null;
+
+      // ─── Clock ────────────────────────────────────────────────────────────────────
+      function tickClock() {
+        const now = new Date();
+        $("header-clock").textContent = now.toLocaleTimeString("en-US", {
+          hour12: false,
+        });
+      }
+      setInterval(tickClock, 1000);
+      tickClock();
+
+      // ─── WebSocket ────────────────────────────────────────────────────────────────
+      function connect() {
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+        ws = new WebSocket(WS_URL);
+
+        ws.addEventListener("open", () => {
+          setWsStatus(true);
+          $("ws-overlay").classList.add("hidden");
+        });
+
+        ws.addEventListener("close", () => {
+          setWsStatus(false);
+          $("ws-overlay").classList.remove("hidden");
+          reconnectTimer = setTimeout(connect, RECONNECT_MS);
+        });
+
+        ws.addEventListener("error", () => {});
+
+        ws.addEventListener("message", (e) => {
+          try {
+            const msg = JSON.parse(e.data);
+            handleMessage(msg);
+          } catch {}
+        });
+      }
+
+      function setWsStatus(online) {
+        const pill = $("ws-status-pill");
+        const text = $("ws-status-text");
+        pill.className =
+          "status-pill " + (online ? "connected" : "disconnected");
+        text.textContent = "WS: " + (online ? "ONLINE" : "OFFLINE");
+      }
+
+      function sendCommand(cmd) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({ command: cmd }));
+        highlightCmdButton(cmd);
+      }
+
+      function highlightCmdButton(cmd) {
+        // Flash visual feedback
+        const destMap = {
+          SET_DEST_A: "btn-A",
+          SET_DEST_B: "btn-B",
+          SET_DEST_C: "btn-C",
+        };
+        if (destMap[cmd]) {
+          const el = $(destMap[cmd]);
+          el.style.transform = "scale(0.95)";
+          setTimeout(() => {
+            el.style.transform = "";
+          }, 150);
+        }
+      }
+
+      // ─── Message Handler ──────────────────────────────────────────────────────────
+      function handleMessage({ topic, data }) {
+        switch (topic) {
+          case "xora/snapshot":
+            handleSnapshot(data);
+            break;
+          case "xora/state":
+            updateState(data);
+            break;
+          case "xora/destination":
+            updateDestination(data);
+            break;
+          case "xora/mode":
+            updateMode(data);
+            break;
+          case "xora/battery":
+            updateBattery(data);
+            break;
+          case "xora/sensor/ir":
+            updateIR(data);
+            break;
+          case "xora/sensor/ultrasonic":
+            updateUltrasonic(data);
+            break;
+          case "xora/sensor/loadcell":
+            updateLoadCell(data);
+            break;
+          case "xora/event":
+            handleEvent(data);
+            break;
+        }
+      }
+
+      function handleSnapshot(snap) {
+        if (!snap) return;
+        updateState(snap.state);
+        updateDestination(snap.destination);
+        updateMode(snap.mode);
+        updateBattery(snap.battery);
+        if (snap.sensors) {
+          updateIR(snap.sensors.ir);
+          updateUltrasonic(snap.sensors.ultrasonic);
+          updateLoadCell(snap.sensors.loadcell);
+        }
+        if (snap.events) {
+          snap.events
+            .slice(0, 20)
+            .reverse()
+            .forEach((ev) => appendLog(ev));
+          if (snap.events.length > 0) displayLastEvent(snap.events[0]);
+        }
+        // Fake MQTT status as connected after snapshot
+        const mp = $("mqtt-status-pill");
+        mp.className = "status-pill connected";
+        $("mqtt-status-text").textContent = "MQTT: broker.hivemq.com";
+      }
+
+      // ─── State ────────────────────────────────────────────────────────────────────
+      function updateState(state) {
+        if (!state) return;
+        const s = typeof state === "string" ? state : state.state || state;
+        const el = $("fsm-state");
+        el.textContent = s;
+        el.setAttribute("data-state", s);
+      }
+
+      // ─── Destination ──────────────────────────────────────────────────────────────
+      function updateDestination(dest) {
+        if (!dest) return;
+        const d = typeof dest === "string" ? dest : dest.destination || dest;
+        $("current-dest").textContent = d;
+
+        // Update arena marker position
+        const pos = arenaPos[d] || arenaPos.BASE;
+        const marker = $("agv-marker");
+        marker.setAttribute("transform", `translate(${pos.x},${pos.y})`);
+
+        // Highlight destination node
+        ["A", "B", "C", "BASE"].forEach((n) => {
+          const node = $(n === "BASE" ? "node-BASE" : `node-${n}`);
+          const label = $(`label-${n}`);
+          if (node && label) {
+            if (n === d) {
+              node.setAttribute("stroke", "#00c8f0");
+              label.setAttribute("fill", "#00c8f0");
+            } else {
+              node.setAttribute("stroke", "#243040");
+              label.setAttribute("fill", "#4a6580");
+            }
+          }
+        });
+
+        // Highlight dest buttons
+        ["A", "B", "C"].forEach((l) => {
+          $(`btn-${l}`).classList.toggle("active", l === d);
+        });
+      }
+
+      // ─── Mode ─────────────────────────────────────────────────────────────────────
+      function updateMode(mode) {
+        if (!mode) return;
+        const m = typeof mode === "string" ? mode : mode.mode || mode;
+
+        // Chips in arena panel
+        document.querySelectorAll(".mode-chip").forEach((chip) => {
+          chip.classList.toggle("active", chip.dataset.mode === m);
+        });
+
+        // Mode buttons in control panel
+        $("mode-btn-auto").classList.toggle("active", m === "AUTO");
+        $("mode-btn-manual").classList.toggle("active", m === "MANUAL");
+        $("mode-btn-pickup").classList.toggle("active", m === "PICKUP");
+      }
+
+      // ─── Battery ──────────────────────────────────────────────────────────────────
+      function updateBattery(pct) {
+        if (pct == null) return;
+        const v = Math.max(0, Math.min(100, Number(pct)));
+        $("battery-pct").textContent = v + "%";
+        const fill = $("battery-fill");
+        fill.style.width = v + "%";
+        fill.style.background =
+          v > 40 ? "var(--green)" : v > 20 ? "var(--amber)" : "var(--red)";
+      }
+
+      // ─── Ultrasonic ───────────────────────────────────────────────────────────────
+      function updateUltrasonic(val) {
+        if (val == null) return;
+        const cm = Number(val);
+        $("ultrasonic-val").textContent = cm;
+        const pct = Math.min(100, (cm / 100) * 100);
+        const bar = $("ultrasonic-bar");
+        bar.style.width = pct + "%";
+        const warn = $("obstacle-warn");
+        if (cm < 15) {
+          bar.style.background = "var(--red)";
+          warn.textContent = "⚠ OBSTACLE";
+          warn.className = "obstacle-warn alert";
+        } else {
+          bar.style.background = cm < 30 ? "var(--amber)" : "var(--cyan)";
+          warn.textContent = "CLEAR";
+          warn.className = "obstacle-warn";
+        }
+      }
+
+      // ─── Load Cell ────────────────────────────────────────────────────────────────
+      function updateLoadCell(val) {
+        if (val == null) return;
+        const g = Number(val);
+        $("loadcell-val").textContent = g;
+        const pct = Math.min(100, (g / 1000) * 100);
+        $("loadcell-bar").style.width = pct + "%";
+        const st = $("load-status");
+        if (g > 50) {
+          st.textContent = "LOADED";
+          st.className = "load-status loaded";
+        } else {
+          st.textContent = "NO LOAD";
+          st.className = "load-status empty";
+        }
+      }
+
+      // ─── IR Array ─────────────────────────────────────────────────────────────────
+      function updateIR(data) {
+        if (!data) return;
+        const d = typeof data === "object" ? data : {};
+        const keys = ["s1", "s2", "s3", "s4", "s5"];
+        keys.forEach((k, i) => {
+          const dot = $(`ir-${k}`);
+          if (dot) dot.classList.toggle("active", !!d[k] || d[k] === 1);
+        });
+        const pattern = keys.map((k) => (d[k] ? "■" : "□")).join(" ");
+        $("ir-pattern").textContent = pattern;
+      }
+
+      // ─── Event / Log ──────────────────────────────────────────────────────────────
+      function handleEvent(data) {
+        if (!data) return;
+        const ev =
+          typeof data === "object"
+            ? data
+            : {
+                code: "EVENT",
+                message: String(data),
+                timestamp: new Date().toISOString(),
+              };
+        appendLog(ev);
+        displayLastEvent(ev);
+      }
+
+      function displayLastEvent(ev) {
+        const codeEl = $("event-code");
+        const code = ev.code || "—";
+        codeEl.textContent = code;
+
+        const errorCodes = [
+          "LINE_LOST",
+          "OBSTACLE_DETECTED",
+          "SENSOR_ERROR",
+          "INVALID_DEST",
+          "LOW_BATTERY",
+          "ESTOP",
+        ];
+        const warnCodes = ["NO_OBJECT", "WAITING_PICKUP", "TIMEOUT"];
+        const okCodes = ["CMD_SENT", "ARRIVED", "LOADED", "UNLOADED", "RESET"];
+
+        codeEl.className =
+          "event-code" +
+          (errorCodes.some((c) => code.includes(c))
+            ? " error"
+            : warnCodes.some((c) => code.includes(c))
+              ? " warn"
+              : okCodes.some((c) => code.includes(c))
+                ? " ok"
+                : "");
+
+        $("event-msg").textContent = ev.message || "—";
+        $("event-ts").textContent = ev.timestamp
+          ? new Date(ev.timestamp).toLocaleTimeString()
+          : "—";
+      }
+
+      function appendLog(ev) {
+        const list = $("log-list");
+        const code = ev.code || "EVENT";
+        const source =
+          ev.source === "dashboard" ? "source-dashboard" : "source-esp32";
+        const errorCodes = ["LINE_LOST", "OBSTACLE", "ERROR", "ESTOP", "FAIL"];
+        const warnCodes = ["WAITING", "NO_OBJECT", "TIMEOUT", "INVALID"];
+        const okCodes = ["CMD_SENT", "ARRIVED", "LOADED", "RETURN", "IDLE"];
+        const level = errorCodes.some((c) => code.includes(c))
+          ? "level-error"
+          : warnCodes.some((c) => code.includes(c))
+            ? "level-warn"
+            : okCodes.some((c) => code.includes(c))
+              ? "level-ok"
+              : "";
+
+        const ts = ev.timestamp
+          ? new Date(ev.timestamp).toLocaleTimeString("en-US", {
+              hour12: false,
+            })
+          : "--:--:--";
+
+        const entry = document.createElement("div");
+        entry.className = `log-entry ${source} ${level}`;
+        entry.innerHTML = `
+    <span class="log-ts">${ts}</span>
+    <span class="log-code">${code}</span>
+    <span class="log-msg">${ev.message || ""}</span>
+  `;
+
+        list.insertBefore(entry, list.firstChild);
+
+        // Keep max 60 entries
+        while (list.children.length > 60) list.removeChild(list.lastChild);
+      }
+
+      // ─── Init ─────────────────────────────────────────────────────────────────────
+      connect();
+    </script>
+  </body>
+</html>
