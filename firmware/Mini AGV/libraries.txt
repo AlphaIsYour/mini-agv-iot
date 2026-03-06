@@ -1,0 +1,12 @@
+# Wokwi Library List
+# See https://docs.wokwi.com/guides/libraries
+
+# Automatically added based on includes:
+Adafruit GFX Library
+
+Adafruit SSD1306
+Adafruit HX711
+HX711
+PubSubClient
+MQTTPubSubClient
+ArduinoJson

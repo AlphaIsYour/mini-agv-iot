@@ -13,7 +13,7 @@ const { WebSocketServer } = require("ws");
 
 const CONFIG = {
   mqtt: {
-    broker: "mqtt://broker.hivemq.com:1883",
+    broker: "mqtt://192.168.1.9:1883",
     clientId: `xora-bridge-${Math.random().toString(16).slice(2, 8)}`,
     keepalive: 60,
     reconnectPeriod: 3000,

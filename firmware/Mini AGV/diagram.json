@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "author": "YourAlpha",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 38.4, "left": 206.44, "attrs": {} },
+    { "type": "wokwi-hc-sr04", "id": "ultrasonic1", "top": -104.1, "left": 168.7, "attrs": {} },
+    {
+      "type": "board-ssd1306",
+      "id": "oled1",
+      "top": 99.14,
+      "left": -57.37,
+      "attrs": { "i2cAddress": "0x3c" }
+    },
+    { "type": "wokwi-led", "id": "led1", "top": -42, "left": 71, "attrs": { "color": "red" } },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz1",
+      "top": -93.6,
+      "left": 1.8,
+      "attrs": { "volume": "0.1" }
+    },
+    {
+      "type": "wokwi-hx711",
+      "id": "cell1",
+      "top": 50.6,
+      "left": 367.4,
+      "attrs": { "type": "5kg" }
+    },
+    { "type": "wokwi-a4988", "id": "drv1", "top": 321.6, "left": 379.2, "attrs": {} },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn1",
+      "top": 275,
+      "left": 86.4,
+      "attrs": { "color": "green", "xray": "1" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "oled1:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "oled1:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "oled1:SCL", "esp:22", "green", [ "v0" ] ],
+    [ "oled1:SDA", "esp:21", "green", [ "v0" ] ],
+    [ "ultrasonic1:VCC", "esp:5V", "red", [ "v0" ] ],
+    [ "ultrasonic1:GND", "esp:GND.3", "black", [ "v0" ] ],
+    [ "ultrasonic1:TRIG", "esp:5", "green", [ "v0" ] ],
+    [ "ultrasonic1:ECHO", "esp:18", "green", [ "v0" ] ],
+    [ "cell1:VCC", "esp:5V", "red", [ "h0" ] ],
+    [ "cell1:SCK", "esp:33", "green", [ "h0" ] ],
+    [ "cell1:DT", "esp:32", "green", [ "h0" ] ],
+    [ "cell1:GND", "esp:GND.1", "black", [ "h0" ] ],
+    [ "btn1:2.r", "esp:25", "green", [ "h0" ] ],
+    [ "btn1:1.r", "esp:GND.3", "green", [ "v0" ] ],
+    [ "led1:C", "esp:GND.1", "green", [ "v0" ] ],
+    [ "led1:A", "esp:26", "green", [ "v0" ] ],
+    [ "bz1:2", "esp:27", "green", [ "v0" ] ],
+    [ "bz1:1", "esp:GND.1", "green", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}
