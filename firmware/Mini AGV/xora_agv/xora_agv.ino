@@ -1,10 +1,6 @@
 // ============================================================
-//  XORA Mini AGV — Firmware v0.3
-//  Fixes:
-//  - Pin sesuai wiring dokumentasi
-//  - SET_MODE_AUTO bisa dari state manapun
-//  - Mode manual tidak cek loadcell
-//  - Bug MANUAL → AUTO diperbaiki
+//  XORA Mini AGV — Firmware v0.4
+//  + WiFiManager: auto hotspot jika WiFi gagal
 // ============================================================
 
 #include <Wire.h>
@@ -12,15 +8,12 @@
 #include <Adafruit_SSD1306.h>
 #include "HX711.h"
 #include <WiFi.h>
+#include <WiFiManager.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
-// ─── WiFi ─────────────────────────────────────────────────────────────────────
-const char* WIFI_SSID     = "KOSTAN BUK NIE";
-const char* WIFI_PASSWORD = "OMAHAPIK4B";
-
 // ─── MQTT ─────────────────────────────────────────────────────────────────────
-const char* MQTT_BROKER   = "192.168.1.34";
+const char* MQTT_BROKER   = "broker.hivemq.com";
 const int   MQTT_PORT     = 1883;
 const char* MQTT_CLIENT_ID = "xora-agv-001";
 
@@ -36,23 +29,19 @@ const char* MQTT_CLIENT_ID = "xora-agv-001";
 #define TOPIC_COMMAND     "xora/command"
 #define TOPIC_MANUAL_CMD  "agv/xora/cmd"
 
-// ─── PIN — sesuai dokumentasi wiring ──────────────────────────────────────────
-// Sensor
+// ─── PIN ──────────────────────────────────────────────────────────────────────
 #define TRIG_PIN    18
 #define ECHO_PIN    19
 #define HX_DT       35
 #define HX_SCK      32
+#define PIN_LED     2
+#define PIN_BUZZER  33
 
-// Output
-#define PIN_LED     2    // LED onboard ESP32 (bebas konflik)
-#define PIN_BUZZER  33   // ⚠ Pindah dari 35 (konflik HX_DT) ke 33
-
-// Motor TB6612FNG
 #define PIN_STBY  4
-#define PIN_PWMA  25   // Motor KIRI
+#define PIN_PWMA  25
 #define PIN_AIN1  26
 #define PIN_AIN2  27
-#define PIN_PWMB  14   // Motor KANAN
+#define PIN_PWMB  14
 #define PIN_BIN1  12
 #define PIN_BIN2  13
 
@@ -64,7 +53,7 @@ const char* MQTT_CLIENT_ID = "xora-agv-001";
 #define SCREEN_HEIGHT 64
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
-// ─── Hardware instances ───────────────────────────────────────────────────────
+// ─── Hardware ─────────────────────────────────────────────────────────────────
 HX711        scale;
 WiFiClient   wifiClient;
 PubSubClient mqtt(wifiClient);
@@ -91,7 +80,7 @@ AGVState    prevState    = (AGVState)-1;
 // ─── Runtime vars ─────────────────────────────────────────────────────────────
 bool  objectDetected = false;
 bool  emergencyStop  = false;
-bool buttonPressed = false;
+bool  buttonPressed  = false;
 float distanceCm     = 0;
 float loadGrams      = 0;
 
@@ -103,14 +92,16 @@ unsigned long tArrivedAt         = 0;
 const unsigned long SENSOR_INTERVAL = 500;
 const unsigned long MQTT_RETRY_MS   = 3000;
 
-// ─── Beeper non-blocking ──────────────────────────────────────────────────────
+// ─── Beeper ───────────────────────────────────────────────────────────────────
 struct Beeper {
   bool active=false; unsigned long onAt=0; int duration=0;
   void start(int ms){ digitalWrite(PIN_BUZZER,HIGH);active=true;onAt=millis();duration=ms; }
   void tick(){ if(active&&millis()-onAt>=(unsigned long)duration){digitalWrite(PIN_BUZZER,LOW);active=false;} }
 } beeper;
 
-// ─── Motor control ────────────────────────────────────────────────────────────
+// ─── Motor ────────────────────────────────────────────────────────────────────
+void motorStop();
+
 void motorSetup(){
   pinMode(PIN_STBY,OUTPUT);
   pinMode(PIN_PWMA,OUTPUT);pinMode(PIN_AIN1,OUTPUT);pinMode(PIN_AIN2,OUTPUT);
@@ -221,7 +212,6 @@ void onMqttMessage(char* topic,byte* payload,unsigned int length){
   memcpy(msg,payload,length); msg[length]='\0';
   Serial.printf("[MQTT IN] %s: %s\n",topic,msg);
 
-  // Manual motor command — langsung eksekusi tanpa cek state
   if(strcmp(topic,TOPIC_MANUAL_CMD)==0){
     if(currentMode==MODE_MANUAL) handleManualCommand(msg);
     return;
@@ -234,70 +224,57 @@ void onMqttMessage(char* topic,byte* payload,unsigned int length){
   const char* cmd=doc["command"];
   if(!cmd) return;
 
-  // ── EMERGENCY STOP — berlaku di state manapun ──
   if(strcmp(cmd,"EMERGENCY_STOP")==0){
-    emergencyStop=true;
-    motorStop();
+    emergencyStop=true; motorStop();
     currentState=ERROR_STATE;
     publishEvent("ESTOP","Emergency stop from dashboard");
-    beeper.start(800);
-    return;
+    beeper.start(800); return;
   }
 
-  // ── SET_MODE_AUTO — berlaku dari state manapun ──────────────────────────────
-  // FIX: dulu hanya update mode, sekarang juga reset state ke IDLE
   if(strcmp(cmd,"SET_MODE_AUTO")==0){
-    motorStop();                    // pastikan motor berhenti
-    currentMode  = MODE_AUTO;
-    currentState = IDLE;            // ← FIX: paksa kembali ke IDLE
-    currentDest  = DEST_NONE;
+    motorStop();
+    currentMode=MODE_AUTO; currentState=IDLE; currentDest=DEST_NONE;
     publishState();
     publishEvent("MODE_AUTO","Switched to AUTO mode");
     drawOLED("AUTO MODE","Siap terima","perintah");
     return;
   }
 
-  // ── SET_MODE_MANUAL ──
   if(strcmp(cmd,"SET_MODE_MANUAL")==0){
-    motorStop();
-    currentMode=MODE_MANUAL;
-    // Kalau sedang jalan → balik ke base dulu
+    motorStop(); currentMode=MODE_MANUAL;
     if(currentState==FOLLOW_LINE||currentState==ARRIVED_AT_DESTINATION){
       currentState=RETURN_TO_BASE;
-      publishEvent("FORCED_RETURN","Mode manual: returning to base first");
-    } else {
-      currentState=MANUAL_OVERRIDE;
-    }
-    publishState();
-    return;
+      publishEvent("FORCED_RETURN","Returning to base first");
+    } else { currentState=MANUAL_OVERRIDE; }
+    publishState(); return;
   }
 
-  if(strcmp(cmd,"SET_MODE_PICKUP")==0){
-    currentMode=MODE_PICKUP; publishState(); return;
-  }
+  if(strcmp(cmd,"SET_MODE_PICKUP")==0){ currentMode=MODE_PICKUP; publishState(); return; }
 
   if(strcmp(cmd,"RETURN_BASE")==0){
-    motorStop();
-    currentState=RETURN_TO_BASE;
-    publishState();
-    publishEvent("CMD_RETURN","Return to base commanded");
-    return;
+    motorStop(); currentState=RETURN_TO_BASE;
+    publishState(); publishEvent("CMD_RETURN","Return to base"); return;
   }
 
   if(strcmp(cmd,"RESET_ERROR")==0){
-    motorStop();
-    emergencyStop=false;
-    currentState=IDLE;
-    currentDest=DEST_NONE;
-    publishState();
-    publishEvent("RESET","Error cleared from dashboard");
+    motorStop(); emergencyStop=false;
+    currentState=IDLE; currentDest=DEST_NONE;
+    publishState(); publishEvent("RESET","Error cleared"); return;
+  }
+
+  // ── WiFiManager reset via MQTT ──
+  if(strcmp(cmd,"RESET_WIFI")==0){
+    publishEvent("WIFI_RESET","Resetting WiFi config...");
+    drawOLED("WIFI RESET","Restart as","hotspot...");
+    delay(1000);
+    WiFiManager wm;
+    wm.resetSettings();   // hapus kredensial tersimpan
+    ESP.restart();        // restart → otomatis jadi hotspot
     return;
   }
 
-  // ── Destination — hanya saat IDLE/READY dan mode AUTO/PICKUP ──
   if(currentMode==MODE_MANUAL){
-    publishEvent("INVALID_CMD","Destination ignored in MANUAL mode");
-    return;
+    publishEvent("INVALID_CMD","Destination ignored in MANUAL mode"); return;
   }
 
   if(currentState==IDLE||currentState==READY){
@@ -305,12 +282,9 @@ void onMqttMessage(char* topic,byte* payload,unsigned int length){
     if     (strcmp(cmd,"SET_DEST_A")==0) newDest=DEST_A;
     else if(strcmp(cmd,"SET_DEST_B")==0) newDest=DEST_B;
     else if(strcmp(cmd,"SET_DEST_C")==0) newDest=DEST_C;
-
     if(newDest!=DEST_NONE){
-      currentDest=newDest;
-      currentState=READY;
-      beeper.start(100);
-      publishState();
+      currentDest=newDest; currentState=READY;
+      beeper.start(100); publishState();
       char ev[30]; snprintf(ev,sizeof(ev),"Destination set to %s",destStr(newDest));
       publishEvent("DEST_SET",ev);
     }
@@ -333,19 +307,34 @@ void mqttConnect(){
     publishState();
     publishEvent("ONLINE","Xora AGV online");
   } else {
-    Serial.printf("[MQTT] Failed rc=%d, retry %lums\n",mqtt.state(),MQTT_RETRY_MS);
+    Serial.printf("[MQTT] Failed rc=%d\n",mqtt.state());
   }
 }
 
-void wifiConnect(){
-  Serial.printf("[WiFi] Connecting to %s",WIFI_SSID);
-  WiFi.begin(WIFI_SSID,WIFI_PASSWORD);
-  int tries=0;
-  while(WiFi.status()!=WL_CONNECTED&&tries<30){ delay(500);Serial.print(".");tries++; }
-  if(WiFi.status()==WL_CONNECTED)
-    Serial.printf("\n[WiFi] Connected! IP: %s\n",WiFi.localIP().toString().c_str());
-  else
-    Serial.println("\n[WiFi] Failed");
+// ─── WiFiManager Setup ────────────────────────────────────────────────────────
+void wifiSetup(){
+  WiFiManager wm;
+
+  // Callback saat masuk mode hotspot
+  wm.setAPCallback([](WiFiManager* wm){
+    Serial.println("[WiFi] Hotspot aktif: XORA-Setup");
+    drawOLED("WIFI SETUP","Connect ke:","XORA-Setup");
+  });
+
+  // Timeout hotspot 120 detik — kalau tidak ada yang connect, lanjut tanpa WiFi
+  wm.setConfigPortalTimeout(120);
+
+  // Coba connect ke WiFi tersimpan, kalau gagal → jadi hotspot "XORA-Setup"
+  // tanpa password (bisa ditambah password sebagai argumen ke-2)
+  if(!wm.autoConnect("XORA-Setup")){
+    Serial.println("[WiFi] Timeout/gagal — lanjut tanpa WiFi");
+    drawOLED("WIFI GAGAL","Mode offline","MQTT disabled");
+    delay(2000);
+  } else {
+    Serial.printf("[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
+    drawOLED("WIFI OK", WiFi.localIP().toString().c_str(), "");
+    delay(1000);
+  }
 }
 
 // ─── SETUP ────────────────────────────────────────────────────────────────────
@@ -366,10 +355,12 @@ void setup(){
   scale.set_scale();
   scale.tare();
 
-  wifiConnect();
+  // WiFiManager — gantikan wifiConnect() lama
+  wifiSetup();
+
   mqtt.setServer(MQTT_BROKER,MQTT_PORT);
   mqtt.setCallback(onMqttMessage);
-  mqttConnect();
+  if(WiFi.status()==WL_CONNECTED) mqttConnect();
 
   drawOLED("IDLE","Dest: --",modeStr(currentMode));
   beeper.start(150);
@@ -387,17 +378,13 @@ void runStateMachine(){
     case IDLE:
       digitalWrite(PIN_LED,LOW);
       drawOLED("IDLE","Tunggu perintah",modeStr(currentMode));
-      if(buttonPressed&&currentDest!=DEST_NONE){ currentState=READY; beeper.start(100); }
       break;
 
     case READY:{
       char db[20]; snprintf(db,sizeof(db),"Tujuan: %s",destStr(currentDest));
       drawOLED("READY",db,"Cek barang...");
       if(currentDest==DEST_NONE){ currentState=IDLE;publishEvent("INVALID_DEST","No destination");break; }
-
-      // FIX: mode manual TIDAK cek loadcell
-      bool canMove = (currentMode==MODE_MANUAL) ? true : objectDetected;
-
+      bool canMove=(currentMode==MODE_MANUAL)?true:objectDetected;
       if(!canMove){
         currentState=ERROR_STATE;
         drawOLED("ERROR","NO OBJECT","Taruh barang!");
@@ -415,8 +402,7 @@ void runStateMachine(){
       char db[20]; snprintf(db,sizeof(db),"→ %s",destStr(currentDest));
       drawOLED("MOVING",db,"Follow line...");
       if(distanceCm>0&&distanceCm<10){
-        currentState=ERROR_STATE;
-        motorStop();
+        currentState=ERROR_STATE; motorStop();
         publishEvent("OBSTACLE_DETECTED","Object too close");
         beeper.start(300); break;
       }
@@ -434,13 +420,11 @@ void runStateMachine(){
     case ARRIVED_AT_DESTINATION:
       drawOLED("ARRIVED",destStr(currentDest),"Ambil barang...");
       if(tArrivedAt==0) tArrivedAt=millis();
-      // Mock: auto unload setelah 3 detik
-      if(millis()-tArrivedAt>3000){ objectDetected=false; }
+      if(millis()-tArrivedAt>3000) objectDetected=false;
       if(!objectDetected){
         publishEvent("UNLOADED","Cargo picked up");
         currentState=RETURN_TO_BASE;
-        tArrivedAt=0;
-        beeper.start(150);
+        tArrivedAt=0; beeper.start(150);
       } else if(millis()-tArrivedAt>30000){
         publishEvent("WAITING_PICKUP","Timeout waiting");
         tArrivedAt=millis();
@@ -452,11 +436,8 @@ void runStateMachine(){
       static unsigned long tReturn=0;
       if(tReturn==0) tReturn=millis();
       if(millis()-tReturn>2000){
-        currentState=IDLE;
-        currentDest=DEST_NONE;
-        tReturn=0;
-        digitalWrite(PIN_LED,LOW);
-        // Kalau kembali karena mode manual → masuk MANUAL_OVERRIDE
+        currentState=IDLE; currentDest=DEST_NONE;
+        tReturn=0; digitalWrite(PIN_LED,LOW);
         if(currentMode==MODE_MANUAL) currentState=MANUAL_OVERRIDE;
         publishEvent("RETURNED","AGV back at base");
       }
@@ -465,19 +446,11 @@ void runStateMachine(){
 
     case MANUAL_OVERRIDE:
       drawOLED("MANUAL","Mode manual","WASD/Dashboard");
-      // Tombol fisik untuk keluar manual
       break;
 
     case ERROR_STATE:
-      digitalWrite(PIN_LED,LOW);
-      motorStop();
-      drawOLED("!! ERROR !!","Tekan tombol","untuk reset");
-      if(buttonPressed){
-        emergencyStop=false;
-        currentState=IDLE;
-        currentDest=DEST_NONE;
-        publishEvent("RESET","Error cleared by button");
-      }
+      digitalWrite(PIN_LED,LOW); motorStop();
+      drawOLED("!! ERROR !!","Dashboard:","Reset Error");
       break;
 
     default: currentState=IDLE; break;
@@ -494,10 +467,8 @@ void loop(){
   }
 
   beeper.tick();
-
   distanceCm=readDistance();
 
-  // Loadcell — hanya baca saat mode AUTO/PICKUP
   if(currentMode!=MODE_MANUAL){
     if(scale.is_ready()){
       loadGrams=scale.get_units(1);
