@@ -56,6 +56,13 @@
         font-size: 13px;
         overflow: hidden;
       }
+      @media (max-width: 768px) {
+        html,
+        body {
+          overflow: auto;
+          font-size: 12px;
+        }
+      }
       ::-webkit-scrollbar {
         width: 3px;
       }
@@ -67,32 +74,43 @@
         border-radius: 2px;
       }
 
-      /* ── App layout ──────────────────────────────────────────────────────────── */
+      /* ── App layout ── */
       .app {
         display: grid;
         grid-template-rows: 48px 34px 1fr;
         height: 100vh;
         overflow: hidden;
       }
+      @media (max-width: 768px) {
+        .app {
+          height: auto;
+          min-height: 100vh;
+          overflow: auto;
+          grid-template-rows: 48px 34px auto;
+        }
+      }
 
-      /* ── Header ──────────────────────────────────────────────────────────────── */
+      /* ── Header ── */
       header {
         background: var(--bg2);
         border-bottom: 1px solid var(--border);
         display: flex;
         align-items: center;
-        padding: 0 16px;
-        gap: 14px;
+        padding: 0 12px;
+        gap: 10px;
         z-index: 10;
+        flex-wrap: nowrap;
+        overflow: hidden;
       }
       .brand {
         display: flex;
         align-items: baseline;
-        gap: 8px;
+        gap: 6px;
+        flex-shrink: 0;
       }
       .brand-name {
         font-family: var(--mono);
-        font-size: 20px;
+        font-size: 18px;
         font-weight: 700;
         letter-spacing: 0.15em;
         color: var(--cyan);
@@ -101,14 +119,25 @@
       .brand-tag {
         font-size: 9px;
         font-weight: 700;
-        letter-spacing: 0.25em;
+        letter-spacing: 0.2em;
         color: var(--text-dim);
         text-transform: uppercase;
+      }
+      @media (max-width: 480px) {
+        .brand-tag {
+          display: none;
+        }
       }
       .h-sep {
         width: 1px;
         height: 20px;
         background: var(--border2);
+        flex-shrink: 0;
+      }
+      @media (max-width: 480px) {
+        .h-sep {
+          display: none;
+        }
       }
       .h-pill {
         display: flex;
@@ -117,6 +146,12 @@
         font-family: var(--mono);
         font-size: 10px;
         color: var(--text-mid);
+        flex-shrink: 0;
+      }
+      @media (max-width: 600px) {
+        .h-pill {
+          font-size: 9px;
+        }
       }
       .h-pill .dot {
         width: 6px;
@@ -124,6 +159,7 @@
         border-radius: 50%;
         background: var(--text-dim);
         transition: all 0.3s;
+        flex-shrink: 0;
       }
       .h-pill.on .dot {
         background: var(--green);
@@ -145,12 +181,14 @@
       .h-state {
         margin-left: auto;
         font-family: var(--mono);
-        font-size: 11px;
-        padding: 3px 10px;
+        font-size: 10px;
+        padding: 3px 8px;
         border-radius: 2px;
         border: 1px solid var(--border2);
         color: var(--text-mid);
         transition: all 0.3s;
+        white-space: nowrap;
+        flex-shrink: 0;
       }
       .h-state.FOLLOW_LINE {
         color: var(--cyan);
@@ -187,13 +225,19 @@
       .h-bat {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
         font-family: var(--mono);
         font-size: 10px;
         color: var(--text-dim);
+        flex-shrink: 0;
+      }
+      @media (max-width: 480px) {
+        .h-bat span:first-child {
+          display: none;
+        }
       }
       .bat-track {
-        width: 30px;
+        width: 26px;
         height: 10px;
         border: 1px solid var(--border2);
         border-radius: 1px;
@@ -210,9 +254,15 @@
         font-family: var(--mono);
         font-size: 10px;
         color: var(--text-dim);
+        flex-shrink: 0;
+      }
+      @media (max-width: 480px) {
+        .h-clock {
+          display: none;
+        }
       }
 
-      /* ── Tab bar ─────────────────────────────────────────────────────────────── */
+      /* ── Tab bar ── */
       .tabbar {
         background: var(--bg2);
         border-bottom: 1px solid var(--border);
@@ -222,7 +272,7 @@
         gap: 0;
       }
       .tab {
-        padding: 0 18px;
+        padding: 0 16px;
         height: 34px;
         display: flex;
         align-items: center;
@@ -243,7 +293,7 @@
         border-bottom-color: var(--cyan);
       }
 
-      /* ── Tab content ─────────────────────────────────────────────────────────── */
+      /* ── Tab content ── */
       .tab-content {
         display: none;
         height: 100%;
@@ -253,8 +303,14 @@
         display: flex;
         flex-direction: column;
       }
+      @media (max-width: 768px) {
+        .tab-content {
+          height: auto;
+          overflow: visible;
+        }
+      }
 
-      /* ── Control tab: main grid ──────────────────────────────────────────────── */
+      /* ── Control tab: main grid ── */
       .ctrl-grid {
         display: grid;
         grid-template-columns: 260px 1fr 220px;
@@ -264,6 +320,19 @@
         flex: 1;
         overflow: hidden;
       }
+      @media (max-width: 1024px) {
+        .ctrl-grid {
+          grid-template-columns: 220px 1fr 200px;
+        }
+      }
+      @media (max-width: 768px) {
+        .ctrl-grid {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto auto auto auto auto;
+          overflow: visible;
+          flex: none;
+        }
+      }
       .panel {
         background: var(--bg2);
         padding: 14px;
@@ -271,6 +340,19 @@
         display: flex;
         flex-direction: column;
         gap: 10px;
+      }
+      @media (max-width: 768px) {
+        .panel {
+          overflow: visible;
+        }
+        #p-log {
+          grid-column: 1 !important;
+          grid-row: auto !important;
+        }
+        #p-event {
+          grid-column: 1 !important;
+          grid-row: auto !important;
+        }
       }
       .ptitle {
         font-size: 8px;
@@ -338,6 +420,11 @@
         justify-content: center;
         min-height: 0;
       }
+      @media (max-width: 768px) {
+        .arena-wrap {
+          min-height: 200px;
+        }
+      }
       #arena-svg {
         width: 100%;
         max-width: 210px;
@@ -380,6 +467,12 @@
         align-items: center;
         min-height: 0;
       }
+      @media (max-width: 768px) {
+        .ctrl-body {
+          min-height: auto;
+          padding: 10px 0;
+        }
+      }
       .dest-label {
         font-size: 9px;
         font-weight: 700;
@@ -407,6 +500,12 @@
         transition: all 0.15s;
         position: relative;
         overflow: hidden;
+      }
+      @media (max-width: 480px) {
+        .btn-dest {
+          width: 60px;
+          height: 60px;
+        }
       }
       .btn-dest::after {
         content: "";
@@ -458,6 +557,8 @@
       .qa-row {
         display: flex;
         gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
       }
       .btn-qa {
         padding: 7px 14px;
@@ -561,6 +662,13 @@
         color: var(--text-mid);
         user-select: none;
         -webkit-user-select: none;
+      }
+      @media (max-width: 480px) {
+        .dpad-btn {
+          width: 46px;
+          height: 46px;
+          font-size: 18px;
+        }
       }
       .dpad-btn:hover {
         background: var(--bg4);
@@ -713,6 +821,12 @@
         gap: 2px;
         min-height: 0;
       }
+      @media (max-width: 768px) {
+        .log-list {
+          min-height: 150px;
+          max-height: 200px;
+        }
+      }
       .log-entry {
         display: grid;
         grid-template-columns: 80px 95px 1fr;
@@ -724,6 +838,13 @@
         background: var(--bg3);
         border-left: 2px solid var(--border2);
         animation: login 0.25s ease;
+      }
+      @media (max-width: 480px) {
+        .log-entry {
+          grid-template-columns: 65px 80px 1fr;
+          font-size: 8px;
+          gap: 4px;
+        }
       }
       @keyframes login {
         from {
@@ -805,7 +926,7 @@
       /* AGV animation */
       #agv-trail {
         stroke: var(--cyan);
-        stroke-width: 1;
+        stroke-width: 1.5;
         stroke-dasharray: 4 4;
         fill: none;
         opacity: 0;
@@ -874,7 +995,7 @@
         stroke: var(--green);
       }
 
-      /* ── Analytics tab ───────────────────────────────────────────────────────── */
+      /* ── Analytics tab ── */
       .analytics {
         flex: 1;
         overflow-y: auto;
@@ -883,13 +1004,17 @@
         flex-direction: column;
         gap: 16px;
       }
-
-      /* Range selector */
+      @media (max-width: 768px) {
+        .analytics {
+          padding: 10px;
+        }
+      }
       .range-row {
         display: flex;
         align-items: center;
         gap: 8px;
         flex-shrink: 0;
+        flex-wrap: wrap;
       }
       .range-label {
         font-size: 9px;
@@ -934,13 +1059,16 @@
         border-color: var(--green);
         color: var(--green);
       }
-
-      /* Stats summary row */
       .stats-row {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
         gap: 8px;
         flex-shrink: 0;
+      }
+      @media (max-width: 600px) {
+        .stats-row {
+          grid-template-columns: repeat(2, 1fr);
+        }
       }
       .stat-card {
         background: var(--bg2);
@@ -965,16 +1093,24 @@
         color: var(--text);
         transition: color 0.3s;
       }
+      @media (max-width: 480px) {
+        .stat-val {
+          font-size: 20px;
+        }
+      }
       .stat-sub {
         font-size: 9px;
         color: var(--text-dim);
       }
-
-      /* Chart grid */
       .chart-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 10px;
+      }
+      @media (max-width: 600px) {
+        .chart-grid {
+          grid-template-columns: 1fr;
+        }
       }
       .chart-card {
         background: var(--bg2);
@@ -996,8 +1132,11 @@
         position: relative;
         height: 180px;
       }
-
-      /* Error list */
+      @media (max-width: 480px) {
+        .chart-wrap {
+          height: 150px;
+        }
+      }
       .err-list-card {
         background: var(--bg2);
         border: 1px solid var(--border);
@@ -1040,8 +1179,6 @@
         color: var(--text-dim);
         font-size: 8px;
       }
-
-      /* Full event log */
       .evlog-card {
         background: var(--bg2);
         border: 1px solid var(--border);
@@ -1055,6 +1192,7 @@
         display: flex;
         align-items: center;
         gap: 8px;
+        flex-wrap: wrap;
       }
       .evlog-filter {
         background: var(--bg3);
@@ -1067,6 +1205,11 @@
         outline: none;
         width: 200px;
         transition: border-color 0.2s;
+      }
+      @media (max-width: 480px) {
+        .evlog-filter {
+          width: 100%;
+        }
       }
       .evlog-filter:focus {
         border-color: var(--cyan);
@@ -1129,8 +1272,6 @@
         font-size: 9px;
         color: var(--text-dim);
       }
-
-      /* Loading */
       .loading {
         font-family: var(--mono);
         font-size: 10px;
@@ -1182,6 +1323,18 @@
         color: var(--text-dim);
         opacity: 0.4;
       }
+
+      /* Mobile overflow fix for tables */
+      @media (max-width: 600px) {
+        .err-list-card,
+        .evlog-card {
+          overflow-x: auto;
+        }
+        .err-table,
+        .evlog-table {
+          min-width: 500px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -1194,7 +1347,6 @@
     </div>
 
     <div class="app">
-      <!-- Header -->
       <header>
         <div class="brand">
           <span class="brand-name">XORA</span
@@ -1221,13 +1373,12 @@
         <div class="h-clock" id="h-clock">—</div>
       </header>
 
-      <!-- Tab bar -->
       <div class="tabbar">
         <div class="tab active" data-tab="control">Control</div>
         <div class="tab" data-tab="analytics">Analytics</div>
       </div>
 
-      <!-- ── TAB: Control ─────────────────────────────────────────────────────────── -->
+      <!-- TAB: Control -->
       <div class="tab-content active" id="tab-control">
         <div class="ctrl-grid">
           <!-- Arena -->
@@ -1272,13 +1423,16 @@
                   stroke="#0d1828"
                   stroke-width=".5"
                 />
+                <!-- Track path -->
                 <path
                   d="M40,160 L40,40 L160,40 L160,160 L40,160 M100,40 L100,160"
                   stroke="#1a2e48"
                   stroke-width="2.5"
                   stroke-linecap="round"
                 />
+                <!-- Animated trail along path -->
                 <path id="agv-trail" d="" />
+                <!-- Zone highlights -->
                 <circle
                   cx="40"
                   cy="40"
@@ -1313,6 +1467,7 @@
                   stroke="none"
                   id="zone-BASE"
                 />
+                <!-- Nodes -->
                 <circle
                   cx="40"
                   cy="40"
@@ -1395,6 +1550,7 @@
                 >
                   BASE
                 </text>
+                <!-- AGV marker -->
                 <g id="agv-marker" transform="translate(100,160)">
                   <circle class="agv-pulse" r="7" />
                   <circle class="agv-ring" r="7" stroke-dasharray="6 3" />
@@ -1587,10 +1743,9 @@
         </div>
       </div>
 
-      <!-- ── TAB: Analytics ───────────────────────────────────────────────────────── -->
+      <!-- TAB: Analytics -->
       <div class="tab-content" id="tab-analytics">
         <div class="analytics">
-          <!-- Range + refresh -->
           <div class="range-row">
             <span class="range-label">Range</span>
             <button class="range-btn" data-range="1h">1H</button>
@@ -1600,8 +1755,6 @@
               ↻ Refresh
             </button>
           </div>
-
-          <!-- Stats summary -->
           <div class="stats-row">
             <div class="stat-card">
               <div class="stat-label">Events (range)</div>
@@ -1638,8 +1791,6 @@
               <div class="stat-sub">all time</div>
             </div>
           </div>
-
-          <!-- Charts row -->
           <div class="chart-grid">
             <div class="chart-card">
               <div class="chart-title">Event Distribution</div>
@@ -1658,14 +1809,10 @@
               <div class="chart-wrap"><canvas id="chart-bat"></canvas></div>
             </div>
           </div>
-
-          <!-- Error summary table -->
           <div class="err-list-card">
             <div class="ptitle">Recent Errors & Warnings</div>
             <div id="err-table-wrap"><div class="loading">Loading...</div></div>
           </div>
-
-          <!-- Full event log -->
           <div class="evlog-card">
             <div class="ptitle">Full Event Log</div>
             <div class="evlog-header">
@@ -1697,33 +1844,100 @@
         </div>
       </div>
     </div>
-    <!-- /.app -->
 
     <script>
       // ─── Config & State ───────────────────────────────────────────────────────────
       const WS_URL = "ws://localhost:3001";
+
+      // Node positions in SVG space
       const NODE_POS = {
         BASE: { x: 100, y: 160 },
         A: { x: 40, y: 40 },
         B: { x: 100, y: 40 },
         C: { x: 160, y: 40 },
       };
-      const PATHS = {
-        "BASE-A": "M100,160 L40,160 L40,40",
-        "BASE-B": "M100,160 L100,40",
-        "BASE-C": "M100,160 L160,160 L160,40",
-        "A-BASE": "M40,40 L40,160 L100,160",
-        "B-BASE": "M100,40 L100,160",
-        "C-BASE": "M160,40 L160,160 L100,160",
+
+      // Track waypoints: each key is "FROM-TO", value is array of {x,y} waypoints
+      // The AGV follows the physical track lines on the SVG
+      const TRACK_ROUTES = {
+        // From BASE along the bottom rail, up the sides to each zone
+        "BASE-A": [
+          { x: 100, y: 160 },
+          { x: 40, y: 160 },
+          { x: 40, y: 40 },
+        ],
+        "BASE-B": [
+          { x: 100, y: 160 },
+          { x: 100, y: 40 },
+        ],
+        "BASE-C": [
+          { x: 100, y: 160 },
+          { x: 160, y: 160 },
+          { x: 160, y: 40 },
+        ],
+        // Return routes
+        "A-BASE": [
+          { x: 40, y: 40 },
+          { x: 40, y: 160 },
+          { x: 100, y: 160 },
+        ],
+        "B-BASE": [
+          { x: 100, y: 40 },
+          { x: 100, y: 160 },
+        ],
+        "C-BASE": [
+          { x: 160, y: 40 },
+          { x: 160, y: 160 },
+          { x: 100, y: 160 },
+        ],
+        // Between zones (via top rail)
+        "A-B": [
+          { x: 40, y: 40 },
+          { x: 100, y: 40 },
+        ],
+        "A-C": [
+          { x: 40, y: 40 },
+          { x: 160, y: 40 },
+        ],
+        "B-A": [
+          { x: 100, y: 40 },
+          { x: 40, y: 40 },
+        ],
+        "B-C": [
+          { x: 100, y: 40 },
+          { x: 160, y: 40 },
+        ],
+        "C-A": [
+          { x: 160, y: 40 },
+          { x: 40, y: 40 },
+        ],
+        "C-B": [
+          { x: 160, y: 40 },
+          { x: 100, y: 40 },
+        ],
       };
+
+      // Build SVG path string from waypoints array
+      function waypointsToPath(pts) {
+        if (!pts || !pts.length) return "";
+        return pts
+          .map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`)
+          .join(" ");
+      }
 
       let ws = null,
         reconnectT = null;
       let currentMode = "AUTO",
         currentDest = "BASE",
         currentState = "IDLE";
-      let agvPos = { x: 100, y: 160 },
-        animFrame = null;
+
+      // AGV path animation state
+      let agvPos = { x: 100, y: 160 };
+      let animFrame = null;
+      let currentWaypoints = null; // [{x,y}, ...]
+      let animProgress = 0; // 0..1 over the whole route
+      let animStartTime = null;
+      let animDuration = 1000;
 
       // Analytics
       let analyticsRange = "24h",
@@ -1731,13 +1945,13 @@
         evlogData = [];
       let charts = {};
 
-      // ─── Clock ────────────────────────────────────────────────────────────────────
+      // ─── Clock ───────────────────────────────────────────────────────────────────
       setInterval(() => {
         document.getElementById("h-clock").textContent =
           new Date().toLocaleTimeString("en-US", { hour12: false });
       }, 1000);
 
-      // ─── Tabs ─────────────────────────────────────────────────────────────────────
+      // ─── Tabs ────────────────────────────────────────────────────────────────────
       document.querySelectorAll(".tab").forEach((t) => {
         t.addEventListener("click", () => {
           document
@@ -1750,8 +1964,6 @@
           if (t.dataset.tab === "analytics") loadAnalytics();
         });
       });
-
-      // Range buttons
       document.querySelectorAll(".range-btn").forEach((b) => {
         b.addEventListener("click", () => {
           document
@@ -1763,7 +1975,7 @@
         });
       });
 
-      // ─── WebSocket ────────────────────────────────────────────────────────────────
+      // ─── WebSocket ───────────────────────────────────────────────────────────────
       function connect() {
         if (reconnectT) {
           clearTimeout(reconnectT);
@@ -1807,7 +2019,7 @@
         ws.send(JSON.stringify({ api, params }));
       }
 
-      // ─── Message handler ──────────────────────────────────────────────────────────
+      // ─── Message handler ─────────────────────────────────────────────────────────
       function handleMsg({ topic, data }) {
         switch (topic) {
           case "xora/snapshot":
@@ -1891,6 +2103,7 @@
       function applyDest(raw) {
         if (!raw) return;
         const d = typeof raw === "string" ? raw : raw.destination || raw;
+        const prev = currentDest;
         currentDest = d;
         document.getElementById("cur-dest").textContent = d;
         ["A", "B", "C", "BASE"].forEach((n) => {
@@ -1912,7 +2125,8 @@
             .getElementById("btn-" + l)
             ?.classList.toggle("active", l === d),
         );
-        animateAGVTo(d);
+        // Animate AGV along track
+        animateAGVAlongTrack(prev, d);
       }
 
       function applyMode(raw) {
@@ -2064,7 +2278,48 @@
         while (list.children.length > 60) list.removeChild(list.lastChild);
       }
 
-      // ─── AGV Animation ────────────────────────────────────────────────────────────
+      // ─── AGV Path Animation ──────────────────────────────────────────────────────
+
+      // Compute total length of a multi-segment route
+      function routeLength(pts) {
+        let len = 0;
+        for (let i = 1; i < pts.length; i++) {
+          const dx = pts[i].x - pts[i - 1].x;
+          const dy = pts[i].y - pts[i - 1].y;
+          len += Math.sqrt(dx * dx + dy * dy);
+        }
+        return len;
+      }
+
+      // Get {x,y} at a given 0..1 progress along the route
+      function posAlongRoute(pts, t) {
+        if (!pts || pts.length === 0) return { x: 0, y: 0 };
+        if (pts.length === 1) return { ...pts[0] };
+        const total = routeLength(pts);
+        const target = total * t;
+        let covered = 0;
+        for (let i = 1; i < pts.length; i++) {
+          const dx = pts[i].x - pts[i - 1].x;
+          const dy = pts[i].y - pts[i - 1].y;
+          const seg = Math.sqrt(dx * dx + dy * dy);
+          if (covered + seg >= target || i === pts.length - 1) {
+            const rem = target - covered;
+            const frac = seg > 0 ? rem / seg : 0;
+            return {
+              x: pts[i - 1].x + dx * frac,
+              y: pts[i - 1].y + dy * frac,
+            };
+          }
+          covered += seg;
+        }
+        return { ...pts[pts.length - 1] };
+      }
+
+      // Easing
+      function easeInOut(t) {
+        return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      }
+
       function updateAGVVisual(state) {
         const m = document.getElementById("agv-marker");
         m.className = "";
@@ -2090,42 +2345,80 @@
         }
       }
 
-      function animateAGVTo(dest) {
-        const target = NODE_POS[dest] || NODE_POS.BASE;
-        const pathKey =
-          currentState === "RETURN_TO_BASE" ? dest + "-BASE" : "BASE-" + dest;
-        const pathStr = PATHS[pathKey] || PATHS["BASE-" + dest];
-        if (pathStr)
-          document.getElementById("agv-trail").setAttribute("d", pathStr);
-        moveAGVSmooth(target.x, target.y);
-      }
+      function animateAGVAlongTrack(from, to) {
+        if (from === to) return;
 
-      function moveAGVSmooth(tx, ty) {
-        const marker = document.getElementById("agv-marker");
+        // Find route waypoints
+        let key = `${from}-${to}`;
+        let waypoints = TRACK_ROUTES[key];
+
+        if (!waypoints) {
+          // Fallback: route via BASE if no direct path
+          const toBase = TRACK_ROUTES[`${from}-BASE`];
+          const fromBase = TRACK_ROUTES[`BASE-${to}`];
+          if (toBase && fromBase) {
+            // Merge: skip duplicate BASE point
+            waypoints = [...toBase, ...fromBase.slice(1)];
+          } else {
+            // Last resort: snap directly (shouldn't happen with full table)
+            const target = NODE_POS[to] || NODE_POS.BASE;
+            agvPos = { ...target };
+            document
+              .getElementById("agv-marker")
+              .setAttribute("transform", `translate(${target.x},${target.y})`);
+            return;
+          }
+        }
+
+        // Set trail path
+        document
+          .getElementById("agv-trail")
+          .setAttribute("d", waypointsToPath(waypoints));
+
+        // Store route and start animation from current position
+        // If AGV is not at the expected start, inject current pos as first waypoint
+        const dist0x = agvPos.x - waypoints[0].x;
+        const dist0y = agvPos.y - waypoints[0].y;
+        const distToStart = Math.sqrt(dist0x * dist0x + dist0y * dist0y);
+        const fullWaypoints =
+          distToStart > 2 ? [{ ...agvPos }, ...waypoints] : waypoints;
+
+        const totalDist = routeLength(fullWaypoints);
+        const speed = 80; // px per second
+        animDuration = Math.max(600, (totalDist / speed) * 1000);
+
+        currentWaypoints = fullWaypoints;
+        animProgress = 0;
+        animStartTime = null;
+
         stopAnimation();
-        const sx = agvPos.x,
-          sy = agvPos.y;
-        const dist = Math.sqrt((tx - sx) ** 2 + (ty - sy) ** 2);
-        const dur = Math.max(800, dist * 10);
-        const t0 = performance.now();
+
         function step(now) {
-          const t = Math.min(1, (now - t0) / dur);
-          const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-          const cx = sx + (tx - sx) * e,
-            cy = sy + (ty - sy) * e;
-          agvPos = { x: cx, y: cy };
-          marker.setAttribute(
-            "transform",
-            `translate(${cx.toFixed(1)},${cy.toFixed(1)})`,
-          );
-          if (t < 1) animFrame = requestAnimationFrame(step);
-          else {
-            agvPos = { x: tx, y: ty };
+          if (!animStartTime) animStartTime = now;
+          const elapsed = now - animStartTime;
+          const t = Math.min(1, elapsed / animDuration);
+          const ease = easeInOut(t);
+
+          const pos = posAlongRoute(currentWaypoints, ease);
+          agvPos = { ...pos };
+
+          document
+            .getElementById("agv-marker")
+            .setAttribute(
+              "transform",
+              `translate(${pos.x.toFixed(2)},${pos.y.toFixed(2)})`,
+            );
+
+          if (t < 1) {
+            animFrame = requestAnimationFrame(step);
+          } else {
+            agvPos = { ...currentWaypoints[currentWaypoints.length - 1] };
             animFrame = null;
           }
         }
         animFrame = requestAnimationFrame(step);
       }
+
       function stopAnimation() {
         if (animFrame) {
           cancelAnimationFrame(animFrame);
@@ -2133,7 +2426,7 @@
         }
       }
 
-      // ─── D-pad ────────────────────────────────────────────────────────────────────
+      // ─── D-pad ───────────────────────────────────────────────────────────────────
       document.querySelectorAll(".dpad-btn").forEach((btn) => {
         const cmd = btn.dataset.cmd;
         if (!cmd) return;
@@ -2200,9 +2493,7 @@
           document.getElementById("spd-val").textContent = this.value;
         });
 
-      // ─── Analytics ────────────────────────────────────────────────────────────────
-      let pendingAPI = {};
-
+      // ─── Analytics ───────────────────────────────────────────────────────────────
       function loadAnalytics() {
         requestAPI("stats_summary", { range: analyticsRange });
         requestAPI("event_counts", { range: analyticsRange });
@@ -2355,19 +2646,19 @@
           return;
         }
         wrap.innerHTML = `<table class="err-table">
-    <thead><tr><th>Code</th><th>Message</th><th>State</th><th>Dest</th><th>Time</th></tr></thead>
-    <tbody>${rows
-      .map(
-        (r) => `<tr>
-      <td class="code-cell">${r.code || "—"}</td>
-      <td>${(r.message || "").slice(0, 40)}</td>
-      <td>${r.state || "—"}</td>
-      <td>${r.destination || "—"}</td>
-      <td class="ts-cell">${new Date(r.ts).toLocaleString()}</td>
-    </tr>`,
-      )
-      .join("")}</tbody>
-  </table>`;
+          <thead><tr><th>Code</th><th>Message</th><th>State</th><th>Dest</th><th>Time</th></tr></thead>
+          <tbody>${rows
+            .map(
+              (r) => `<tr>
+            <td class="code-cell">${r.code || "—"}</td>
+            <td>${(r.message || "").slice(0, 40)}</td>
+            <td>${r.state || "—"}</td>
+            <td>${r.destination || "—"}</td>
+            <td class="ts-cell">${new Date(r.ts).toLocaleString()}</td>
+          </tr>`,
+            )
+            .join("")}</tbody>
+        </table>`;
       }
 
       function renderEventLog(rows) {
@@ -2395,21 +2686,21 @@
           return;
         }
         wrap.innerHTML = `<table class="evlog-table">
-    <thead><tr><th>ID</th><th>Code</th><th>Message</th><th>State</th><th>Dest</th><th>Source</th><th>Time</th></tr></thead>
-    <tbody>${rows
-      .map(
-        (r) => `<tr>
-      <td style="color:var(--text-dim)">${r.id}</td>
-      <td style="color:var(--amber)">${r.code || "—"}</td>
-      <td>${(r.message || "").slice(0, 50)}</td>
-      <td>${r.state || "—"}</td>
-      <td>${r.destination || "—"}</td>
-      <td style="color:var(--text-dim)">${r.source || "—"}</td>
-      <td style="color:var(--text-dim);font-size:8px">${new Date(r.ts).toLocaleString()}</td>
-    </tr>`,
-      )
-      .join("")}</tbody>
-  </table>`;
+          <thead><tr><th>ID</th><th>Code</th><th>Message</th><th>State</th><th>Dest</th><th>Source</th><th>Time</th></tr></thead>
+          <tbody>${rows
+            .map(
+              (r) => `<tr>
+            <td style="color:var(--text-dim)">${r.id}</td>
+            <td style="color:var(--amber)">${r.code || "—"}</td>
+            <td>${(r.message || "").slice(0, 50)}</td>
+            <td>${r.state || "—"}</td>
+            <td>${r.destination || "—"}</td>
+            <td style="color:var(--text-dim)">${r.source || "—"}</td>
+            <td style="color:var(--text-dim);font-size:8px">${new Date(r.ts).toLocaleString()}</td>
+          </tr>`,
+            )
+            .join("")}</tbody>
+        </table>`;
       }
 
       function changePage(dir) {
@@ -2421,7 +2712,7 @@
         .getElementById("evlog-filter")
         .addEventListener("input", renderFilteredLog);
 
-      // ─── Init ─────────────────────────────────────────────────────────────────────
+      // ─── Init ────────────────────────────────────────────────────────────────────
       connect();
     </script>
   </body>
