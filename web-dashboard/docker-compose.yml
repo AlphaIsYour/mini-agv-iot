@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  # 1. Backend Server (MQTT - WebSocket Bridge)
+  bridge-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agv_bridge_server
+    restart: unless-stopped
+    ports:
+      # Expose WebSocket port
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - agv_network
+
+  # 2. Frontend UI (Static HTML file disajikan melalui Nginx)
+  dashboard-ui:
+    image: nginx:alpine
+    container_name: agv_dashboard_ui
+    restart: unless-stopped
+    ports:
+      # Expose HTTP dashboard ke host di port 8080 (bisa disesuaikan)
+      - "8080:80"
+    volumes:
+      # Map index.html ke web root nginx untuk diserve
+      - ./index.html:/usr/share/nginx/html/index.html:ro
+    networks:
+      - agv_network
+    depends_on:
+      - bridge-server
+
+networks:
+  agv_network:
+    driver: bridge

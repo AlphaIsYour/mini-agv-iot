@@ -1,0 +1,7 @@
+node_modules
+npm-debug.log
+.dccache
+.env
+Dockerfile
+.dockerignore
+docker-compose.yml
