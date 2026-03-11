@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>XORA — Access Control</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Rajdhani:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --bg: #060810;
+        --bg2: #0a0e1a;
+        --bg3: #0f1520;
+        --border: #1a2438;
+        --border2: #223050;
+        --cyan: #00d4ff;
+        --cyan-dim: #004a5a;
+        --cyan-glow: rgba(0, 212, 255, 0.12);
+        --cyan-glow2: rgba(0, 212, 255, 0.06);
+        --green: #00ff88;
+        --red: #ff3366;
+        --amber: #ffb300;
+        --text: #c8daf0;
+        --text-mid: #6a8aaa;
+        --text-dim: #3a5070;
+        --mono: "JetBrains Mono", monospace;
+        --ui: "Rajdhani", sans-serif;
+      }
+      html,
+      body {
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--ui);
+        overflow: hidden;
+      }
+
+      /* ── Animated grid background ── */
+      .bg-grid {
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+        pointer-events: none;
+        z-index: 0;
+      }
+      .bg-glow {
+        position: fixed;
+        top: -20%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 600px;
+        height: 400px;
+        background: radial-gradient(
+          ellipse,
+          rgba(0, 212, 255, 0.06) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+        z-index: 0;
+        animation: glow-pulse 4s ease-in-out infinite;
+      }
+      @keyframes glow-pulse {
+        0%,
+        100% {
+          opacity: 0.7;
+          transform: translateX(-50%) scale(1);
+        }
+        50% {
+          opacity: 1;
+          transform: translateX(-50%) scale(1.08);
+        }
+      }
+
+      /* ── Scan line overlay ── */
+      .scanlines {
+        position: fixed;
+        inset: 0;
+        background: repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 2px,
+          rgba(0, 0, 0, 0.03) 2px,
+          rgba(0, 0, 0, 0.03) 4px
+        );
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* ── Corner decorators ── */
+      .corner {
+        position: fixed;
+        width: 60px;
+        height: 60px;
+        z-index: 1;
+      }
+      .corner::before,
+      .corner::after {
+        content: "";
+        position: absolute;
+        background: var(--cyan);
+      }
+      .corner::before {
+        width: 1px;
+        height: 100%;
+        opacity: 0.3;
+      }
+      .corner::after {
+        width: 100%;
+        height: 1px;
+        opacity: 0.3;
+      }
+      .corner.tl {
+        top: 20px;
+        left: 20px;
+      }
+      .corner.tl::before {
+        top: 0;
+        left: 0;
+      }
+      .corner.tl::after {
+        top: 0;
+        left: 0;
+      }
+      .corner.tr {
+        top: 20px;
+        right: 20px;
+      }
+      .corner.tr::before {
+        top: 0;
+        right: 0;
+      }
+      .corner.tr::after {
+        top: 0;
+        right: 0;
+      }
+      .corner.bl {
+        bottom: 20px;
+        left: 20px;
+      }
+      .corner.bl::before {
+        bottom: 0;
+        left: 0;
+      }
+      .corner.bl::after {
+        bottom: 0;
+        left: 0;
+      }
+      .corner.br {
+        bottom: 20px;
+        right: 20px;
+      }
+      .corner.br::before {
+        bottom: 0;
+        right: 0;
+      }
+      .corner.br::after {
+        bottom: 0;
+        right: 0;
+      }
+
+      /* ── Main layout ── */
+      .page {
+        position: relative;
+        z-index: 2;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 32px;
+        padding: 20px;
+      }
+
+      /* ── Brand ── */
+      .brand {
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        animation: fade-down 0.6s ease both;
+      }
+      .brand-logo {
+        display: flex;
+        align-items: center;
+        gap: 0;
+      }
+      .brand-name {
+        font-family: var(--mono);
+        font-size: 48px;
+        font-weight: 700;
+        letter-spacing: 0.25em;
+        color: var(--cyan);
+        text-shadow:
+          0 0 30px rgba(0, 212, 255, 0.5),
+          0 0 60px rgba(0, 212, 255, 0.2);
+        line-height: 1;
+      }
+      .brand-ver {
+        font-family: var(--mono);
+        font-size: 9px;
+        color: var(--cyan-dim);
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        border: 1px solid var(--cyan-dim);
+        padding: 2px 8px;
+        border-radius: 2px;
+        margin-top: 4px;
+        align-self: flex-end;
+      }
+      .brand-sub {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+      }
+
+      /* ── Login card ── */
+      .card {
+        width: 100%;
+        max-width: 380px;
+        background: var(--bg2);
+        border: 1px solid var(--border2);
+        border-radius: 4px;
+        overflow: hidden;
+        box-shadow:
+          0 0 0 1px rgba(0, 212, 255, 0.05),
+          0 20px 60px rgba(0, 0, 0, 0.6),
+          0 0 40px rgba(0, 212, 255, 0.04);
+        animation: fade-up 0.6s ease 0.1s both;
+      }
+      .card-header {
+        background: var(--bg3);
+        border-bottom: 1px solid var(--border);
+        padding: 12px 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .card-header-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--cyan);
+        box-shadow: 0 0 8px var(--cyan);
+        animation: pdot 2s infinite;
+      }
+      @keyframes pdot {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+      .card-header-title {
+        font-family: var(--mono);
+        font-size: 9px;
+        letter-spacing: 0.25em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+      }
+      .card-header-sep {
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+      .card-header-id {
+        font-family: var(--mono);
+        font-size: 8px;
+        color: var(--text-dim);
+        opacity: 0.5;
+      }
+      .card-body {
+        padding: 28px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      /* ── Form fields ── */
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .field-label {
+        font-size: 8px;
+        font-weight: 700;
+        letter-spacing: 0.25em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .field-label::before {
+        content: "//";
+        color: var(--cyan-dim);
+        font-family: var(--mono);
+      }
+      .field-input-wrap {
+        position: relative;
+      }
+      .field-input {
+        width: 100%;
+        background: var(--bg3);
+        border: 1px solid var(--border2);
+        border-radius: 3px;
+        padding: 10px 14px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--text);
+        outline: none;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+        letter-spacing: 0.05em;
+        -webkit-text-security: none;
+      }
+      .field-input:focus {
+        border-color: var(--cyan);
+        box-shadow:
+          0 0 0 1px rgba(0, 212, 255, 0.15),
+          0 0 16px rgba(0, 212, 255, 0.05);
+      }
+      .field-input::placeholder {
+        color: var(--text-dim);
+      }
+      .field-input.error {
+        border-color: var(--red);
+      }
+
+      /* ── Toggle password visibility ── */
+      .toggle-pw {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--text-dim);
+        font-family: var(--mono);
+        font-size: 9px;
+        letter-spacing: 0.1em;
+        padding: 2px 4px;
+        transition: color 0.2s;
+      }
+      .toggle-pw:hover {
+        color: var(--cyan);
+      }
+
+      /* ── Submit button ── */
+      .btn-submit {
+        width: 100%;
+        padding: 12px;
+        background: transparent;
+        border: 1px solid var(--cyan);
+        border-radius: 3px;
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--cyan);
+        cursor: pointer;
+        transition: all 0.2s;
+        position: relative;
+        overflow: hidden;
+      }
+      .btn-submit::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: var(--cyan-glow);
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+      .btn-submit:hover::before {
+        opacity: 1;
+      }
+      .btn-submit:hover {
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.25);
+        transform: translateY(-1px);
+      }
+      .btn-submit:active {
+        transform: translateY(0);
+      }
+      .btn-submit:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .btn-submit.loading {
+        color: transparent;
+      }
+      .btn-submit.loading::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 16px;
+        height: 16px;
+        border: 1px solid var(--border2);
+        border-top-color: var(--cyan);
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: translate(-50%, -50%) rotate(360deg);
+        }
+      }
+
+      /* ── Error message ── */
+      .error-msg {
+        display: none;
+        background: rgba(255, 51, 102, 0.06);
+        border: 1px solid rgba(255, 51, 102, 0.3);
+        border-radius: 3px;
+        padding: 8px 12px;
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--red);
+        letter-spacing: 0.05em;
+        animation: shake 0.3s ease;
+      }
+      .error-msg.visible {
+        display: block;
+      }
+      @keyframes shake {
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        20% {
+          transform: translateX(-6px);
+        }
+        60% {
+          transform: translateX(6px);
+        }
+      }
+
+      /* ── Footer ── */
+      .card-footer {
+        border-top: 1px solid var(--border);
+        padding: 10px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .footer-txt {
+        font-family: var(--mono);
+        font-size: 8px;
+        color: var(--text-dim);
+        letter-spacing: 0.1em;
+      }
+      .footer-status {
+        font-family: var(--mono);
+        font-size: 8px;
+        color: var(--text-dim);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .status-dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 4px var(--green);
+      }
+
+      /* ── System info row ── */
+      .sys-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        animation: fade-up 0.6s ease 0.2s both;
+      }
+      .sys-chip {
+        font-family: var(--mono);
+        font-size: 8px;
+        color: var(--text-dim);
+        border: 1px solid var(--border);
+        padding: 3px 8px;
+        border-radius: 2px;
+        letter-spacing: 0.1em;
+      }
+
+      /* ── Animations ── */
+      @keyframes fade-up {
+        from {
+          opacity: 0;
+          transform: translateY(16px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes fade-down {
+        from {
+          opacity: 0;
+          transform: translateY(-12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* ── Clock ── */
+      .live-clock {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--text-dim);
+        letter-spacing: 0.2em;
+        animation: fade-up 0.6s ease 0.3s both;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+    <div class="scanlines"></div>
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+
+    <div class="page">
+      <div class="brand">
+        <div class="brand-logo">
+          <div class="brand-name">XORA</div>
+          <div class="brand-ver">v4</div>
+        </div>
+        <div class="brand-sub">AGV Control Terminal — Access Control</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-header-dot"></div>
+          <div class="card-header-title">Authentication Required</div>
+          <div class="card-header-sep"></div>
+          <div class="card-header-id" id="session-id">SID:——</div>
+        </div>
+        <div class="card-body">
+          <div class="error-msg" id="err-msg">Invalid credentials</div>
+
+          <div class="field">
+            <div class="field-label">Username</div>
+            <div class="field-input-wrap">
+              <input
+                class="field-input"
+                type="text"
+                id="inp-user"
+                placeholder="username"
+                autocomplete="username"
+                spellcheck="false"
+                maxlength="64"
+              />
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="field-label">Password</div>
+            <div class="field-input-wrap">
+              <input
+                class="field-input"
+                type="password"
+                id="inp-pass"
+                placeholder="••••••••"
+                autocomplete="current-password"
+                maxlength="128"
+              />
+              <button
+                class="toggle-pw"
+                type="button"
+                id="toggle-pw"
+                tabindex="-1"
+              >
+                SHOW
+              </button>
+            </div>
+          </div>
+
+          <button class="btn-submit" id="btn-login">AUTHENTICATE</button>
+        </div>
+        <div class="card-footer">
+          <span class="footer-txt">XORA AGV TERMINAL / SECURE ACCESS</span>
+          <span class="footer-status">
+            <span class="status-dot"></span>
+            <span>SYSTEM READY</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="sys-row">
+        <span class="sys-chip">BCRYPT:SALT-12</span>
+        <span class="sys-chip">SESSION:8H</span>
+        <span class="sys-chip">CSRF:ENABLED</span>
+        <span class="sys-chip">RATE-LIMIT:10/15MIN</span>
+      </div>
+
+      <div class="live-clock" id="live-clock">——:——:——</div>
+    </div>
+
+    <script>
+      // ── Clock ────────────────────────────────────────────────────────────────
+      const clockEl = document.getElementById("live-clock");
+      function tick() {
+        clockEl.textContent = new Date().toLocaleTimeString("en-US", {
+          hour12: false,
+        });
+      }
+      tick();
+      setInterval(tick, 1000);
+
+      // ── Session ID hint (just cosmetic) ─────────────────────────────────────
+      document.getElementById("session-id").textContent =
+        "SID:" + Math.random().toString(36).slice(2, 8).toUpperCase();
+
+      // ── Password toggle ──────────────────────────────────────────────────────
+      const passEl = document.getElementById("inp-pass");
+      const toggleEl = document.getElementById("toggle-pw");
+      toggleEl.addEventListener("click", () => {
+        const show = passEl.type === "password";
+        passEl.type = show ? "text" : "password";
+        toggleEl.textContent = show ? "HIDE" : "SHOW";
+      });
+
+      // ── CSRF token fetch ─────────────────────────────────────────────────────
+      let csrfToken = null;
+      async function fetchCSRF() {
+        try {
+          const r = await fetch("/api/csrf-token");
+          const d = await r.json();
+          csrfToken = d.csrfToken;
+        } catch {}
+      }
+      fetchCSRF();
+
+      // ── Login handler ────────────────────────────────────────────────────────
+      const errEl = document.getElementById("err-msg");
+      const btnEl = document.getElementById("btn-login");
+      const userEl = document.getElementById("inp-user");
+
+      async function doLogin() {
+        const username = userEl.value.trim();
+        const password = passEl.value;
+
+        if (!username || !password) {
+          showError("Username dan password wajib diisi.");
+          return;
+        }
+
+        btnEl.classList.add("loading");
+        btnEl.disabled = true;
+        errEl.classList.remove("visible");
+        userEl.classList.remove("error");
+        passEl.classList.remove("error");
+
+        try {
+          if (!csrfToken) await fetchCSRF();
+
+          const res = await fetch("/login", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              username,
+              password,
+              _csrf: csrfToken || "",
+            }),
+          });
+
+          const data = await res.json();
+
+          if (res.ok && data.ok) {
+            btnEl.textContent = "✓ ACCESS GRANTED";
+            btnEl.style.borderColor = "var(--green)";
+            btnEl.style.color = "var(--green)";
+            setTimeout(() => {
+              window.location.href = data.redirect || "/";
+            }, 400);
+          } else {
+            showError(data.error || "Authentication failed.");
+            userEl.classList.add("error");
+            passEl.classList.add("error");
+            passEl.value = "";
+            // Refresh CSRF token setelah gagal
+            await fetchCSRF();
+          }
+        } catch {
+          showError("Koneksi ke server gagal. Periksa server.js berjalan.");
+        } finally {
+          btnEl.classList.remove("loading");
+          btnEl.disabled = false;
+        }
+      }
+
+      function showError(msg) {
+        errEl.textContent = msg;
+        errEl.classList.remove("visible");
+        void errEl.offsetWidth; // trigger reflow untuk restart animation
+        errEl.classList.add("visible");
+      }
+
+      btnEl.addEventListener("click", doLogin);
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") doLogin();
+      });
+
+      // Auto-focus
+      userEl.focus();
+    </script>
+  </body>
+</html>

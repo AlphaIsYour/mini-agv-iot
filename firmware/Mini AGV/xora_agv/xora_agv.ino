@@ -1,6 +1,9 @@
 // ============================================================
-//  XORA Mini AGV — Firmware v0.4
-//  + WiFiManager: auto hotspot jika WiFi gagal
+//  XORA Mini AGV — Firmware v0.5
+//  + Line following (3 IR sensor)
+//  + 180° turn di destination dan base
+//  + Auto mode tidak perlu loadcell dulu
+//  + Semua fungsionalitas v0.4 tetap ada
 // ============================================================
 
 #include <Wire.h>
@@ -13,11 +16,11 @@
 #include <ArduinoJson.h>
 
 // ─── MQTT ─────────────────────────────────────────────────────────────────────
-const char* MQTT_BROKER   = "broker.hivemq.com";
-const int   MQTT_PORT     = 1883;
+const char* MQTT_BROKER    = "broker.hivemq.com";
+const int   MQTT_PORT      = 1883;
 const char* MQTT_CLIENT_ID = "xora-agv-001";
 
-// ─── MQTT Topics ──────────────────────────────────────────────────────────────
+// ─── Topics ───────────────────────────────────────────────────────────────────
 #define TOPIC_STATE       "xora/state"
 #define TOPIC_DESTINATION "xora/destination"
 #define TOPIC_MODE        "xora/mode"
@@ -30,27 +33,46 @@ const char* MQTT_CLIENT_ID = "xora-agv-001";
 #define TOPIC_MANUAL_CMD  "agv/xora/cmd"
 
 // ─── PIN ──────────────────────────────────────────────────────────────────────
+// Sensor jarak
 #define TRIG_PIN    18
 #define ECHO_PIN    19
+
+// Loadcell
 #define HX_DT       35
 #define HX_SCK      32
-#define PIN_LED     2
-#define PIN_BUZZER  33
 
+// Output
+#define PIN_LED     2
+#define PIN_BUZZER  33   // ⚠ bukan 35 (konflik HX_DT)
+
+// Motor TB6612FNG
 #define PIN_STBY  4
-#define PIN_PWMA  25
+#define PIN_PWMA  25   // Motor KIRI  (A01/A02)
 #define PIN_AIN1  26
 #define PIN_AIN2  27
-#define PIN_PWMB  14
+#define PIN_PWMB  14   // Motor KANAN (B01/B02)
 #define PIN_BIN1  12
 #define PIN_BIN2  13
 
-#define MOTOR_SPEED_DEFAULT  180
-#define MOTOR_SPEED_TURN     130
+// IR Line Sensor — input only pins (no internal pullup)
+#define IR_LEFT   34   // GPIO34
+#define IR_MID    36   // GPIO36
+#define IR_RIGHT  39   // GPIO39
+// LOW (0) = deteksi garis hitam
+// HIGH(1) = permukaan putih
+
+// ─── Motor speed ──────────────────────────────────────────────────────────────
+#define SPD_NORMAL   110   // turunkan dari 160
+#define SPD_TURN     80   // turunkan dari 120  
+#define SPD_SPIN     100   // turunkan dari 150
+
+// Durasi putar 180° — SESUAIKAN dengan AGV fisik
+// Mulai dengan 900ms, naikkan/turunkan 100ms sampai pas
+#define TURN_180_MS  900
 
 // ─── OLED ─────────────────────────────────────────────────────────────────────
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
+#define SCREEN_WIDTH  128
+#define SCREEN_HEIGHT  64
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // ─── Hardware ─────────────────────────────────────────────────────────────────
@@ -60,11 +82,15 @@ PubSubClient mqtt(wifiClient);
 
 // ─── State Machine ────────────────────────────────────────────────────────────
 enum AGVState {
-  IDLE, READY, FOLLOW_LINE,
-  DECISION_AT_INTERSECTION,
-  ARRIVED_AT_DESTINATION,
+  IDLE,
+  READY,
+  FOLLOW_LINE,              // maju mengikuti garis ke tujuan
+  TURN_180_AT_DEST,         // putar 180° di titik tujuan
+  RETURN_TO_BASE,           // balik mengikuti garis ke base
+  TURN_180_AT_BASE,         // putar 180° di base setelah kembali
+  ARRIVED_AT_DESTINATION,   // (dipakai MQTT dashboard)
   LOAD_UNLOAD,
-  RETURN_TO_BASE,
+  DECISION_AT_INTERSECTION,
   MANUAL_OVERRIDE,
   ERROR_STATE
 };
@@ -78,19 +104,23 @@ AGVMode     currentMode  = MODE_AUTO;
 AGVState    prevState    = (AGVState)-1;
 
 // ─── Runtime vars ─────────────────────────────────────────────────────────────
-bool  objectDetected = false;
 bool  emergencyStop  = false;
 bool  buttonPressed  = false;
 float distanceCm     = 0;
 float loadGrams      = 0;
 
-// ─── Timing ───────────────────────────────────────────────────────────────────
+// IR readings
+bool irL=false, irM=false, irR=false;
+
+// Timing
 unsigned long tLastSensorPublish = 0;
 unsigned long tLastMqttReconnect = 0;
-unsigned long tArrivedAt         = 0;
+unsigned long tTurn180Start      = 0;   // kapan mulai putar 180°
+unsigned long tLineLost          = 0;   // kapan garis hilang
 
 const unsigned long SENSOR_INTERVAL = 500;
 const unsigned long MQTT_RETRY_MS   = 3000;
+const unsigned long LINE_LOST_MS    = 2000; // toleransi garis hilang
 
 // ─── Beeper ───────────────────────────────────────────────────────────────────
 struct Beeper {
@@ -110,32 +140,64 @@ void motorSetup(){
   motorStop();
 }
 
-void motorRight(int speed,int dir){
+void motorLeft(int speed,int dir){
   if(dir==0||speed==0){digitalWrite(PIN_AIN1,LOW);digitalWrite(PIN_AIN2,LOW);analogWrite(PIN_PWMA,0);return;}
   digitalWrite(PIN_AIN1,dir==1?HIGH:LOW);
   digitalWrite(PIN_AIN2,dir==1?LOW:HIGH);
   analogWrite(PIN_PWMA,speed);
 }
 
-void motorLeft(int speed,int dir){
+void motorRight(int speed,int dir){
   if(dir==0||speed==0){digitalWrite(PIN_BIN1,LOW);digitalWrite(PIN_BIN2,LOW);analogWrite(PIN_PWMB,0);return;}
   digitalWrite(PIN_BIN1,dir==1?HIGH:LOW);
   digitalWrite(PIN_BIN2,dir==1?LOW:HIGH);
   analogWrite(PIN_PWMB,speed);
 }
 
-void motorForward(int speed=MOTOR_SPEED_DEFAULT){ motorLeft(speed,1);motorRight(speed,1); }
-void motorBackward(int speed=MOTOR_SPEED_DEFAULT){ motorLeft(speed,-1);motorRight(speed,-1); }
-void motorTurnLeft(int speed=MOTOR_SPEED_TURN){ motorLeft(speed,-1);motorRight(speed,1); }
-void motorTurnRight(int speed=MOTOR_SPEED_TURN){ motorLeft(speed,1);motorRight(speed,-1); }
+void motorForward (int s=SPD_NORMAL){ motorLeft(s,1); motorRight(s,1); }
+void motorBackward(int s=SPD_NORMAL){ motorLeft(s,-1);motorRight(s,-1);}
+// Putar kanan: roda kiri maju, roda kanan mundur
+void motorSpinRight(int s=SPD_SPIN){ motorLeft(s,1); motorRight(s,-1);}
+// Putar kiri: roda kiri mundur, roda kanan maju
+void motorSpinLeft (int s=SPD_SPIN){ motorLeft(s,-1);motorRight(s,1); }
+// Koreksi belok saat line following
+void motorVeerLeft (int s=SPD_TURN){ motorLeft(s/2,1);motorRight(s,1); }
+void motorVeerRight(int s=SPD_TURN){ motorLeft(s,1); motorRight(s/2,1);}
 void motorStop(){ motorLeft(0,0);motorRight(0,0); }
 
 void handleManualCommand(const char* cmd){
   if     (strcmp(cmd,"FORWARD") ==0) motorForward();
   else if(strcmp(cmd,"BACKWARD")==0) motorBackward();
-  else if(strcmp(cmd,"LEFT")    ==0) motorTurnLeft();
-  else if(strcmp(cmd,"RIGHT")   ==0) motorTurnRight();
+  else if(strcmp(cmd,"LEFT")    ==0) motorSpinLeft();
+  else if(strcmp(cmd,"RIGHT")   ==0) motorSpinRight();
   else if(strcmp(cmd,"STOP")    ==0) motorStop();
+}
+
+void readIR(){
+  irL = (digitalRead(IR_LEFT)  == HIGH);
+  irM = (digitalRead(IR_MID)   == HIGH);
+  irR = (digitalRead(IR_RIGHT) == HIGH);
+}
+
+
+// Garis horizontal terdeteksi jika ketiga sensor ON
+bool isHorizontalLine(){
+  return irL && irM && irR;
+}
+
+// Line following logic — return true jika masih ada garis
+bool doLineFollow(){
+  readIR();
+  if(isHorizontalLine()) return true;
+  if(!irL && !irM && !irR) return false;
+
+  if(!irL && irM && !irR)  motorForward(SPD_NORMAL);      // lurus
+  else if(irL && irM && !irR)  motorVeerRight(SPD_TURN);  // serong kiri → koreksi kanan
+  else if(!irL && irM && irR)  motorVeerLeft(SPD_TURN);   // serong kanan → koreksi kiri
+  else if(irL && !irM && !irR) motorSpinRight(80);        // belok tajam pelan
+  else if(!irL && !irM && irR) motorSpinLeft(80);         // belok tajam pelan
+  else motorForward(SPD_NORMAL);
+  return true;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -152,10 +214,12 @@ const char* stateStr(AGVState s){
     case IDLE:                     return "IDLE";
     case READY:                    return "READY";
     case FOLLOW_LINE:              return "FOLLOW_LINE";
-    case DECISION_AT_INTERSECTION: return "DECISION_AT_INTERSECTION";
+    case TURN_180_AT_DEST:         return "ARRIVED_AT_DESTINATION"; // dashboard baca ini
+    case RETURN_TO_BASE:           return "RETURN_TO_BASE";
+    case TURN_180_AT_BASE:         return "RETURN_TO_BASE";
     case ARRIVED_AT_DESTINATION:   return "ARRIVED_AT_DESTINATION";
     case LOAD_UNLOAD:              return "LOAD_UNLOAD";
-    case RETURN_TO_BASE:           return "RETURN_TO_BASE";
+    case DECISION_AT_INTERSECTION: return "DECISION_AT_INTERSECTION";
     case MANUAL_OVERRIDE:          return "MANUAL_OVERRIDE";
     case ERROR_STATE:              return "ERROR_STATE";
     default:                       return "UNKNOWN";
@@ -189,12 +253,13 @@ void publishState(){
 }
 
 void publishSensors(){
-  char buf[32];
+  char buf[64];
   snprintf(buf,sizeof(buf),"%.1f",distanceCm); mqtt.publish(TOPIC_SENSOR_US,buf);
   snprintf(buf,sizeof(buf),"%.0f",loadGrams);  mqtt.publish(TOPIC_SENSOR_LC,buf);
-  mqtt.publish(TOPIC_SENSOR_IR,
-    objectDetected?"{\"s1\":0,\"s2\":0,\"s3\":1,\"s4\":0,\"s5\":0}"
-                  :"{\"s1\":0,\"s2\":0,\"s3\":0,\"s4\":0,\"s5\":0}");
+  // Publish IR ke dashboard
+  snprintf(buf,sizeof(buf),"{\"s1\":%d,\"s2\":%d,\"s3\":%d,\"s4\":0,\"s5\":0}",
+    irL?1:0, irM?1:0, irR?1:0);
+  mqtt.publish(TOPIC_SENSOR_IR,buf);
 }
 
 void publishEvent(const char* code,const char* message){
@@ -212,6 +277,7 @@ void onMqttMessage(char* topic,byte* payload,unsigned int length){
   memcpy(msg,payload,length); msg[length]='\0';
   Serial.printf("[MQTT IN] %s: %s\n",topic,msg);
 
+  // Manual motor
   if(strcmp(topic,TOPIC_MANUAL_CMD)==0){
     if(currentMode==MODE_MANUAL) handleManualCommand(msg);
     return;
@@ -224,6 +290,7 @@ void onMqttMessage(char* topic,byte* payload,unsigned int length){
   const char* cmd=doc["command"];
   if(!cmd) return;
 
+  // Emergency stop
   if(strcmp(cmd,"EMERGENCY_STOP")==0){
     emergencyStop=true; motorStop();
     currentState=ERROR_STATE;
@@ -231,6 +298,7 @@ void onMqttMessage(char* topic,byte* payload,unsigned int length){
     beeper.start(800); return;
   }
 
+  // Mode AUTO
   if(strcmp(cmd,"SET_MODE_AUTO")==0){
     motorStop();
     currentMode=MODE_AUTO; currentState=IDLE; currentDest=DEST_NONE;
@@ -240,9 +308,10 @@ void onMqttMessage(char* topic,byte* payload,unsigned int length){
     return;
   }
 
+  // Mode MANUAL
   if(strcmp(cmd,"SET_MODE_MANUAL")==0){
     motorStop(); currentMode=MODE_MANUAL;
-    if(currentState==FOLLOW_LINE||currentState==ARRIVED_AT_DESTINATION){
+    if(currentState==FOLLOW_LINE||currentState==RETURN_TO_BASE){
       currentState=RETURN_TO_BASE;
       publishEvent("FORCED_RETURN","Returning to base first");
     } else { currentState=MANUAL_OVERRIDE; }
@@ -262,17 +331,15 @@ void onMqttMessage(char* topic,byte* payload,unsigned int length){
     publishState(); publishEvent("RESET","Error cleared"); return;
   }
 
-  // ── WiFiManager reset via MQTT ──
+  // WiFi reset
   if(strcmp(cmd,"RESET_WIFI")==0){
-    publishEvent("WIFI_RESET","Resetting WiFi config...");
-    drawOLED("WIFI RESET","Restart as","hotspot...");
+    publishEvent("WIFI_RESET","Resetting WiFi...");
+    drawOLED("WIFI RESET","Restart...","");
     delay(1000);
-    WiFiManager wm;
-    wm.resetSettings();   // hapus kredensial tersimpan
-    ESP.restart();        // restart → otomatis jadi hotspot
-    return;
+    WiFiManager wm; wm.resetSettings(); ESP.restart(); return;
   }
 
+  // Destination — hanya saat IDLE/READY dan bukan MANUAL
   if(currentMode==MODE_MANUAL){
     publishEvent("INVALID_CMD","Destination ignored in MANUAL mode"); return;
   }
@@ -285,11 +352,11 @@ void onMqttMessage(char* topic,byte* payload,unsigned int length){
     if(newDest!=DEST_NONE){
       currentDest=newDest; currentState=READY;
       beeper.start(100); publishState();
-      char ev[30]; snprintf(ev,sizeof(ev),"Destination set to %s",destStr(newDest));
+      char ev[32]; snprintf(ev,sizeof(ev),"Destination: %s",destStr(newDest));
       publishEvent("DEST_SET",ev);
     }
   } else {
-    publishEvent("INVALID_CMD","Command ignored: AGV busy");
+    publishEvent("INVALID_CMD","AGV busy");
   }
 }
 
@@ -299,9 +366,9 @@ void mqttConnect(){
   unsigned long now=millis();
   if(now-tLastMqttReconnect<MQTT_RETRY_MS) return;
   tLastMqttReconnect=now;
-  Serial.printf("[MQTT] Connecting to %s...\n",MQTT_BROKER);
   if(mqtt.connect(MQTT_CLIENT_ID)){
     Serial.println("[MQTT] Connected!");
+    delay(100);
     mqtt.subscribe(TOPIC_COMMAND);
     mqtt.subscribe(TOPIC_MANUAL_CMD);
     publishState();
@@ -311,28 +378,21 @@ void mqttConnect(){
   }
 }
 
-// ─── WiFiManager Setup ────────────────────────────────────────────────────────
+// ─── WiFiManager ──────────────────────────────────────────────────────────────
 void wifiSetup(){
   WiFiManager wm;
-
-  // Callback saat masuk mode hotspot
   wm.setAPCallback([](WiFiManager* wm){
-    Serial.println("[WiFi] Hotspot aktif: XORA-Setup");
+    Serial.println("[WiFi] Hotspot: XORA-Setup");
     drawOLED("WIFI SETUP","Connect ke:","XORA-Setup");
   });
-
-  // Timeout hotspot 120 detik — kalau tidak ada yang connect, lanjut tanpa WiFi
   wm.setConfigPortalTimeout(120);
-
-  // Coba connect ke WiFi tersimpan, kalau gagal → jadi hotspot "XORA-Setup"
-  // tanpa password (bisa ditambah password sebagai argumen ke-2)
   if(!wm.autoConnect("XORA-Setup")){
-    Serial.println("[WiFi] Timeout/gagal — lanjut tanpa WiFi");
-    drawOLED("WIFI GAGAL","Mode offline","MQTT disabled");
+    Serial.println("[WiFi] Timeout — offline mode");
+    drawOLED("WIFI GAGAL","Mode offline","");
     delay(2000);
   } else {
-    Serial.printf("[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
-    drawOLED("WIFI OK", WiFi.localIP().toString().c_str(), "");
+    Serial.printf("[WiFi] IP: %s\n",WiFi.localIP().toString().c_str());
+    drawOLED("WIFI OK",WiFi.localIP().toString().c_str(),"");
     delay(1000);
   }
 }
@@ -345,6 +405,11 @@ void setup(){
   pinMode(TRIG_PIN,OUTPUT);
   pinMode(ECHO_PIN,INPUT);
 
+  // IR — input only, no pullup (modul punya output sendiri)
+  pinMode(IR_LEFT, INPUT);
+  pinMode(IR_MID,  INPUT);
+  pinMode(IR_RIGHT,INPUT);
+
   motorSetup();
 
   Wire.begin(21,22);
@@ -355,7 +420,6 @@ void setup(){
   scale.set_scale();
   scale.tare();
 
-  // WiFiManager — gantikan wifiConnect() lama
   wifiSetup();
 
   mqtt.setServer(MQTT_BROKER,MQTT_PORT);
@@ -364,7 +428,7 @@ void setup(){
 
   drawOLED("IDLE","Dest: --",modeStr(currentMode));
   beeper.start(150);
-  Serial.println("[XORA] System ready.");
+  Serial.println("[XORA] Ready.");
 }
 
 // ─── STATE MACHINE ────────────────────────────────────────────────────────────
@@ -375,79 +439,124 @@ void runStateMachine(){
 
   switch(currentState){
 
+    // ── IDLE: diam di BASE, siap terima perintah ──────────────────────────────
     case IDLE:
       digitalWrite(PIN_LED,LOW);
       drawOLED("IDLE","Tunggu perintah",modeStr(currentMode));
       break;
 
-    case READY:{
-      char db[20]; snprintf(db,sizeof(db),"Tujuan: %s",destStr(currentDest));
-      drawOLED("READY",db,"Cek barang...");
-      if(currentDest==DEST_NONE){ currentState=IDLE;publishEvent("INVALID_DEST","No destination");break; }
-      bool canMove=(currentMode==MODE_MANUAL)?true:objectDetected;
-      if(!canMove){
-        currentState=ERROR_STATE;
-        drawOLED("ERROR","NO OBJECT","Taruh barang!");
-        publishEvent("NO_OBJECT","Object not detected");
-        beeper.start(400);
-      } else {
-        currentState=FOLLOW_LINE;
-        digitalWrite(PIN_LED,HIGH);
-        publishEvent("MOVING","AGV starting");
-      }
+    // ── READY: tujuan sudah di-set, langsung mulai jalan ─────────────────────
+    case READY:
+      if(currentDest==DEST_NONE){ currentState=IDLE; break; }
+      // v0.5: tidak perlu loadcell — langsung FOLLOW_LINE
+      currentState=FOLLOW_LINE;
+      digitalWrite(PIN_LED,HIGH);
+      tLineLost=0;
+      publishEvent("MOVING","AGV starting, following line");
       break;
-    }
 
+    // ── FOLLOW_LINE: ikuti garis ke tujuan ───────────────────────────────────
     case FOLLOW_LINE:{
-      char db[20]; snprintf(db,sizeof(db),"→ %s",destStr(currentDest));
+      char db[24]; snprintf(db,sizeof(db),"→ %s",destStr(currentDest));
       drawOLED("MOVING",db,"Follow line...");
+
+      // Cek obstacle
       if(distanceCm>0&&distanceCm<10){
-        currentState=ERROR_STATE; motorStop();
-        publishEvent("OBSTACLE_DETECTED","Object too close");
+        motorStop(); currentState=ERROR_STATE;
+        publishEvent("OBSTACLE_DETECTED","Too close");
         beeper.start(300); break;
       }
-      static unsigned long tStart=0;
-      if(tStart==0) tStart=millis();
-      if(millis()-tStart>3000){
-        tStart=0;
-        currentState=ARRIVED_AT_DESTINATION;
-        publishEvent("ARRIVED","AGV arrived at destination");
-        beeper.start(200);
+
+      readIR();
+
+      // Deteksi garis horizontal = sampai di tujuan
+      if(isHorizontalLine()){
+        motorStop();
+        publishEvent("ARRIVED","Arrived at destination");
+        beeper.start(300);
+        currentState=TURN_180_AT_DEST;
+        tTurn180Start=millis();
+        break;
+      }
+
+      // Line following
+      bool lineOk = doLineFollow();
+      if(!lineOk){
+        if(tLineLost==0) tLineLost=millis();
+        if(millis()-tLineLost>LINE_LOST_MS){
+          motorStop(); currentState=ERROR_STATE;
+          publishEvent("LINE_LOST","Line not detected");
+          beeper.start(500);
+        }
+      } else {
+        tLineLost=0;
       }
       break;
     }
 
-    case ARRIVED_AT_DESTINATION:
-      drawOLED("ARRIVED",destStr(currentDest),"Ambil barang...");
-      if(tArrivedAt==0) tArrivedAt=millis();
-      if(millis()-tArrivedAt>3000) objectDetected=false;
-      if(!objectDetected){
-        publishEvent("UNLOADED","Cargo picked up");
+    // ── TURN_180_AT_DEST: putar 180° di titik tujuan ─────────────────────────
+    case TURN_180_AT_DEST:
+      drawOLED("ARRIVED",destStr(currentDest),"Putar balik...");
+      motorSpinRight(SPD_SPIN);   // putar kanan 180°
+      if(millis()-tTurn180Start>=TURN_180_MS){
+        motorStop();
         currentState=RETURN_TO_BASE;
-        tArrivedAt=0; beeper.start(150);
-      } else if(millis()-tArrivedAt>30000){
-        publishEvent("WAITING_PICKUP","Timeout waiting");
-        tArrivedAt=millis();
+        tLineLost=0;
+        publishEvent("RETURNING","Returning to base");
       }
       break;
 
+    // ── RETURN_TO_BASE: ikuti garis balik ke BASE ─────────────────────────────
     case RETURN_TO_BASE:{
-      drawOLED("RETURNING","→ BASE","");
-      static unsigned long tReturn=0;
-      if(tReturn==0) tReturn=millis();
-      if(millis()-tReturn>2000){
-        currentState=IDLE; currentDest=DEST_NONE;
-        tReturn=0; digitalWrite(PIN_LED,LOW);
-        if(currentMode==MODE_MANUAL) currentState=MANUAL_OVERRIDE;
-        publishEvent("RETURNED","AGV back at base");
+      drawOLED("RETURNING","→ BASE","Follow line...");
+
+      readIR();
+
+      // Deteksi garis horizontal = sampai di BASE
+      if(isHorizontalLine()){
+        motorStop();
+        publishEvent("AT_BASE","Arrived at base");
+        beeper.start(200);
+        currentState=TURN_180_AT_BASE;
+        tTurn180Start=millis();
+        break;
+      }
+
+      // Line following (logika sama, AGV sudah terbalik arah)
+      bool lineOk = doLineFollow();
+      if(!lineOk){
+        if(tLineLost==0) tLineLost=millis();
+        if(millis()-tLineLost>LINE_LOST_MS){
+          motorStop(); currentState=ERROR_STATE;
+          publishEvent("LINE_LOST","Line not detected on return");
+          beeper.start(500);
+        }
+      } else {
+        tLineLost=0;
       }
       break;
     }
 
+    // ── TURN_180_AT_BASE: putar 180° di BASE, kembali hadap maju ─────────────
+    case TURN_180_AT_BASE:
+      drawOLED("AT BASE","Putar balik...","Siap berangkat");
+      motorSpinRight(SPD_SPIN);
+      if(millis()-tTurn180Start>=TURN_180_MS){
+        motorStop();
+        currentState=IDLE;
+        currentDest=DEST_NONE;
+        digitalWrite(PIN_LED,LOW);
+        publishEvent("RETURNED","AGV ready at base");
+        beeper.start(150);
+      }
+      break;
+
+    // ── MANUAL_OVERRIDE ───────────────────────────────────────────────────────
     case MANUAL_OVERRIDE:
       drawOLED("MANUAL","Mode manual","WASD/Dashboard");
       break;
 
+    // ── ERROR ─────────────────────────────────────────────────────────────────
     case ERROR_STATE:
       digitalWrite(PIN_LED,LOW); motorStop();
       drawOLED("!! ERROR !!","Dashboard:","Reset Error");
@@ -467,12 +576,14 @@ void loop(){
   }
 
   beeper.tick();
-  distanceCm=readDistance();
 
+  distanceCm=readDistance();
+  readIR(); // update global irL,irM,irR untuk publishSensors
+
+  // Loadcell — tetap dibaca untuk monitoring, tidak wajib untuk jalan
   if(currentMode!=MODE_MANUAL){
     if(scale.is_ready()){
       loadGrams=scale.get_units(1);
-      objectDetected=loadGrams>10;
     }
   }
 
@@ -480,8 +591,9 @@ void loop(){
 
   if(currentState!=prevState){
     publishState();
-    Serial.printf("[STATE] %s → %s | Dest: %s | Mode: %s\n",
-      stateStr(prevState),stateStr(currentState),destStr(currentDest),modeStr(currentMode));
+    Serial.printf("[STATE] %s → %s | Dest:%s | Mode:%s\n",
+      stateStr(prevState),stateStr(currentState),
+      destStr(currentDest),modeStr(currentMode));
     prevState=currentState;
   }
 
