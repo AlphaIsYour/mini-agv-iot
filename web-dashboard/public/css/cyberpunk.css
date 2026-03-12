@@ -1,0 +1,168 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   CYBERPUNK.CSS — Dark neon theme variables
+   Aktif saat: [data-theme="cyberpunk"]
+══════════════════════════════════════════════════════════════════════════════ */
+
+[data-theme="cyberpunk"] {
+  /* ── Fonts ─────────────────────────────────────────────────────────────── */
+  --font-ui: "Rajdhani", sans-serif;
+  --font-brand: "JetBrains Mono", monospace;
+  --mono: "JetBrains Mono", monospace;
+
+  /* ── Sizing ────────────────────────────────────────────────────────────── */
+  --sidebar-w: 224px;
+  --sidebar-col: 52px;
+  --header-h: 48px;
+  --r: 3px;
+
+  /* ── Core backgrounds ──────────────────────────────────────────────────── */
+  --bg: #060810;
+  --bg2: #0a0e1a;
+  --bg3: #0f1520;
+  --bg4: #141c2a;
+
+  /* ── Surfaces ──────────────────────────────────────────────────────────── */
+  --header-bg: var(--bg2);
+  --sidebar-bg: var(--bg2);
+  --panel-bg: var(--bg2);
+  --badge-bg: var(--bg3);
+  --btn-bg: var(--bg3);
+  --toast-bg: var(--bg3);
+  --overlay-bg: rgba(6, 8, 16, 0.93);
+  --tt-bg: #060810;
+
+  /* ── Borders ───────────────────────────────────────────────────────────── */
+  --border: #1a2438;
+  --border2: #223050;
+
+  /* ── Scrollbar ─────────────────────────────────────────────────────────── */
+  --scrollbar-track: var(--bg2);
+  --scrollbar-thumb: var(--border2);
+
+  /* ── Text ──────────────────────────────────────────────────────────────── */
+  --text: #c8daf0;
+  --text-mid: #6a8aaa;
+  --text-dim: #3a5070;
+
+  /* ── Accent (default cyan, overridable by JS) ──────────────────────────── */
+  --accent: #00d4ff;
+  --accent-dim: rgba(0, 212, 255, 0.25);
+  --accent-glow: rgba(0, 212, 255, 0.12);
+  --accent-glow2: rgba(0, 212, 255, 0.06);
+
+  /* ── Semantic colors ───────────────────────────────────────────────────── */
+  --clr-green: #00ff88;
+  --clr-amber: #ffb300;
+  --clr-red: #ff3366;
+  --clr-purple: #a855f7;
+
+  --green-dim: rgba(0, 255, 136, 0.2);
+  --green-glow: rgba(0, 255, 136, 0.1);
+  --amber-dim: rgba(255, 179, 0, 0.25);
+  --amber-glow: rgba(255, 179, 0, 0.12);
+  --red-dim: rgba(255, 51, 102, 0.2);
+  --red-glow: rgba(255, 51, 102, 0.15);
+  --purple-dim: rgba(168, 85, 247, 0.2);
+  --purple-glow: rgba(168, 85, 247, 0.12);
+
+  /* ── Arena SVG ─────────────────────────────────────────────────────────── */
+  --arena-border: #131f30;
+  --arena-grid: #0d1828;
+  --arena-track: #1a2e48;
+  --arena-zone: #0a1520;
+  --arena-node-fill: #0c1520;
+  --arena-node-stroke: #1e3050;
+  --arena-lbl: #3a5070;
+
+  /* ── Nav ───────────────────────────────────────────────────────────────── */
+  --nav-hover-bg: var(--bg3);
+  --nav-active-bg: rgba(0, 212, 255, 0.08);
+
+  /* ── Shadows ───────────────────────────────────────────────────────────── */
+  --header-shadow: none;
+  --toast-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --brand-glow: 0 0 20px rgba(0, 212, 255, 0.5);
+
+  /* ── Font size base ────────────────────────────────────────────────────── */
+  --font-size-base: 13px;
+}
+
+/* ── Cyberpunk-only decorative effects ───────────────────────────────────── */
+[data-theme="cyberpunk"] body {
+  background: var(--bg);
+}
+
+/* Scanline overlay on header */
+[data-theme="cyberpunk"] .header::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 212, 255, 0.015) 2px,
+    rgba(0, 212, 255, 0.015) 4px
+  );
+  pointer-events: none;
+}
+[data-theme="cyberpunk"] .header {
+  position: relative;
+}
+
+/* Neon glow on active nav */
+[data-theme="cyberpunk"] .nav-item.active {
+  box-shadow: inset 0 0 20px rgba(0, 212, 255, 0.04);
+}
+
+/* Neon border on focused inputs */
+[data-theme="cyberpunk"] .settings-input:focus,
+[data-theme="cyberpunk"] .evlog-filter:focus {
+  box-shadow:
+    0 0 0 1px rgba(0, 212, 255, 0.15),
+    0 0 12px rgba(0, 212, 255, 0.08);
+}
+
+/* Chart.js grid & tick override for cyberpunk */
+[data-theme="cyberpunk"] .chart-wrap {
+  --chart-grid: #1a2438;
+  --chart-tick: #3a5070;
+  --chart-label: "JetBrains Mono";
+}
+
+/* Accent color overrides (applied by JS when user picks a color) */
+[data-theme="cyberpunk"][data-accent="green"] {
+  --accent: #00ff88;
+  --accent-dim: rgba(0, 255, 136, 0.25);
+  --accent-glow: rgba(0, 255, 136, 0.12);
+  --accent-glow2: rgba(0, 255, 136, 0.06);
+  --brand-glow: 0 0 20px rgba(0, 255, 136, 0.5);
+}
+[data-theme="cyberpunk"][data-accent="purple"] {
+  --accent: #a855f7;
+  --accent-dim: rgba(168, 85, 247, 0.25);
+  --accent-glow: rgba(168, 85, 247, 0.12);
+  --accent-glow2: rgba(168, 85, 247, 0.06);
+  --brand-glow: 0 0 20px rgba(168, 85, 247, 0.5);
+}
+[data-theme="cyberpunk"][data-accent="amber"] {
+  --accent: #ffb300;
+  --accent-dim: rgba(255, 179, 0, 0.25);
+  --accent-glow: rgba(255, 179, 0, 0.12);
+  --accent-glow2: rgba(255, 179, 0, 0.06);
+  --brand-glow: 0 0 20px rgba(255, 179, 0, 0.5);
+}
+[data-theme="cyberpunk"][data-accent="red"] {
+  --accent: #ff3366;
+  --accent-dim: rgba(255, 51, 102, 0.25);
+  --accent-glow: rgba(255, 51, 102, 0.15);
+  --accent-glow2: rgba(255, 51, 102, 0.06);
+  --brand-glow: 0 0 20px rgba(255, 51, 102, 0.5);
+}
+[data-theme="cyberpunk"][data-accent="teal"] {
+  --accent: #06b6d4;
+  --accent-dim: rgba(6, 182, 212, 0.25);
+  --accent-glow: rgba(6, 182, 212, 0.12);
+  --accent-glow2: rgba(6, 182, 212, 0.06);
+  --brand-glow: 0 0 20px rgba(6, 182, 212, 0.5);
+}

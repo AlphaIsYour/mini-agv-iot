@@ -239,6 +239,12 @@ const app = express();
 
 // Trust proxy (untuk reverse proxy / VPS)
 app.set("trust proxy", 1);
+app.use(
+  "/fontawesome",
+  express.static(
+    path.join(__dirname, "node_modules/@fortawesome/fontawesome-free"),
+  ),
+);
 
 // ── Helmet Security Headers ────────────────────────────────────────────────────
 app.use(
@@ -249,16 +255,21 @@ app.use(
         scriptSrc: [
           "'self'",
           "'unsafe-inline'",
-          "cdnjs.cloudflare.com",
-          "fonts.googleapis.com",
+          "https://cdnjs.cloudflare.com",
+          "https://fonts.googleapis.com",
+          "https://unpkg.com",
         ],
         styleSrc: [
           "'self'",
           "'unsafe-inline'",
-          "fonts.googleapis.com",
-          "fonts.gstatic.com",
+          "https://fonts.googleapis.com",
+          "https://fonts.gstatic.com",
         ],
-        fontSrc: ["'self'", "fonts.googleapis.com", "fonts.gstatic.com"],
+        fontSrc: [
+          "'self'",
+          "https://fonts.googleapis.com",
+          "https://fonts.gstatic.com",
+        ],
         connectSrc: [
           "'self'",
           "ws://localhost:3001",
