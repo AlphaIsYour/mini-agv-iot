@@ -23,7 +23,7 @@ services:
     restart: unless-stopped
     ports:
       # Expose HTTP dashboard ke host di port 8080 (bisa disesuaikan)
-      - "8080:80"
+      - "80:80"
     volumes:
       - ./public/index.html:/usr/share/nginx/html/index.html:ro
     networks:
