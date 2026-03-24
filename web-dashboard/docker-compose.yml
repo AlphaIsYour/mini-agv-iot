@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # 1. Backend Server (MQTT - WebSocket Bridge)
@@ -25,8 +25,7 @@ services:
       # Expose HTTP dashboard ke host di port 8080 (bisa disesuaikan)
       - "8080:80"
     volumes:
-      # Map index.html ke web root nginx untuk diserve
-      - ./index.html:/usr/share/nginx/html/index.html:ro
+      - ./public/index.html:/usr/share/nginx/html/index.html:ro
     networks:
       - agv_network
     depends_on:
