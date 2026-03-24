@@ -621,6 +621,19 @@
   .main {
     overflow-y: auto;
   }
+
+  .sidebar.open .nav-label {
+    opacity: 1 !important;
+    pointer-events: auto;
+  }
+  .sidebar.open .nav-section-label,
+  .sidebar.open .sf-item {
+    opacity: 1 !important;
+  }
+  .sidebar.open .nav-badge {
+    opacity: 1;
+  }
+
   #page-control {
     overflow-y: auto;
   }

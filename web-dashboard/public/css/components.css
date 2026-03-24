@@ -261,6 +261,8 @@
   justify-content: center;
   align-items: center;
   min-height: 0;
+  overflow-y: auto;
+  padding-top: 60px;
 }
 .dest-label {
   font-size: 9px;
@@ -1615,7 +1617,11 @@
     max-height: 200px;
   }
   .ctrl-body {
+    flex: unset; /* ← fix: flex:1 tidak efektif di auto-height mobile */
     overflow: visible;
+    justify-content: flex-start;
+    width: 100%;
+    padding-bottom: 12px;
   }
   /* Sensor cards in mobile: horizontal row */
   #panel-sensors {
