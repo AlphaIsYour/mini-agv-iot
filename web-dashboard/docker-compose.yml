@@ -1,7 +1,6 @@
 version: "3.8"
 
 services:
-  # 1. Backend Server (MQTT - WebSocket Bridge)
   bridge-server:
     build:
       context: .
@@ -9,10 +8,13 @@ services:
     container_name: agv_bridge_server
     restart: unless-stopped
     ports:
-      # Expose WebSocket port
-      - "3001:3001"
+      - "3000:3000" # HTTP
+      - "3001:3001" # WebSocket
     environment:
       - NODE_ENV=production
+      - SESSION_SECRET=isi_secret_panjang_random
+      - ADMIN_PASSWORD_PLAIN=isi_password_admin_kamu
+      - DATABASE_URL=isi_neondb_connection_string_kamu
     networks:
       - agv_network
 
