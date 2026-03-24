@@ -1,0 +1,1100 @@
+<!doctype html>
+<html lang="en" data-theme="cyberpunk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>XORA — AGV Control Terminal</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Xora custom font (untuk tema Tableau) -->
+    <style>
+      @font-face {
+        font-family: "Xora";
+        src: url("fonts/xora.woff2") format("woff2");
+        font-weight: 400 700;
+        font-style: normal;
+        font-display: swap;
+      }
+    </style>
+
+    <!-- Icons: Font Awesome 6 Free -->
+    <link rel="stylesheet" href="/fontawesome/css/all.min.css" />
+
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+
+    <!-- CSS Modules -->
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/layout.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <link rel="stylesheet" href="css/cyberpunk.css" id="theme-cyberpunk" />
+    <link rel="stylesheet" href="css/tableau.css" id="theme-tableau" disabled />
+  </head>
+  <body>
+    <!-- ══ THEME TRANSITION OVERLAY ══════════════════════════════════════════════ -->
+    <div id="theme-transition">
+      <div class="tt-inner">
+        <div class="tt-spinner"></div>
+        <div class="tt-label" id="tt-label">SWITCHING THEME</div>
+        <div class="tt-sub" id="tt-sub">Reinitializing render engine...</div>
+      </div>
+    </div>
+
+    <!-- ══ CONNECT OVERLAY ═══════════════════════════════════════════════════════ -->
+    <div id="overlay">
+      <div class="ov-inner">
+        <div class="ov-spin"></div>
+        <div class="ov-txt">CONNECTING TO BRIDGE</div>
+        <div class="ov-sub" id="ov-sub">Initializing secure WebSocket...</div>
+      </div>
+    </div>
+
+    <!-- ══ TOAST CONTAINER ═══════════════════════════════════════════════════════ -->
+    <div id="toast-container"></div>
+
+    <!-- ══ APP SHELL ══════════════════════════════════════════════════════════════ -->
+    <div class="app" id="app">
+      <!-- ── HEADER ────────────────────────────────────────────────────────────── -->
+      <header class="header" id="main-header">
+        <button class="btn-icon" id="btn-toggle-sidebar" title="Toggle sidebar">
+          <i class="fa-solid fa-bars icon"></i>
+        </button>
+
+        <a class="brand" href="/">
+          <span class="brand-name">XORA</span>
+          <span class="brand-tag">AGV Terminal</span>
+        </a>
+
+        <div class="h-sep"></div>
+
+        <div class="h-pill" id="hws">
+          <div class="dot"></div>
+          <span id="hws-txt">WS —</span>
+        </div>
+        <div class="h-pill" id="hmqtt">
+          <div class="dot"></div>
+          <span id="hmqtt-txt">MQTT —</span>
+        </div>
+
+        <div class="h-sep"></div>
+
+        <div class="h-bat">
+          <i class="fa-solid fa-battery-half icon" style="font-size: 13px"></i>
+          <div class="bat-track">
+            <div class="bat-fill" id="bat-fill"></div>
+          </div>
+          <span id="bat-pct">—%</span>
+        </div>
+
+        <div class="h-state" id="h-state">IDLE</div>
+        <div class="h-clock" id="h-clock">—</div>
+
+        <div class="h-right">
+          <span class="h-username" id="h-username">—</span>
+          <div class="dropdown-wrap">
+            <button class="btn-icon" id="btn-user-menu" title="User menu">
+              <i class="fa-solid fa-circle-user icon"></i>
+            </button>
+            <div class="dropdown hidden" id="user-dropdown">
+              <div class="dd-item" onclick="navTo('settings')">
+                <i class="fa-solid fa-gear icon"></i>Settings
+              </div>
+              <div class="dd-item" onclick="navTo('system')">
+                <i class="fa-solid fa-microchip icon"></i>System Info
+              </div>
+              <div class="dd-sep"></div>
+              <div class="dd-item danger" id="btn-logout">
+                <i class="fa-solid fa-right-from-bracket icon"></i>Logout
+              </div>
+            </div>
+          </div>
+          <button class="btn-icon" id="btn-sound" title="Toggle sound">
+            <i class="fa-solid fa-volume-high icon" id="sound-icon-el"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- ── SIDEBAR ───────────────────────────────────────────────────────────── -->
+      <nav class="sidebar" id="sidebar">
+        <div class="nav-section-label">Navigation</div>
+
+        <div class="nav-item active" data-page="control">
+          <div class="nav-icon">
+            <i class="fa-solid fa-gamepad icon"></i>
+          </div>
+          <div class="nav-label">Control</div>
+        </div>
+        <div class="nav-item" data-page="sensors">
+          <div class="nav-icon">
+            <i class="fa-solid fa-satellite-dish icon"></i>
+          </div>
+          <div class="nav-label">Sensors Live</div>
+        </div>
+        <div class="nav-item" data-page="analytics">
+          <div class="nav-icon">
+            <i class="fa-solid fa-chart-bar icon"></i>
+          </div>
+          <div class="nav-label">Analytics</div>
+        </div>
+        <div class="nav-item" data-page="eventlog">
+          <div class="nav-icon">
+            <i class="fa-solid fa-clipboard-list icon"></i>
+          </div>
+          <div class="nav-label">Event Log</div>
+          <div class="nav-badge" id="err-badge">!</div>
+        </div>
+        <div class="nav-item" data-page="system">
+          <div class="nav-icon"><i class="fa-solid fa-microchip icon"></i></div>
+          <div class="nav-label">System</div>
+        </div>
+        <div class="nav-item" data-page="settings">
+          <div class="nav-icon">
+            <i class="fa-solid fa-gear icon"></i>
+          </div>
+          <div class="nav-label">Settings</div>
+        </div>
+
+        <div class="sidebar-spacer"></div>
+
+        <div class="sidebar-footer">
+          <div class="sf-item">STATE: <span id="sf-state">IDLE</span></div>
+          <div class="sf-item">DEST: <span id="sf-dest">BASE</span></div>
+          <div class="sf-item">MODE: <span id="sf-mode">AUTO</span></div>
+          <div class="sf-item" id="sf-uptime">UP: —</div>
+        </div>
+      </nav>
+
+      <!-- ── MAIN ──────────────────────────────────────────────────────────────── -->
+      <main class="main" id="main-content">
+        <!-- PAGE: Control -->
+        <div class="page-view active" id="page-control">
+          <div class="page-header">
+            <span class="page-title">XORA</span>
+            <span class="page-sep">/</span>
+            <span class="page-active">CONTROL</span>
+            <div class="page-actions">
+              <button class="btn-sm" onclick="sendCmd('RESET_ERROR')">
+                <i class="fa-solid fa-rotate-left icon"></i>Reset Error
+              </button>
+            </div>
+          </div>
+          <div class="ctrl-grid">
+            <!-- Arena -->
+            <div class="panel" id="panel-arena">
+              <div class="ptitle">
+                <i class="fa-solid fa-map icon"></i>Arena Map
+              </div>
+              <div class="state-badge">
+                <div class="sb-group">
+                  <div class="sb-label">FSM State</div>
+                  <div class="sb-val" id="fsm-state">IDLE</div>
+                </div>
+                <div class="sb-group" style="text-align: right">
+                  <div class="sb-label">Destination</div>
+                  <div class="sb-val accent2" id="cur-dest">BASE</div>
+                </div>
+              </div>
+              <div class="arena-wrap">
+                <svg id="arena-svg" viewBox="0 0 200 200" fill="none">
+                  <rect
+                    x="1"
+                    y="1"
+                    width="198"
+                    height="198"
+                    rx="2"
+                    class="arena-border"
+                  />
+                  <line x1="100" y1="1" x2="100" y2="199" class="arena-grid" />
+                  <line x1="1" y1="100" x2="199" y2="100" class="arena-grid" />
+                  <path
+                    d="M40,160 L40,40 L160,40 L160,160 L40,160 M100,40 L100,160"
+                    class="arena-track"
+                  />
+                  <path id="agv-trail" d="" />
+                  <circle
+                    cx="40"
+                    cy="40"
+                    r="16"
+                    class="arena-zone"
+                    id="zone-A"
+                  />
+                  <circle
+                    cx="100"
+                    cy="40"
+                    r="16"
+                    class="arena-zone"
+                    id="zone-B"
+                  />
+                  <circle
+                    cx="160"
+                    cy="40"
+                    r="16"
+                    class="arena-zone"
+                    id="zone-C"
+                  />
+                  <rect
+                    x="82"
+                    y="152"
+                    width="36"
+                    height="18"
+                    rx="2"
+                    class="arena-zone"
+                    id="zone-BASE"
+                  />
+                  <circle
+                    cx="40"
+                    cy="40"
+                    r="9"
+                    class="arena-node"
+                    id="node-A"
+                  />
+                  <text
+                    x="40"
+                    y="44"
+                    text-anchor="middle"
+                    class="arena-lbl"
+                    id="lbl-A"
+                  >
+                    A
+                  </text>
+                  <circle
+                    cx="100"
+                    cy="40"
+                    r="9"
+                    class="arena-node"
+                    id="node-B"
+                  />
+                  <text
+                    x="100"
+                    y="44"
+                    text-anchor="middle"
+                    class="arena-lbl"
+                    id="lbl-B"
+                  >
+                    B
+                  </text>
+                  <circle
+                    cx="160"
+                    cy="40"
+                    r="9"
+                    class="arena-node"
+                    id="node-C"
+                  />
+                  <text
+                    x="160"
+                    y="44"
+                    text-anchor="middle"
+                    class="arena-lbl"
+                    id="lbl-C"
+                  >
+                    C
+                  </text>
+                  <rect
+                    x="84"
+                    y="154"
+                    width="32"
+                    height="14"
+                    rx="2"
+                    class="arena-node"
+                    id="node-BASE"
+                  />
+                  <text
+                    x="100"
+                    y="164"
+                    text-anchor="middle"
+                    class="arena-lbl arena-lbl-sm"
+                    id="lbl-BASE"
+                  >
+                    BASE
+                  </text>
+                  <g id="agv-marker" transform="translate(100,160)">
+                    <circle class="agv-pulse" r="16" />
+                    <image
+                      href="images/agv.png"
+                      x="-13"
+                      y="-13"
+                      width="26"
+                      height="26"
+                      class="agv-img"
+                      preserveAspectRatio="xMidYMid meet"
+                    />
+                  </g>
+                </svg>
+              </div>
+              <div class="mode-row" id="mode-chips">
+                <div class="mchip active" data-mode="AUTO">AUTO</div>
+                <div class="mchip" data-mode="MANUAL">MAN</div>
+                <div class="mchip" data-mode="VOICE">VOICE</div>
+                <div class="mchip" data-mode="PICKUP">PICK</div>
+              </div>
+            </div>
+
+            <!-- Commands -->
+            <div class="panel" id="panel-commands">
+              <div class="ptitle">
+                <i class="fa-solid fa-terminal icon"></i>Command Interface
+              </div>
+              <div class="ctrl-body">
+                <div>
+                  <div class="dest-label">Select Destination</div>
+                  <div class="dest-row">
+                    <button
+                      class="btn-dest"
+                      id="btn-A"
+                      onclick="sendCmd('SET_DEST_A')"
+                    >
+                      <span class="dl">A</span><span class="ds">Zone A</span>
+                    </button>
+                    <button
+                      class="btn-dest"
+                      id="btn-B"
+                      onclick="sendCmd('SET_DEST_B')"
+                    >
+                      <span class="dl">B</span><span class="ds">Zone B</span>
+                    </button>
+                    <button
+                      class="btn-dest"
+                      id="btn-C"
+                      onclick="sendCmd('SET_DEST_C')"
+                    >
+                      <span class="dl">C</span><span class="ds">Zone C</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="qa-row">
+                  <button
+                    class="btn-qa accent2"
+                    onclick="sendCmd('RETURN_BASE')"
+                  >
+                    <i class="fa-solid fa-reply icon"></i>Return Base
+                  </button>
+                  <button class="btn-qa" onclick="sendCmd('RESET_ERROR')">
+                    <i class="fa-solid fa-rotate-left icon"></i>Reset Error
+                  </button>
+                </div>
+                <div>
+                  <div class="dest-label">Mode Override</div>
+                  <div class="mode-btns">
+                    <button
+                      class="btn-mode active"
+                      id="mbtn-auto"
+                      onclick="sendCmd('SET_MODE_AUTO')"
+                    >
+                      AUTO
+                    </button>
+                    <button
+                      class="btn-mode"
+                      id="mbtn-manual"
+                      onclick="sendCmd('SET_MODE_MANUAL')"
+                    >
+                      MANUAL
+                    </button>
+                    <button
+                      class="btn-mode"
+                      id="mbtn-pickup"
+                      onclick="sendCmd('SET_MODE_PICKUP')"
+                    >
+                      PICKUP
+                    </button>
+                  </div>
+                </div>
+                <div class="dpad-wrap" id="dpad" style="display: none">
+                  <div class="dest-label">Motor Control</div>
+                  <div class="dpad-row">
+                    <div class="dpad-empty"></div>
+                    <button class="dpad-btn up" data-cmd="FORWARD">
+                      <i class="fa-solid fa-arrow-up icon"></i>
+                    </button>
+                    <div class="dpad-empty"></div>
+                  </div>
+                  <div class="dpad-row">
+                    <button class="dpad-btn left-btn" data-cmd="LEFT">
+                      <i class="fa-solid fa-arrow-left icon"></i>
+                    </button>
+                    <button class="dpad-btn center" data-cmd="STOP">
+                      <i class="fa-solid fa-circle-stop icon"></i>
+                    </button>
+                    <button class="dpad-btn right-btn" data-cmd="RIGHT">
+                      <i class="fa-solid fa-arrow-right icon"></i>
+                    </button>
+                  </div>
+                  <div class="dpad-row">
+                    <div class="dpad-empty"></div>
+                    <button class="dpad-btn down" data-cmd="BACKWARD">
+                      <i class="fa-solid fa-arrow-down icon"></i>
+                    </button>
+                    <div class="dpad-empty"></div>
+                  </div>
+                  <div class="dpad-speed">
+                    <span>SPD</span>
+                    <input
+                      type="range"
+                      id="spd-slider"
+                      min="60"
+                      max="255"
+                      value="180"
+                    />
+                    <span id="spd-val" class="accent2">180</span>
+                  </div>
+                </div>
+                <button class="btn-estop" onclick="sendCmd('EMERGENCY_STOP')">
+                  <i class="fa-solid fa-ban icon"></i>EMERGENCY STOP
+                </button>
+              </div>
+            </div>
+
+            <!-- Sensors -->
+            <div class="panel" id="panel-sensors">
+              <div class="ptitle">
+                <i class="fa-solid fa-chart-line icon"></i>Sensor Monitor
+              </div>
+              <div class="scard">
+                <div class="sname">Ultrasonic HC-SR04</div>
+                <div class="sval">
+                  <span id="us-val">—</span><span class="sunit">cm</span>
+                </div>
+                <div class="sbar">
+                  <div class="sbar-fill" id="us-bar"></div>
+                </div>
+                <div class="obs-warn" id="obs-warn">CLEAR</div>
+              </div>
+              <div class="scard">
+                <div class="sname">Load Cell / HX711</div>
+                <div class="sval">
+                  <span id="lc-val">—</span><span class="sunit">g</span>
+                </div>
+                <div class="sbar">
+                  <div class="sbar-fill sbar-green" id="lc-bar"></div>
+                </div>
+                <div class="load-tag" id="lc-tag">NO LOAD</div>
+              </div>
+              <div class="scard">
+                <div class="sname">IR Line Follower</div>
+                <div class="ir-dots">
+                  <div class="ir-dot" id="ir-s1"></div>
+                  <div class="ir-dot" id="ir-s2"></div>
+                  <div class="ir-dot" id="ir-s3"></div>
+                  <div class="ir-dot" id="ir-s4"></div>
+                  <div class="ir-dot" id="ir-s5"></div>
+                </div>
+                <div class="ir-pat" id="ir-pat">□ □ □ □ □</div>
+              </div>
+            </div>
+
+            <!-- Log -->
+            <div class="panel log-panel" id="panel-log">
+              <div class="ptitle">
+                <i class="fa-solid fa-list icon"></i>Activity Log
+              </div>
+              <div class="log-list" id="log-list"></div>
+            </div>
+
+            <!-- Last Event -->
+            <div class="panel" id="panel-lastevent">
+              <div class="ptitle">
+                <i class="fa-solid fa-bell icon"></i>Last Event
+              </div>
+              <div class="ev-box">
+                <div class="ev-code" id="ev-code">—</div>
+                <div class="ev-msg" id="ev-msg">Waiting for events...</div>
+                <div class="ev-ts" id="ev-ts">—</div>
+              </div>
+            </div>
+          </div>
+          <!-- /ctrl-grid -->
+        </div>
+        <!-- /page-control -->
+
+        <!-- PAGE: Sensors Live -->
+        <div class="page-view" id="page-sensors">
+          <div class="page-header">
+            <span class="page-title">XORA</span>
+            <span class="page-sep">/</span>
+            <span class="page-active">SENSORS LIVE</span>
+          </div>
+          <div class="sensor-page">
+            <div class="sensor-big-grid">
+              <div class="sensor-big-card">
+                <div class="big-header">
+                  <div class="big-label">
+                    <i class="fa-solid fa-water icon"></i>Ultrasonic
+                  </div>
+                  <div class="obs-warn" id="big-obs-warn">CLEAR</div>
+                </div>
+                <div class="gauge-wrap">
+                  <svg width="160" height="100" viewBox="0 0 160 100">
+                    <path
+                      d="M 10 90 A 70 70 0 0 1 150 90"
+                      class="gauge-track"
+                      stroke-width="10"
+                      fill="none"
+                      stroke-linecap="round"
+                    />
+                    <path
+                      id="gauge-us-arc"
+                      d="M 10 90 A 70 70 0 0 1 150 90"
+                      class="gauge-arc-cyan"
+                      stroke-width="10"
+                      fill="none"
+                      stroke-linecap="round"
+                      stroke-dasharray="220"
+                      stroke-dashoffset="110"
+                    />
+                  </svg>
+                  <div class="gauge-center">
+                    <div class="gauge-val accent1" id="big-us">—</div>
+                    <div class="gauge-unit">cm</div>
+                  </div>
+                </div>
+                <div class="sparkline-wrap">
+                  <canvas id="spark-us"></canvas>
+                </div>
+              </div>
+
+              <div class="sensor-big-card">
+                <div class="big-header">
+                  <div class="big-label">
+                    <i class="fa-solid fa-scale-balanced icon"></i>Load Cell
+                  </div>
+                  <div class="load-tag" id="big-lc-tag">NO LOAD</div>
+                </div>
+                <div class="gauge-wrap">
+                  <svg width="160" height="100" viewBox="0 0 160 100">
+                    <path
+                      d="M 10 90 A 70 70 0 0 1 150 90"
+                      class="gauge-track"
+                      stroke-width="10"
+                      fill="none"
+                      stroke-linecap="round"
+                    />
+                    <path
+                      id="gauge-lc-arc"
+                      d="M 10 90 A 70 70 0 0 1 150 90"
+                      class="gauge-arc-green"
+                      stroke-width="10"
+                      fill="none"
+                      stroke-linecap="round"
+                      stroke-dasharray="220"
+                      stroke-dashoffset="220"
+                    />
+                  </svg>
+                  <div class="gauge-center">
+                    <div class="gauge-val accent-green" id="big-lc">—</div>
+                    <div class="gauge-unit">g</div>
+                  </div>
+                </div>
+                <div class="sparkline-wrap">
+                  <canvas id="spark-lc"></canvas>
+                </div>
+              </div>
+
+              <div class="sensor-big-card">
+                <div class="big-header">
+                  <div class="big-label">
+                    <i class="fa-solid fa-bolt icon"></i>Battery
+                  </div>
+                  <div class="bat-status" id="big-bat-status">—</div>
+                </div>
+                <div class="gauge-wrap">
+                  <svg width="160" height="100" viewBox="0 0 160 100">
+                    <path
+                      d="M 10 90 A 70 70 0 0 1 150 90"
+                      class="gauge-track"
+                      stroke-width="10"
+                      fill="none"
+                      stroke-linecap="round"
+                    />
+                    <path
+                      id="gauge-bat-arc"
+                      d="M 10 90 A 70 70 0 0 1 150 90"
+                      class="gauge-arc-amber"
+                      stroke-width="10"
+                      fill="none"
+                      stroke-linecap="round"
+                      stroke-dasharray="220"
+                      stroke-dashoffset="0"
+                    />
+                  </svg>
+                  <div class="gauge-center">
+                    <div class="gauge-val accent-amber" id="big-bat">—</div>
+                    <div class="gauge-unit">%</div>
+                  </div>
+                </div>
+                <div class="sparkline-wrap">
+                  <canvas id="spark-bat"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <div class="ir-big-card">
+              <div class="ptitle">
+                <i class="fa-solid fa-minus icon"></i>IR Line Follower — 5
+                Channel
+              </div>
+              <div class="ir-big-row">
+                <div class="ir-big-chip" id="big-ir-s1">
+                  <i class="fa-solid fa-circle icon"></i>S1
+                </div>
+                <div class="ir-big-chip" id="big-ir-s2">
+                  <i class="fa-solid fa-circle icon"></i>S2
+                </div>
+                <div class="ir-big-chip" id="big-ir-s3">
+                  <i class="fa-solid fa-circle icon"></i>S3
+                </div>
+                <div class="ir-big-chip" id="big-ir-s4">
+                  <i class="fa-solid fa-circle icon"></i>S4
+                </div>
+                <div class="ir-big-chip" id="big-ir-s5">
+                  <i class="fa-solid fa-circle icon"></i>S5
+                </div>
+              </div>
+              <div class="ir-pat" id="big-ir-pat">□ □ □ □ □</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAGE: Analytics -->
+        <div class="page-view" id="page-analytics">
+          <div class="page-header">
+            <span class="page-title">XORA</span>
+            <span class="page-sep">/</span>
+            <span class="page-active">ANALYTICS</span>
+            <div class="page-actions">
+              <button class="btn-sm" onclick="loadAnalytics()">
+                <i class="fa-solid fa-arrows-rotate icon"></i>Refresh
+              </button>
+            </div>
+          </div>
+          <div class="analytics-page">
+            <div class="range-row">
+              <span class="range-label">Range</span>
+              <button class="range-btn" data-range="1h">1H</button>
+              <button class="range-btn active" data-range="24h">24H</button>
+              <button class="range-btn" data-range="7d">7D</button>
+            </div>
+            <div class="stats-row">
+              <div class="stat-card stat-accent">
+                <div class="stat-label">Events (range)</div>
+                <div class="stat-val" id="stat-events">—</div>
+                <div class="stat-sub">total in period</div>
+              </div>
+              <div class="stat-card stat-green">
+                <div class="stat-label">Deliveries</div>
+                <div class="stat-val" id="stat-deliveries">—</div>
+                <div class="stat-sub">successful arrived</div>
+              </div>
+              <div class="stat-card stat-red">
+                <div class="stat-label">Errors</div>
+                <div class="stat-val" id="stat-errors">—</div>
+                <div class="stat-sub">in period</div>
+              </div>
+              <div class="stat-card stat-dim">
+                <div class="stat-label">Total Events</div>
+                <div class="stat-val" id="stat-total">—</div>
+                <div class="stat-sub">all time</div>
+              </div>
+            </div>
+            <div class="chart-grid">
+              <div class="chart-card">
+                <div class="chart-title">
+                  <i class="fa-solid fa-chart-bar icon"></i>Event Distribution
+                </div>
+                <div class="chart-wrap">
+                  <canvas id="chart-events"></canvas>
+                </div>
+              </div>
+              <div class="chart-card">
+                <div class="chart-title">
+                  <i class="fa-solid fa-water icon"></i>Ultrasonic History (cm)
+                </div>
+                <div class="chart-wrap"><canvas id="chart-us"></canvas></div>
+              </div>
+              <div class="chart-card">
+                <div class="chart-title">
+                  <i class="fa-solid fa-scale-balanced icon"></i>Load Cell
+                  History (g)
+                </div>
+                <div class="chart-wrap"><canvas id="chart-lc"></canvas></div>
+              </div>
+              <div class="chart-card">
+                <div class="chart-title">
+                  <i class="fa-solid fa-bolt icon"></i>Battery History (%)
+                </div>
+                <div class="chart-wrap"><canvas id="chart-bat"></canvas></div>
+              </div>
+            </div>
+            <div class="err-list-card">
+              <div class="ptitle">
+                <i class="fa-solid fa-circle-exclamation icon"></i>Recent Errors
+                & Warnings
+              </div>
+              <div id="err-table-wrap">
+                <div class="loading">Loading...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAGE: Event Log -->
+        <div class="page-view" id="page-eventlog">
+          <div class="page-header">
+            <span class="page-title">XORA</span>
+            <span class="page-sep">/</span>
+            <span class="page-active">EVENT LOG</span>
+            <div class="page-actions">
+              <button class="btn-sm" onclick="exportCSV()">
+                <i class="fa-solid fa-download icon"></i>Export CSV
+              </button>
+            </div>
+          </div>
+          <div class="analytics-page">
+            <div class="evlog-card">
+              <div class="evlog-header">
+                <input
+                  class="evlog-filter"
+                  id="evlog-filter"
+                  type="text"
+                  placeholder="Filter by code or message..."
+                />
+                <span class="pg-info" id="evlog-info">—</span>
+              </div>
+              <div id="evlog-wrap"><div class="loading">Loading...</div></div>
+              <div class="pg-row">
+                <button
+                  class="pg-btn"
+                  id="pg-prev"
+                  onclick="changePage(-1)"
+                  disabled
+                >
+                  <i class="fa-solid fa-chevron-left icon"></i>Prev
+                </button>
+                <button class="pg-btn" id="pg-next" onclick="changePage(1)">
+                  Next<i class="fa-solid fa-chevron-right icon"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAGE: System -->
+        <div class="page-view" id="page-system">
+          <div class="page-header">
+            <span class="page-title">XORA</span>
+            <span class="page-sep">/</span>
+            <span class="page-active">SYSTEM</span>
+          </div>
+          <div class="system-page">
+            <div class="system-grid">
+              <div class="system-card">
+                <div class="system-card-title">
+                  <i class="fa-solid fa-wifi icon"></i>Connection Status
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">WebSocket</span
+                  ><span class="sys-val" id="sys-ws">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">MQTT Broker</span
+                  ><span class="sys-val" id="sys-mqtt">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Database</span
+                  ><span class="sys-val ok">NeonDB Connected</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">WS Latency</span
+                  ><span class="sys-val" id="sys-latency">—</span>
+                </div>
+              </div>
+              <div class="system-card">
+                <div class="system-card-title">
+                  <i class="fa-solid fa-robot icon"></i>AGV State
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">FSM State</span>
+                  <span class="sys-val" id="sys-state">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Destination</span
+                  ><span class="sys-val" id="sys-dest">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Mode</span>
+                  <span class="sys-val" id="sys-mode">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Battery</span>
+                  <span class="sys-val" id="sys-bat">—</span>
+                </div>
+              </div>
+              <div class="system-card">
+                <div class="system-card-title">
+                  <i class="fa-solid fa-shield-halved icon"></i>Security Info
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Auth</span>
+                  <span class="sys-val ok">bcrypt + Session</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">CSRF</span>
+                  <span class="sys-val ok">Enabled</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Rate Limit</span>
+                  <span class="sys-val ok">Active</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">WS Auth</span>
+                  <span class="sys-val ok">Token-based</span>
+                </div>
+              </div>
+              <div class="system-card">
+                <div class="system-card-title">
+                  <i class="fa-solid fa-user icon"></i>Session
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">User</span>
+                  <span class="sys-val" id="sys-user">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Login At</span>
+                  <span class="sys-val" id="sys-login-at">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Session TTL</span
+                  ><span class="sys-val ok">8 Hours</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Cookie</span>
+                  <span class="sys-val ok">httpOnly + SameSite</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAGE: Settings -->
+        <div class="page-view" id="page-settings">
+          <div class="page-header">
+            <span class="page-title">XORA</span>
+            <span class="page-sep">/</span>
+            <span class="page-active">SETTINGS</span>
+          </div>
+          <div class="settings-page">
+            <div class="settings-grid">
+              <!-- Appearance -->
+              <div class="settings-card">
+                <div class="settings-card-title">
+                  <i class="fa-solid fa-palette icon"></i>Appearance
+                </div>
+
+                <!-- THEME SELECTOR -->
+                <div class="settings-field">
+                  <div class="settings-label">Dashboard Theme</div>
+                  <div class="theme-options">
+                    <div class="theme-opt active" data-theme="cyberpunk">
+                      <div class="theme-preview cyberpunk-prev">
+                        <span></span><span></span><span></span>
+                      </div>
+                      <div class="theme-opt-label">Cyberpunk</div>
+                    </div>
+                    <div class="theme-opt" data-theme="tableau">
+                      <div class="theme-preview tableau-prev">
+                        <span></span><span></span><span></span>
+                      </div>
+                      <div class="theme-opt-label">Tableau</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ACCENT (only for cyberpunk) -->
+                <div class="settings-field" id="accent-field">
+                  <div class="settings-label">Accent Color</div>
+                  <div class="color-row" id="color-swatches">
+                    <div
+                      class="color-swatch active"
+                      data-color="#00d4ff"
+                      style="background: #00d4ff"
+                    ></div>
+                    <div
+                      class="color-swatch"
+                      data-color="#00ff88"
+                      style="background: #00ff88"
+                    ></div>
+                    <div
+                      class="color-swatch"
+                      data-color="#a855f7"
+                      style="background: #a855f7"
+                    ></div>
+                    <div
+                      class="color-swatch"
+                      data-color="#ffb300"
+                      style="background: #ffb300"
+                    ></div>
+                    <div
+                      class="color-swatch"
+                      data-color="#ff3366"
+                      style="background: #ff3366"
+                    ></div>
+                    <div
+                      class="color-swatch"
+                      data-color="#06b6d4"
+                      style="background: #06b6d4"
+                    ></div>
+                  </div>
+                </div>
+
+                <div class="settings-field">
+                  <div class="settings-label">Font Size</div>
+                  <div class="font-row">
+                    <button class="font-btn" data-size="12">S</button>
+                    <button class="font-btn active" data-size="13">M</button>
+                    <button class="font-btn" data-size="14">L</button>
+                  </div>
+                </div>
+
+                <div class="settings-row">
+                  <div class="settings-row-label">
+                    <i class="fa-solid fa-table-columns icon"></i>Collapsed
+                    sidebar by default
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox" id="toggle-sidebar-default" />
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div>
+                  </label>
+                </div>
+
+                <div class="settings-row">
+                  <div class="settings-row-label">
+                    <i class="fa-solid fa-chart-line icon"></i>Show sensor
+                    sparklines
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox" id="toggle-sparklines" checked />
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Alerts -->
+              <div class="settings-card">
+                <div class="settings-card-title">
+                  <i class="fa-solid fa-bell icon"></i>Alerts & Notifications
+                </div>
+                <div class="settings-row">
+                  <div class="settings-row-label">
+                    <i class="fa-solid fa-volume-high icon"></i>Sound alerts
+                  </div>
+                  <label class="toggle"
+                    ><input type="checkbox" id="toggle-sound" checked />
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div
+                  ></label>
+                </div>
+                <div class="settings-row">
+                  <div class="settings-row-label">
+                    <i class="fa-solid fa-bell icon"></i>Toast notifications
+                  </div>
+                  <label class="toggle"
+                    ><input type="checkbox" id="toggle-toast" checked />
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div
+                  ></label>
+                </div>
+                <div class="settings-row">
+                  <div class="settings-row-label">
+                    <i class="fa-solid fa-ban icon"></i>Alert on ESTOP / ERROR
+                  </div>
+                  <label class="toggle"
+                    ><input type="checkbox" id="toggle-alert-error" checked />
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div
+                  ></label>
+                </div>
+                <div class="settings-row">
+                  <div class="settings-row-label">
+                    <i class="fa-solid fa-circle-check icon"></i>Notify on
+                    ARRIVED
+                  </div>
+                  <label class="toggle"
+                    ><input type="checkbox" id="toggle-alert-arrived" checked />
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div
+                  ></label>
+                </div>
+              </div>
+
+              <!-- Change Password -->
+              <div class="settings-card">
+                <div class="settings-card-title">
+                  <i class="fa-solid fa-lock icon"></i>Change Password
+                </div>
+                <div class="settings-field">
+                  <div class="settings-label">Current Password</div>
+                  <input
+                    class="settings-input"
+                    type="password"
+                    id="pw-current"
+                    placeholder="••••••••"
+                  />
+                </div>
+                <div class="settings-field">
+                  <div class="settings-label">New Password</div>
+                  <input
+                    class="settings-input"
+                    type="password"
+                    id="pw-new"
+                    placeholder="Min 8 characters"
+                  />
+                </div>
+                <div class="settings-field">
+                  <div class="settings-label">Confirm New Password</div>
+                  <input
+                    class="settings-input"
+                    type="password"
+                    id="pw-confirm"
+                    placeholder="Repeat new password"
+                  />
+                </div>
+                <button class="btn-save" onclick="changePassword()">
+                  <i class="fa-solid fa-floppy-disk icon"></i>Save Password
+                </button>
+              </div>
+
+              <!-- Session / Danger -->
+              <div class="settings-card">
+                <div class="settings-card-title danger-title">
+                  <i class="fa-solid fa-triangle-exclamation icon"></i>Session
+                </div>
+                <p class="settings-desc">
+                  Logout dari semua sesi aktif. Kamu akan diarahkan ke halaman
+                  login.
+                </p>
+                <button class="btn-danger" onclick="doLogout()">
+                  <i class="fa-solid fa-right-from-bracket icon"></i>Logout Now
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+    <!-- /app -->
+
+    <!-- JS Modules -->
+    <script src="js/app.js"></script>
+    <script src="js/websocket.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/analytics.js"></script>
+    <script src="js/controls.js"></script>
+  </body>
+</html>

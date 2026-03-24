@@ -1,0 +1,565 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   TABLEAU.CSS — Light formal theme variables
+   Aktif saat: [data-theme="tableau"]
+   Font utama: Xora (custom woff2) untuk heading/brand
+══════════════════════════════════════════════════════════════════════════════ */
+
+[data-theme="tableau"] {
+  /* ── Fonts ─────────────────────────────────────────────────────────────── */
+  --font-ui: "Xora", "Inter", sans-serif;
+  --font-brand: "Xora", "Inter", sans-serif;
+  --mono: "JetBrains Mono", monospace;
+
+  /* ── Sizing ────────────────────────────────────────────────────────────── */
+  --sidebar-w: 240px;
+  --sidebar-col: 56px;
+  --header-h: 50px;
+  --r: 4px;
+
+  /* ── Core backgrounds ──────────────────────────────────────────────────── */
+  --bg: #f4f6f9;
+  --bg2: #ffffff;
+  --bg3: #f0f2f5;
+  --bg4: #e8ecf2;
+
+  /* ── Surfaces ──────────────────────────────────────────────────────────── */
+  --header-bg: #ffffff;
+  --sidebar-bg: #ffffff;
+  --panel-bg: #ffffff;
+  --badge-bg: #f4f6f9;
+  --btn-bg: #f0f2f5;
+  --toast-bg: #ffffff;
+  --overlay-bg: rgba(244, 246, 249, 0.95);
+  --tt-bg: #f4f6f9;
+
+  /* ── Borders ───────────────────────────────────────────────────────────── */
+  --border: #ced4de;
+  --border2: #b8c2ce;
+
+  /* ── Scrollbar ─────────────────────────────────────────────────────────── */
+  --scrollbar-track: #e8ecf2;
+  --scrollbar-thumb: #b8c2ce;
+
+  /* ── Text ──────────────────────────────────────────────────────────────── */
+  --text: #1a2433;
+  --text-mid: #3d5068;
+  --text-dim: #6b7e94;
+
+  /* ── Accent (Tableau blue) ─────────────────────────────────────────────── */
+  --accent: #1a73e8;
+  --accent-dim: rgba(26, 115, 232, 0.2);
+  --accent-glow: rgba(26, 115, 232, 0.1);
+  --accent-glow2: rgba(26, 115, 232, 0.05);
+
+  /* ── Semantic colors ───────────────────────────────────────────────────── */
+  --clr-green: #0f9d58;
+  --clr-amber: #f9ab00;
+  --clr-red: #d93025;
+  --clr-purple: #7c4dff;
+
+  --green-dim: rgba(15, 157, 88, 0.15);
+  --green-glow: rgba(15, 157, 88, 0.08);
+  --amber-dim: rgba(249, 171, 0, 0.2);
+  --amber-glow: rgba(249, 171, 0, 0.1);
+  --red-dim: rgba(217, 48, 37, 0.15);
+  --red-glow: rgba(217, 48, 37, 0.08);
+  --purple-dim: rgba(124, 77, 255, 0.15);
+  --purple-glow: rgba(124, 77, 255, 0.08);
+
+  /* ── Arena SVG ─────────────────────────────────────────────────────────── */
+  --arena-border: #ced4de;
+  --arena-grid: #e4e8f0;
+  --arena-track: #b0bece;
+  --arena-zone: #eef1f7;
+  --arena-node-fill: #ffffff;
+  --arena-node-stroke: #b8c2ce;
+  --arena-lbl: #6b7e94;
+
+  /* ── Nav ───────────────────────────────────────────────────────────────── */
+  --nav-hover-bg: #f4f6f9;
+  --nav-active-bg: rgba(26, 115, 232, 0.08);
+
+  /* ── Shadows ───────────────────────────────────────────────────────────── */
+  --header-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --toast-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --brand-glow: none;
+
+  /* ── Font size base ────────────────────────────────────────────────────── */
+  --font-size-base: 13px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   TABLEAU OVERRIDES — Komponen yang tampilannya beda dari cyberpunk
+══════════════════════════════════════════════════════════════════════════════ */
+
+[data-theme="tableau"] body {
+  background: var(--bg);
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .header {
+  box-shadow: var(--header-shadow);
+  border-bottom-color: var(--border);
+}
+
+/* ── Brand ──────────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .brand-name {
+  font-size: 17px;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  text-shadow: none;
+}
+[data-theme="tableau"] .brand-tag {
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .sidebar {
+  border-right: 1px solid var(--border);
+  box-shadow: 1px 0 4px rgba(0, 0, 0, 0.04);
+}
+[data-theme="tableau"] .nav-item.active {
+  box-shadow: none;
+}
+[data-theme="tableau"] .nav-label {
+  font-family: "Xora", "Inter", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  font-size: 12px;
+}
+[data-theme="tableau"] .nav-section-label {
+  font-family: "Xora", "Inter", sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  color: var(--text-dim);
+}
+[data-theme="tableau"] .sidebar-footer {
+  background: var(--bg3);
+}
+
+/* ── Page header ────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .page-header {
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+[data-theme="tableau"] .page-title,
+[data-theme="tableau"] .page-active {
+  font-family: "Xora", "Inter", sans-serif;
+  letter-spacing: 0.04em;
+}
+[data-theme="tableau"] .page-sep {
+  color: var(--text-dim);
+}
+
+/* ── Panel ──────────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .panel {
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+[data-theme="tableau"] .ptitle {
+  font-family: "Xora", "Inter", sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
+  font-weight: 700;
+}
+[data-theme="tableau"] .ptitle::after {
+  background: var(--border);
+}
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .stat-card,
+[data-theme="tableau"] .chart-card,
+[data-theme="tableau"] .sensor-big-card,
+[data-theme="tableau"] .system-card,
+[data-theme="tableau"] .settings-card,
+[data-theme="tableau"] .err-list-card,
+[data-theme="tableau"] .evlog-card,
+[data-theme="tableau"] .ir-big-card {
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.04);
+  border-radius: 6px;
+}
+[data-theme="tableau"] .stat-card:hover,
+[data-theme="tableau"] .sensor-big-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Stat card ──────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .stat-label {
+  font-family: "Xora", "Inter", sans-serif;
+  color: var(--text-mid);
+  letter-spacing: 0.04em;
+  font-size: 11px;
+  text-transform: none;
+  font-weight: 600;
+}
+[data-theme="tableau"] .stat-val {
+  font-size: 32px;
+  color: var(--text);
+}
+[data-theme="tableau"] .stat-sub {
+  color: var(--text-dim);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .btn-icon {
+  border-radius: 6px;
+  border-color: var(--border);
+  color: var(--text-mid);
+}
+[data-theme="tableau"] .btn-icon:hover {
+  background: var(--nav-active-bg);
+  border-color: var(--accent);
+  box-shadow: none;
+}
+[data-theme="tableau"] .btn-sm {
+  border-radius: 6px;
+  font-family: "Xora", "Inter", sans-serif;
+  font-size: 11px;
+  color: var(--text-mid);
+}
+[data-theme="tableau"] .btn-sm:hover {
+  background: var(--nav-active-bg);
+  color: var(--accent);
+}
+[data-theme="tableau"] .btn-dest {
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+[data-theme="tableau"] .btn-dest:hover,
+[data-theme="tableau"] .btn-dest.active {
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.2);
+}
+[data-theme="tableau"] .btn-qa {
+  border-radius: 6px;
+  font-family: "Xora", "Inter", sans-serif;
+  font-size: 11px;
+}
+[data-theme="tableau"] .btn-mode {
+  border-radius: 6px;
+  font-family: "Xora", "Inter", sans-serif;
+  font-size: 11px;
+}
+[data-theme="tableau"] .btn-mode.active {
+  box-shadow: none;
+}
+[data-theme="tableau"] .btn-estop {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(217, 48, 37, 0.2);
+  letter-spacing: 0.08em;
+  font-family: "Xora", "Inter", sans-serif;
+}
+[data-theme="tableau"] .btn-save {
+  border-radius: 6px;
+  font-family: "Xora", "Inter", sans-serif;
+  letter-spacing: 0.04em;
+}
+[data-theme="tableau"] .btn-save:hover {
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.2);
+  transform: none;
+}
+[data-theme="tableau"] .btn-danger {
+  border-radius: 6px;
+  font-family: "Xora", "Inter", sans-serif;
+  letter-spacing: 0.04em;
+}
+
+/* ── Range buttons ──────────────────────────────────────────────────────── */
+[data-theme="tableau"] .range-btn {
+  border-radius: 6px;
+  font-family: "Xora", "Inter", sans-serif;
+  font-size: 11px;
+}
+[data-theme="tableau"] .range-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* ── State badge ────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .state-badge {
+  border-radius: 6px;
+  background: var(--bg3);
+}
+[data-theme="tableau"] .sb-label {
+  font-family: "Xora", "Inter", sans-serif;
+  text-transform: none;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+[data-theme="tableau"] .sb-val {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ── Mode chips ─────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .mchip {
+  border-radius: 4px;
+  font-family: "Xora", "Inter", sans-serif;
+  text-transform: none;
+  font-size: 10px;
+  box-shadow: none;
+}
+
+/* ── Sensor cards ───────────────────────────────────────────────────────── */
+[data-theme="tableau"] .scard {
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+[data-theme="tableau"] .sname {
+  font-family: "Xora", "Inter", sans-serif;
+  text-transform: none;
+  letter-spacing: 0.03em;
+  font-size: 10px;
+  color: var(--text-mid);
+}
+[data-theme="tableau"] .sval {
+  font-size: 22px;
+  color: var(--accent);
+}
+
+/* ── Log entries ────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .log-entry {
+  background: var(--bg3);
+  border-radius: 3px;
+  border-left-width: 3px;
+}
+[data-theme="tableau"] .log-ts {
+  color: var(--text-dim);
+}
+[data-theme="tableau"] .log-code {
+  color: var(--accent);
+}
+
+/* ── H-state chips ──────────────────────────────────────────────────────── */
+[data-theme="tableau"] .h-state {
+  border-radius: 4px;
+  font-family: "Xora", "Inter", sans-serif;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+/* ── Data table ─────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .data-table th {
+  font-family: "Xora", "Inter", sans-serif;
+  background: var(--bg3);
+  text-transform: none;
+  letter-spacing: 0.03em;
+  font-size: 11px;
+  color: var(--text-mid);
+}
+[data-theme="tableau"] .data-table td {
+  font-size: 11px;
+  color: var(--text);
+}
+[data-theme="tableau"] .data-table tr:hover td {
+  background: var(--nav-active-bg);
+}
+[data-theme="tableau"] .data-table .code-cell {
+  color: var(--accent);
+}
+
+/* ── Inputs ─────────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .settings-input {
+  border-radius: 6px;
+  background: var(--bg3);
+  border-color: var(--border);
+  font-size: 12px;
+  color: var(--text);
+}
+[data-theme="tableau"] .settings-input:focus {
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
+}
+[data-theme="tableau"] .evlog-filter {
+  border-radius: 6px;
+  background: var(--bg3);
+}
+[data-theme="tableau"] .evlog-filter:focus {
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
+}
+
+/* ── Settings labels ────────────────────────────────────────────────────── */
+[data-theme="tableau"] .settings-label,
+[data-theme="tableau"] .settings-card-title {
+  font-family: "Xora", "Inter", sans-serif;
+  text-transform: none;
+  letter-spacing: 0.03em;
+}
+[data-theme="tableau"] .settings-row-label {
+  font-family: "Xora", "Inter", sans-serif;
+  font-size: 12px;
+}
+
+/* ── Toggle ─────────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .toggle-track {
+  background: #d0d6e0;
+  border-color: var(--border);
+}
+[data-theme="tableau"] .toggle-thumb {
+  background: #94a3b8;
+}
+[data-theme="tableau"] .toggle input:checked ~ .toggle-track {
+  background: var(--accent);
+}
+[data-theme="tableau"] .toggle input:checked ~ .toggle-thumb {
+  background: #fff;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────── */
+[data-theme="tableau"] ::-webkit-scrollbar-track {
+  background: #f0f2f5;
+}
+[data-theme="tableau"] ::-webkit-scrollbar-thumb {
+  background: #d0d6e0;
+}
+
+/* ── Theme transition overlay (light version) ───────────────────────────── */
+[data-theme="tableau"] #theme-transition {
+  background: #f4f6f9;
+}
+[data-theme="tableau"] .tt-label {
+  color: var(--accent);
+}
+[data-theme="tableau"] .tt-spinner {
+  border-top-color: var(--accent);
+  border-color: var(--border2);
+  border-top-color: var(--accent);
+}
+
+/* ── Toast (light shadow) ───────────────────────────────────────────────── */
+[data-theme="tableau"] .toast {
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.06);
+  border-color: var(--border);
+}
+
+/* ── Dropdown ───────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .dropdown {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border-color: var(--border);
+}
+
+/* ── Gauge ──────────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .gauge-track {
+  stroke: var(--border2);
+}
+[data-theme="tableau"] .gauge-val {
+  color: var(--accent);
+}
+
+/* ── PTITLE icon ────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .ptitle .icon,
+[data-theme="tableau"] .chart-title .icon,
+[data-theme="tableau"] .system-card-title .icon,
+[data-theme="tableau"] .settings-card-title .icon,
+[data-theme="tableau"] .big-label .icon {
+  color: var(--accent);
+  opacity: 1;
+}
+
+/* ── H-sep ──────────────────────────────────────────────────────────────── */
+[data-theme="tableau"] .h-sep {
+  background: var(--border);
+}
+
+/* ── Chart title, system card title, settings card title readability ─────── */
+[data-theme="tableau"] .chart-title {
+  font-family: "Xora", "Inter", sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: none;
+  color: var(--text-mid);
+  font-weight: 700;
+}
+[data-theme="tableau"] .system-card-title {
+  font-family: "Xora", "Inter", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--text-mid);
+  font-weight: 700;
+}
+[data-theme="tableau"] .settings-card-title {
+  font-family: "Xora", "Inter", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--text-mid);
+  font-weight: 700;
+}
+[data-theme="tableau"] .big-label {
+  font-family: "Xora", "Inter", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--text-mid);
+  font-weight: 700;
+}
+[data-theme="tableau"] .sname {
+  color: var(--text-mid);
+  font-weight: 600;
+}
+[data-theme="tableau"] .sys-key {
+  color: var(--text-mid);
+}
+[data-theme="tableau"] .range-label {
+  color: var(--text-mid);
+}
+[data-theme="tableau"] .dest-label {
+  color: var(--text-mid);
+}
+[data-theme="tableau"] .obs-warn {
+  color: var(--text-mid);
+}
+[data-theme="tableau"] .ir-big-chip {
+  background: #e4e8f0;
+  color: var(--text-mid);
+  border-color: var(--border);
+}
+[data-theme="tableau"] .ir-dot {
+  background: #c8d0dc;
+}
+[data-theme="tableau"] .load-tag {
+  background: #dde2ea;
+  color: var(--text-mid);
+}
+[data-theme="tableau"] .log-entry {
+  border-left-width: 3px;
+}
+[data-theme="tableau"] .nav-badge {
+  background: rgba(217, 48, 37, 0.12);
+}
+
+/* ── H-pill & clock readability ─────────────────────────────────────────── */
+[data-theme="tableau"] .h-pill {
+  color: var(--text-mid);
+}
+[data-theme="tableau"] .h-clock {
+  color: var(--text-mid);
+}
+[data-theme="tableau"] .h-bat {
+  color: var(--text-mid);
+}
+[data-theme="tableau"] .h-username {
+  color: var(--text-mid);
+}
+[data-theme="tableau"] .sf-item {
+  color: var(--text-mid);
+}
+[data-theme="tableau"] .sidebar-footer {
+  background: #edf0f5;
+}
+[data-theme="tableau"] .brand-tag {
+  color: var(--text-dim);
+}
+
+/* ── Accent (tableau tidak punya color picker — fixed blue) ─────────────── */
+[data-theme="tableau"] #accent-field {
+  display: none;
+}

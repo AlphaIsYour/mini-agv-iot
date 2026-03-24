@@ -1,0 +1,211 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   BASE.CSS — Reset, Typography, Shared Variables
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Custom Font ─────────────────────────────────────────────────────────── */
+@font-face {
+  font-family: "Xora";
+  src: url("../fonts/xora.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── Reset ───────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+a {
+  text-decoration: none;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 2px;
+}
+
+/* ── Font Awesome icon sizing ────────────────────────────────────────────── */
+.icon {
+  font-size: 13px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  width: 14px;
+  text-align: center;
+  line-height: 1;
+}
+.icon-sm {
+  font-size: 10px;
+  width: 11px;
+}
+.icon-lg {
+  font-size: 16px;
+  width: 18px;
+}
+
+/* ── Page view transitions ───────────────────────────────────────────────── */
+.page-view {
+  display: none;
+  flex: 1;
+  overflow: hidden;
+  flex-direction: column;
+  animation: page-in 0.2s ease both;
+}
+.page-view.active {
+  display: flex;
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Theme Transition Overlay ────────────────────────────────────────────── */
+#theme-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tt-bg, #060810);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+#theme-transition.active {
+  opacity: 1;
+  pointer-events: all;
+}
+.tt-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.tt-spinner {
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--border2, #223050);
+  border-top-color: var(--accent, #00d4ff);
+  border-radius: 50%;
+  animation: tt-spin 0.6s linear infinite;
+}
+@keyframes tt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.tt-label {
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent, #00d4ff);
+}
+.tt-sub {
+  font-family: var(--mono, monospace);
+  font-size: 9px;
+  color: var(--text-dim, #3a5070);
+  letter-spacing: 0.1em;
+}
+
+/* ── Connect Overlay ─────────────────────────────────────────────────────── */
+#overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(6px);
+  transition: opacity 0.4s;
+}
+#overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.ov-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.ov-spin {
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: tt-spin 0.7s linear infinite;
+}
+.ov-txt {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.12em;
+}
+.ov-sub {
+  font-size: 9px;
+  color: var(--text-dim);
+  opacity: 0.5;
+  font-family: var(--mono);
+}
+
+/* ── Loading placeholder ─────────────────────────────────────────────────── */
+.loading {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 30px;
+  letter-spacing: 0.1em;
+}
+
+/* ── Shared utility ──────────────────────────────────────────────────────── */
+.hidden {
+  display: none !important;
+}
+.flex {
+  display: flex;
+}
+.flex-1 {
+  flex: 1;
+}
