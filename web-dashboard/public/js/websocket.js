@@ -3,7 +3,7 @@
 ══════════════════════════════════════════════════════════════════════════════ */
 
 const WS_HOST = window.location.hostname;
-const WS_URL = `ws://${WS_HOST}:3001`;
+const WS_URL = `ws://${WS_HOST}/ws`;
 
 let ws = null;
 let reconnectT = null;
