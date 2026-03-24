@@ -25,7 +25,7 @@ services:
       # Expose HTTP dashboard ke host di port 8080 (bisa disesuaikan)
       - "80:80"
     volumes:
-      - ./public/index.html:/usr/share/nginx/html/index.html:ro
+      - ./public:/usr/share/nginx/html:ro
     networks:
       - agv_network
     depends_on:
