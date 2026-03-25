@@ -8,23 +8,18 @@ services:
     container_name: agv_bridge_server
     restart: unless-stopped
     ports:
-      - "3000:3000" # HTTP
-      - "3001:3001" # WebSocket
-    environment:
-      - NODE_ENV=production
-      - SESSION_SECRET=isi_secret_panjang_random
-      - ADMIN_PASSWORD_PLAIN=isi_password_admin_kamu
-      - DATABASE_URL=isi_neondb_connection_string_kamu
+      - "3000:3000"
+      - "3001:3001"
+    env_file:
+      - .env
     networks:
       - agv_network
 
-  # 2. Frontend UI (Static HTML file disajikan melalui Nginx)
   dashboard-ui:
     image: nginx:alpine
     container_name: agv_dashboard_ui
     restart: unless-stopped
     ports:
-      # Expose HTTP dashboard ke host di port 8080 (bisa disesuaikan)
       - "80:80"
     volumes:
       - ./public:/usr/share/nginx/html:ro

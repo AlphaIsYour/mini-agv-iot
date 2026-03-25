@@ -1,20 +1,20 @@
-# Gunakan base image Node.js versi ringan
 FROM node:20-alpine
 
-# Set working directory di dalam container
+# Set working directory
 WORKDIR /app
 
-# Salin package.json dan package-lock.json (jika ada)
+# Copy package files dulu (biar cache optimal)
 COPY package*.json ./
 
-# Install dependencies Node.js
+# Install dependencies
 RUN npm install --production
 
-# Salin script server.js
-COPY server.js ./
+# ⚠️ INI YANG PENTING → copy SEMUA file project
+COPY . .
 
-# Expose port WebSocket (sesuai konfigurasi di server.js: 3001)
+# Expose port
+EXPOSE 3000
 EXPOSE 3001
 
-# Jalankan server
+# Run server
 CMD ["node", "server.js"]
