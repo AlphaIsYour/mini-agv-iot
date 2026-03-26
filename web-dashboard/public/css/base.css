@@ -26,6 +26,16 @@ body {
   overflow: hidden;
 }
 
+/* FIX: Mobile tidak boleh overflow:hidden di body,
+   agar scroll konten bisa berjalan normal */
+@media (max-width: 768px) {
+  html,
+  body {
+    height: 100dvh;
+    overflow: auto;
+  }
+}
+
 button {
   cursor: pointer;
   font-family: inherit;

@@ -397,6 +397,8 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  /* FIX: pastikan scroll berjalan di iOS Safari */
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ── Stats Row ───────────────────────────────────────────────────────────── */
@@ -491,7 +493,21 @@
 /* ── Mobile portrait (≤768px) ──────────────────────────────────────────── */
 @media (max-width: 768px) {
   .app {
-    grid-template-columns: 0 1fr;
+    grid-template-columns: 1fr; /* ← FIX: hapus kolom sidebar, 1 kolom penuh */
+    height: 100dvh; /* ← FIX: pakai dvh agar address bar tidak memotong */
+    height: 100svh; /* fallback untuk browser lebih lama */
+  }
+
+  /* FIX: header tetap full width */
+  .header {
+    grid-column: 1 / -1;
+  }
+
+  /* FIX: main harus full width — ini root cause utama! */
+  /* Saat sidebar jadi position:fixed, main auto-place ke col1 yg 0px */
+  .main {
+    grid-column: 1 / -1;
+    min-height: 0;
   }
 
   /* Sidebar → full drawer */
