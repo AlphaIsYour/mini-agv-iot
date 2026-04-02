@@ -123,3 +123,52 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
 # Disclaimer
 
 This project is intended for educational and research purposes only.
+
+---
+
+## Production Deployment (Docker)
+
+This project has been dockerized for a production-ready setup. It includes a container for the application runtime, an Eclipse Mosquitto MQTT broker, and a PostgreSQL database. 
+
+### Prerequisites
+- Docker
+- Docker Compose
+
+### How to Build and Run
+
+1. **Environment Setup**:
+   Navigate to the `web-dashboard` directory:
+   ```bash
+   cd web-dashboard
+   ```
+   Copy the example environment variables file and configure it:
+   ```bash
+   cp .env.example .env
+   # Make sure to edit .env to provide your own SESSION_SECRET and ADMIN_PASSWORD_PLAIN
+   ```
+
+2. **Start the containers** in detached mode:
+   ```bash
+   docker-compose up -d --build
+   ```
+   The application will be accessible at:
+   - Dashboard: `http://localhost:3000` (WebSocket via port `3001`)
+   - MQTT Broker: `mqtt://localhost:1883`
+
+### How to Stop
+
+To stop all running containers safely:
+```bash
+docker-compose down
+```
+To stop and remove all data (volumes):
+```bash
+docker-compose down -v
+```
+
+### Common Troubleshooting
+
+- **Authentication Fails / Bypassed**: Ensure you access the app via port `3000` (`http://localhost:3000`). If you are running locally and have issues with sessions not appearing, be sure your `ALLOWED_ORIGIN` matches your URL structure or configure reverse proxy forwards accordingly.
+- **WebSocket issues**: Check if the reverse proxy/load balancer allows traffic on port `3001` or Upgrade headers.
+- **Database Connection Error**: In `docker-compose.yml`, the application awaits `agv_postgres` via health checks before starting. If it fails, ensure `DATABASE_URL` uses the correct internal credentials (`postgresql://user:password@postgres:5432/agv_db`).
+- **MQTT Refusing Connection**: If custom ESP32 devices cannot connect, check `mosquitto.conf` allowing anonymous access or configure it with a password and update `MQTT_BROKER`.

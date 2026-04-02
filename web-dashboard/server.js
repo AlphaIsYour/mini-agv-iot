@@ -276,6 +276,7 @@ app.use(
           "ws://127.0.0.1:3001",
           "wss:",
         ],
+        scriptSrcAttr: ["'unsafe-inline'"],
         imgSrc: ["'self'", "data:"],
         frameSrc: ["'none'"],
         objectSrc: ["'none'"],
@@ -478,7 +479,7 @@ app.use((err, req, res, _next) => {
 const httpServer = http.createServer(app);
 
 // WebSocket server terpisah di port WS_PORT
-const wss = new WebSocketServer({ port: WS_PORT });
+const wss = new WebSocketServer({ server: httpServer });
 console.log(`[WS] Server listening on ws://0.0.0.0:${WS_PORT}`);
 
 wss.on("connection", (ws, req) => {

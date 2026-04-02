@@ -3,7 +3,8 @@
 ══════════════════════════════════════════════════════════════════════════════ */
 
 const WS_HOST = window.location.hostname;
-const WS_URL = `ws://${WS_HOST}/ws`;
+const WS_PORT = window.location.port; // ikut port HTTP
+const WS_URL = `ws://${WS_HOST}:${WS_PORT}/ws`;
 
 let ws = null;
 let reconnectT = null;

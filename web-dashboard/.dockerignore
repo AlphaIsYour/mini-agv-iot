@@ -1,7 +1,11 @@
 node_modules
-npm-debug.log
+npm-debug.log*
 .dccache
 .env
+.env.*
 Dockerfile
 .dockerignore
 docker-compose.yml
+README.md
+mosquitto.conf
+.git
