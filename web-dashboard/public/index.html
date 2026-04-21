@@ -91,6 +91,7 @@
             <div class="bat-fill" id="bat-fill"></div>
           </div>
           <span id="bat-pct">—%</span>
+          <span id="bat-volt" style="font-size:10px;opacity:0.6;margin-left:2px"></span>
         </div>
 
         <div class="h-state" id="h-state">IDLE</div>
@@ -159,6 +160,13 @@
             <i class="fa-solid fa-gear icon"></i>
           </div>
           <div class="nav-label">Settings</div>
+        </div>
+        <div class="nav-item" data-page="roboeyes">
+          <div class="nav-icon">
+            <i class="fa-solid fa-eye icon"></i>
+          </div>
+          <div class="nav-label">Robo Eyes</div>
+          <div class="nav-badge" id="eyes-live-badge" style="display:none;background:var(--clr-green)">●</div>
         </div>
 
         <div class="sidebar-spacer"></div>
@@ -1086,6 +1094,87 @@
             </div>
           </div>
         </div>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             ROBO EYES PAGE
+        ════════════════════════════════════════════════════════════════ -->
+        <div class="page-view" id="page-roboeyes">
+          <div class="page-header">
+            <span class="page-title">XORA</span>
+            <span class="page-sep">/</span>
+            <span class="page-active">ROBO EYES</span>
+            <div class="page-actions" style="margin-left:auto;display:flex;align-items:center;gap:10px">
+              <span id="eyes-state-chip" class="h-state IDLE" style="font-size:11px;padding:3px 10px">IDLE</span>
+              <button class="btn-ctrl" id="btn-eyes-fullscreen" onclick="toggleEyesFullscreen()" title="Fullscreen">
+                <i class="fa-solid fa-expand"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Fullscreen container -->
+          <div id="eyes-container" class="eyes-container">
+            <!-- Black bg -->
+            <div class="eyes-bg"></div>
+
+            <!-- Video elements: one per expression -->
+            <video id="eyes-video-ready"   class="eyes-video active"
+                   src="/videos/ready.mp4"   autoplay loop muted playsinline></video>
+            <video id="eyes-video-moving"  class="eyes-video"
+                   src="/videos/moving.mp4"  autoplay loop muted playsinline></video>
+            <video id="eyes-video-error"   class="eyes-video"
+                   src="/videos/error.mp4"   autoplay loop muted playsinline></video>
+
+            <!-- Overlay info (tersembunyi di fullscreen) -->
+            <div class="eyes-overlay" id="eyes-overlay">
+              <div class="eyes-info-row">
+                <span class="eyes-label">STATE</span>
+                <span class="eyes-val" id="eyes-info-state">IDLE</span>
+              </div>
+              <div class="eyes-info-row">
+                <span class="eyes-label">EXPR</span>
+                <span class="eyes-val" id="eyes-info-expr">READY</span>
+              </div>
+            </div>
+
+            <!-- Tap-to-fullscreen hint -->
+            <div class="eyes-hint" id="eyes-hint">
+              <i class="fa-solid fa-expand"></i> Tap for fullscreen
+            </div>
+          </div>
+
+          <!-- Expression map card -->
+          <div class="card" style="margin-top:16px">
+            <div class="card-title">Expression Map</div>
+            <div class="eyes-map">
+              <div class="eyes-map-row" id="emap-ready">
+                <div class="eyes-map-icon"><i class="fa-solid fa-circle-check"></i></div>
+                <div class="eyes-map-info">
+                  <div class="eyes-map-label">READY</div>
+                  <div class="eyes-map-states">IDLE · READY · ARRIVED · LOAD_UNLOAD · AT_BASE</div>
+                </div>
+                <div class="eyes-map-file">ready.mp4</div>
+              </div>
+              <div class="eyes-map-row" id="emap-moving">
+                <div class="eyes-map-icon"><i class="fa-solid fa-route"></i></div>
+                <div class="eyes-map-info">
+                  <div class="eyes-map-label">MOVING</div>
+                  <div class="eyes-map-states">FOLLOW_LINE · RETURN_TO_BASE · INTERSECTION · TURNING</div>
+                </div>
+                <div class="eyes-map-file">moving.mp4</div>
+              </div>
+              <div class="eyes-map-row" id="emap-error">
+                <div class="eyes-map-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div class="eyes-map-info">
+                  <div class="eyes-map-label">ERROR</div>
+                  <div class="eyes-map-states">ERROR_STATE · MANUAL_OVERRIDE</div>
+                </div>
+                <div class="eyes-map-file">error.mp4</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- /page-roboeyes -->
+
       </main>
     </div>
     <!-- /app -->

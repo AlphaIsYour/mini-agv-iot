@@ -1648,3 +1648,188 @@
     justify-content: center;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   ROBO EYES
+══════════════════════════════════════════════════════════════════════════════ */
+.eyes-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/9;
+  max-height: calc(100vh - 180px);
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eyes-container.fullscreen-mode {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  border-radius: 0 !important;
+  z-index: 9999 !important;
+  border: none !important;
+}
+
+.eyes-bg {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  z-index: 0;
+}
+
+.eyes-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  z-index: 1;
+}
+
+.eyes-video.active {
+  opacity: 1;
+}
+
+/* Smooth crossfade */
+.eyes-video.fading-in  { animation: eyesFadeIn  0.4s ease forwards; }
+.eyes-video.fading-out { animation: eyesFadeOut 0.4s ease forwards; }
+
+@keyframes eyesFadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes eyesFadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+/* HUD overlay */
+.eyes-overlay {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  gap: 12px;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  padding: 6px 12px;
+  backdrop-filter: blur(4px);
+  transition: opacity 0.3s;
+}
+
+.eyes-container.fullscreen-mode .eyes-overlay {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.eyes-info-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.eyes-label {
+  font-size: 9px;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 1px;
+  font-family: var(--font);
+}
+
+.eyes-val {
+  font-size: 11px;
+  color: var(--accent);
+  font-family: var(--font);
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+/* Tap hint */
+.eyes-hint {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+  font-family: var(--font);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.eyes-container.fullscreen-mode .eyes-hint {
+  display: none;
+}
+
+/* Expression map */
+.eyes-map {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.eyes-map-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: border-color 0.3s, background 0.3s;
+}
+
+.eyes-map-row.active-expr {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+.eyes-map-icon {
+  font-size: 18px;
+  color: var(--text-dim);
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.eyes-map-row.active-expr .eyes-map-icon {
+  color: var(--accent);
+}
+
+.eyes-map-info {
+  flex: 1;
+}
+
+.eyes-map-label {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font);
+  color: var(--text);
+  letter-spacing: 1px;
+}
+
+.eyes-map-states {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.eyes-map-file {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: var(--font);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 7px;
+  flex-shrink: 0;
+}

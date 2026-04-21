@@ -1,22 +1,3 @@
-// ============================================================
-//  XORA Mini AGV — Firmware v0.8
-//  + Line following (3 IR sensor)
-//  + Intersection counter: L=1,M=1,R=1 pertama = pertigaan
-//                          L=1,M=1,R=1 kedua   = kotak tujuan / kotak base
-//  + 180° turn di destination dan base
-//  + TinyML integration (weight filter + predictML)
-//  + ML state: NO_OBJECT, OBJECT_PRESENT, OBJECT_PICKED,
-//              OBSTACLE_DETECTED, INVALID_LOAD
-//  Perubahan v0.8 dari v0.7:
-//    [1] Tambah intersectionCount — bedain pertigaan vs kotak tujuan/base
-//    [2] DECISION_AT_INTERSECTION diimplementasi penuh (sebelumnya kosong)
-//    [3] Logic belok per tujuan: A=kiri, B=lurus, C=kanan
-//    [4] Logic return reverse:   A=kanan, B=lurus, C=kiri
-//    [5] Setelah belok di pertigaan, AGV lanjut jalan tanpa berhenti
-//    [6] intersectionCount di-reset setiap mulai perjalanan baru
-//    [7] Tambah TURN_DURATION_MS agar belok di pertigaan tidak terlalu jauh
-// ============================================================
-
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -54,7 +35,8 @@ const char* MQTT_CLIENT_ID = "xora-agv-001";
 #define HX_DT       35
 #define HX_SCK      32
 #define PIN_LED     2
-#define PIN_BUZZER  33
+#define PIN_BUZZER  15
+#define PIN_VOLTAGE 33
 
 #define PIN_STBY  4
 #define PIN_PWMA  25
@@ -68,20 +50,35 @@ const char* MQTT_CLIENT_ID = "xora-agv-001";
 #define IR_MID    36
 #define IR_RIGHT  39
 
+// ─── Kalibrasi loadcell ───────────────────────────────────────────────────────
+// Cara kalibrasi:
+//   1. Tare (kosong), catat nilai raw dari scale.get_units()
+//   2. Taruh benda dengan berat diketahui (misal 100g)
+//   3. Hitung: CALIBRATION_FACTOR = (raw_value - tare) / berat_gram
+// Ubah nilai ini sesuai hasil kalibrasi fisik kamu:
+#define CALIBRATION_FACTOR  420.0f  // <-- sesuaikan!
+
+// ─── Battery ──────────────────────────────────────────────────────────────────
+#define VOLTAGE_MAX_RAW   4095.0f
+#define VOLTAGE_REF       3.3f
+#define VOLTAGE_DIVIDER   7.8f
+#define BATTERY_MAX_V     8.4f
+#define BATTERY_MIN_V     6.0f
+float batteryVoltage  = 0.0f;
+int   batteryPercent  = 0;
+
 // ─── Konfigurasi ──────────────────────────────────────────────────────────────
-#define SPD_NORMAL   110
-#define SPD_TURN     80
-#define SPD_SPIN     100
+#define SPD_NORMAL   180
+#define SPD_TURN     130
+#define SPD_SPIN     160
 
-// Waktu berhenti di titik tujuan sebelum putar (ms)
-#define STOP_AT_DEST_MS   3000
-
-// Durasi putar balik 180° — sesuaikan sampai AGV benar-benar menghadap garis
-#define TURN_180_MS  1500
-
-// Durasi belok di pertigaan (maju sambil spin) — sesuaikan agar tidak kebablasan
-// Naikkan jika AGV belum keluar dari pertigaan, turunkan jika kebablasan
+#define STOP_AT_DEST_MS          3000
+#define TURN_180_MS              1500
 #define TURN_AT_INTERSECTION_MS  400
+
+// ─── Ultrasonic ───────────────────────────────────────────────────────────────
+// Jarak (cm) yang dianggap ada obstacle di depan
+#define OBSTACLE_DIST_CM  20.0f
 
 // ─── OLED ─────────────────────────────────────────────────────────────────────
 #define SCREEN_WIDTH  128
@@ -96,11 +93,11 @@ PubSubClient mqtt(wifiClient);
 // ─── State Machine ────────────────────────────────────────────────────────────
 enum AGVState {
   IDLE, READY, FOLLOW_LINE,
-  DECISION_AT_INTERSECTION,   // Belok di pertigaan (intersection ke-1)
-  TURN_180_AT_DEST,           // Stop + putar balik di kotak tujuan (intersection ke-2)
+  DECISION_AT_INTERSECTION,
+  TURN_180_AT_DEST,
   RETURN_TO_BASE,
-  DECISION_AT_INTERSECTION_RETURN,  // Belok di pertigaan saat kembali ke base
-  TURN_180_AT_BASE,           // Putar balik di kotak base
+  DECISION_AT_INTERSECTION_RETURN,
+  TURN_180_AT_BASE,
   ARRIVED_AT_DESTINATION,
   LOAD_UNLOAD,
   MANUAL_OVERRIDE,
@@ -116,13 +113,7 @@ AGVMode     currentMode  = MODE_AUTO;
 AGVState    prevState    = (AGVState)-1;
 
 // ─── Intersection counter ─────────────────────────────────────────────────────
-// Menghitung berapa kali L=1,M=1,R=1 terdeteksi dalam satu perjalanan.
-// intersection ke-1 = pertigaan → belok sesuai tujuan
-// intersection ke-2 = kotak tujuan / kotak base → stop
 uint8_t intersectionCount = 0;
-
-// Flag untuk mencegah intersectionCount naik berkali-kali
-// selagi AGV masih berada di atas garis kotak yang sama
 bool    onIntersection    = false;
 
 // ─── TinyML State ─────────────────────────────────────────────────────────────
@@ -144,7 +135,7 @@ unsigned long tTurn180Start         = 0;
 unsigned long tStopAtDest           = 0;
 unsigned long tLineLost             = 0;
 unsigned long tLastScaleReady       = 0;
-unsigned long tIntersectionTurn     = 0;   // timer belok di pertigaan
+unsigned long tIntersectionTurn     = 0;
 bool          scaleWarned           = false;
 uint8_t       noObjectCount         = 0;
 
@@ -209,14 +200,10 @@ void readIR(){
   irR = (digitalRead(IR_RIGHT) == HIGH);
 }
 
-// L=1, M=1, R=1 → pertigaan ATAU kotak tujuan/base
 bool isAllSensor(){ return irL && irM && irR; }
 
-// ─── Line Follow dasar (non-intersection) ─────────────────────────────────────
-// Return false jika garis tidak terdeteksi sama sekali
 bool doLineFollow(){
-  // Jika semua sensor aktif, kembalikan true tapi biarkan state machine yang handle
-  if(irL && irM && irR)   return true;
+  if(irL && irM && irR)    return true;
   if(!irL && !irM && !irR) return false;
 
   if(!irL && irM && !irR)       motorForward(SPD_NORMAL);
@@ -228,30 +215,53 @@ bool doLineFollow(){
   return true;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Ultrasonic (median filter 5 sampel) ──────────────────────────────────────
 float readDistance(){
-  digitalWrite(TRIG_PIN,LOW); delayMicroseconds(2);
-  digitalWrite(TRIG_PIN,HIGH); delayMicroseconds(10);
-  digitalWrite(TRIG_PIN,LOW);
-  long dur=pulseIn(ECHO_PIN,HIGH,25000);
-  return dur*0.034f/2.0f;
+  float readings[5];
+  for(int i=0;i<5;i++){
+    digitalWrite(TRIG_PIN,LOW);  delayMicroseconds(2);
+    digitalWrite(TRIG_PIN,HIGH); delayMicroseconds(10);
+    digitalWrite(TRIG_PIN,LOW);
+    long dur = pulseIn(ECHO_PIN, HIGH, 25000);
+    readings[i] = (dur == 0) ? 999.0f : dur * 0.034f / 2.0f;
+    delay(5);
+  }
+  // Insertion sort → ambil median (index 2)
+  for(int i=1;i<5;i++){
+    float key = readings[i]; int j = i-1;
+    while(j>=0 && readings[j]>key){ readings[j+1]=readings[j]; j--; }
+    readings[j+1]=key;
+  }
+  return readings[2];
 }
 
+// ─── Battery ──────────────────────────────────────────────────────────────────
+void readBattery(){
+  long sum = 0;
+  for(int i=0;i<10;i++) sum += analogRead(PIN_VOLTAGE);
+  int raw = sum / 10;
+  batteryVoltage = (raw / VOLTAGE_MAX_RAW) * VOLTAGE_REF * VOLTAGE_DIVIDER;
+  batteryPercent = constrain(
+    (int)((batteryVoltage - BATTERY_MIN_V) / (BATTERY_MAX_V - BATTERY_MIN_V) * 100),
+    0, 100);
+}
+
+// ─── String helpers ───────────────────────────────────────────────────────────
 const char* stateStr(AGVState s){
   switch(s){
-    case IDLE:                              return "IDLE";
-    case READY:                             return "READY";
-    case FOLLOW_LINE:                       return "FOLLOW_LINE";
-    case DECISION_AT_INTERSECTION:          return "INTERSECTION_GO";
-    case TURN_180_AT_DEST:                  return "TURN_AT_DEST";
-    case RETURN_TO_BASE:                    return "RETURN_TO_BASE";
-    case DECISION_AT_INTERSECTION_RETURN:   return "INTERSECTION_RETURN";
-    case TURN_180_AT_BASE:                  return "TURN_AT_BASE";
-    case ARRIVED_AT_DESTINATION:            return "ARRIVED";
-    case LOAD_UNLOAD:                       return "LOAD_UNLOAD";
-    case MANUAL_OVERRIDE:                   return "MANUAL";
-    case ERROR_STATE:                       return "ERROR";
-    default:                                return "UNKNOWN";
+    case IDLE:                            return "IDLE";
+    case READY:                           return "READY";
+    case FOLLOW_LINE:                     return "FOLLOW_LINE";
+    case DECISION_AT_INTERSECTION:        return "INTERSECTION_GO";
+    case TURN_180_AT_DEST:                return "TURN_AT_DEST";
+    case RETURN_TO_BASE:                  return "RETURN_TO_BASE";
+    case DECISION_AT_INTERSECTION_RETURN: return "INTERSECTION_RETURN";
+    case TURN_180_AT_BASE:                return "TURN_AT_BASE";
+    case ARRIVED_AT_DESTINATION:          return "ARRIVED";
+    case LOAD_UNLOAD:                     return "LOAD_UNLOAD";
+    case MANUAL_OVERRIDE:                 return "MANUAL";
+    case ERROR_STATE:                     return "ERROR";
+    default:                              return "UNKNOWN";
   }
 }
 
@@ -265,23 +275,23 @@ const char* modeStr(AGVMode m){
 
 const char* mlStateStr(MLState s){
   switch(s){
-    case NO_OBJECT:        return "NO_OBJECT";
-    case OBJECT_PRESENT:   return "OBJECT_PRESENT";
-    case OBJECT_PICKED:    return "OBJECT_PICKED";
-    case OBSTACLE_DETECTED:return "OBSTACLE";
-    case INVALID_LOAD:     return "INVALID";
-    default:               return "UNKNOWN";
+    case NO_OBJECT:         return "NO_OBJECT";
+    case OBJECT_PRESENT:    return "OBJECT_PRESENT";
+    case OBJECT_PICKED:     return "OBJECT_PICKED";
+    case OBSTACLE_DETECTED: return "OBSTACLE";
+    case INVALID_LOAD:      return "INVALID";
+    default:                return "UNKNOWN";
   }
 }
 
 void drawOLED(const char* l1,const char* l2="",const char* l3=""){
   display.clearDisplay();
-  display.setTextSize(1);display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0,0);display.println("XORA AGV");
+  display.setTextSize(1); display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0,0);  display.println("XORA AGV");
   display.println("----------------");
-  display.setCursor(0,20);display.println(l1);
-  display.setCursor(0,32);display.println(l2);
-  display.setCursor(0,44);display.println(l3);
+  display.setCursor(0,20); display.println(l1);
+  display.setCursor(0,32); display.println(l2);
+  display.setCursor(0,44); display.println(l3);
   display.display();
 }
 
@@ -295,10 +305,13 @@ void publishState(){
 void publishSensors(){
   char buf[64];
   snprintf(buf,sizeof(buf),"%.1f",distanceCm); mqtt.publish(TOPIC_SENSOR_US,buf);
-  snprintf(buf,sizeof(buf),"%.0f",loadGrams);  mqtt.publish(TOPIC_SENSOR_LC,buf);
+  snprintf(buf,sizeof(buf),"%.1f",loadGrams);  mqtt.publish(TOPIC_SENSOR_LC,buf);
   snprintf(buf,sizeof(buf),"{\"s1\":%d,\"s2\":%d,\"s3\":%d,\"s4\":0,\"s5\":0}",
     irL?1:0, irM?1:0, irR?1:0);
   mqtt.publish(TOPIC_SENSOR_IR,buf);
+  char batBuf[32];
+  snprintf(batBuf,sizeof(batBuf),"{\"v\":%.2f,\"pct\":%d}",batteryVoltage,batteryPercent);
+  mqtt.publish(TOPIC_BATTERY,batBuf);
 }
 
 void publishEvent(const char* code,const char* message){
@@ -438,26 +451,68 @@ void wifiSetup(){
   }
 }
 
+// ─── Baca loadcell (dipanggil dari loop) ─────────────────────────────────────
+// Menggunakan rata-rata 3 sampel + moving average filter.
+// Hasil disimpan di loadGrams dan mlState diperbarui via predictML().
+void updateLoadcell(unsigned long now){
+  if(scale.is_ready()){
+    float rawWeight  = scale.get_units(3);           // rata-rata 3 sampel
+    float weight     = weightFilter.update(rawWeight);
+    float delta      = weight - lastWeight;
+    lastWeight       = weight;
+    loadGrams        = max(weight, 0.0f);            // clamp agar tidak negatif
+    tLastScaleReady  = now;
+    scaleWarned      = false;
+
+    mlState = predictML(weight, delta, distanceCm);
+
+  } else if(now - tLastScaleReady > LOADCELL_TIMEOUT_MS){
+    // Loadcell tidak merespons → jalankan ML dengan berat terakhir yang diketahui
+    mlState = predictML(lastWeight, 0.0f, distanceCm);
+
+    if(!scaleWarned){
+      scaleWarned = true;
+      publishEvent("SCALE_TIMEOUT","Loadcell not responding, using last value");
+      Serial.println("[WARN] Loadcell timeout — ML pakai berat terakhir");
+    }
+  }
+}
+
 // ─── SETUP ────────────────────────────────────────────────────────────────────
 void setup(){
   Serial.begin(115200);
-  pinMode(PIN_LED,OUTPUT);
-  pinMode(PIN_BUZZER,OUTPUT);
-  pinMode(TRIG_PIN,OUTPUT);
-  pinMode(ECHO_PIN,INPUT);
-  pinMode(IR_LEFT, INPUT);
-  pinMode(IR_MID,  INPUT);
-  pinMode(IR_RIGHT,INPUT);
+  pinMode(PIN_LED,    OUTPUT);
+  pinMode(PIN_BUZZER, OUTPUT);
+  pinMode(TRIG_PIN,   OUTPUT);
+  pinMode(ECHO_PIN,   INPUT);
+  pinMode(IR_LEFT,    INPUT);
+  pinMode(IR_MID,     INPUT);
+  pinMode(IR_RIGHT,   INPUT);
+  pinMode(PIN_VOLTAGE,INPUT);
+  analogSetAttenuation(ADC_11db);
 
   motorSetup();
 
   Wire.begin(21,22);
-  display.begin(SSD1306_SWITCHCAPVCC,0x3C);
+  if(!display.begin(SSD1306_SWITCHCAPVCC,0x3C)){
+    Serial.println("[OLED] Init gagal!");
+  }
   drawOLED("Booting...","","");
 
-  scale.begin(HX_DT,HX_SCK);
-  scale.set_scale();
-  scale.tare();
+  // ── Inisialisasi HX711 ───────────────────────────────────────────────────
+  scale.begin(HX_DT, HX_SCK);
+  delay(200);
+
+  if(scale.is_ready()){
+    scale.set_scale(CALIBRATION_FACTOR);  // terapkan faktor kalibrasi
+    scale.tare();                         // nol-kan timbangan
+    Serial.println("[SCALE] HX711 siap, tare selesai.");
+    drawOLED("SCALE OK","Tare selesai","");
+  } else {
+    Serial.println("[SCALE] HX711 TIDAK terdeteksi! Cek kabel DT/SCK.");
+    drawOLED("SCALE ERROR","Cek kabel","HX711");
+  }
+  delay(1000);
 
   wifiSetup();
 
@@ -482,8 +537,6 @@ void runStateMachine(){
     case IDLE:
       digitalWrite(PIN_LED,LOW);
       drawOLED("IDLE","Tunggu perintah",modeStr(currentMode));
-
-      // Auto-trigger ke READY saat OBJECT_PRESENT di MODE_AUTO (untuk demo/pickup otomatis)
       if(mlState==OBJECT_PRESENT && currentMode==MODE_AUTO){
         currentState=READY;
       }
@@ -499,7 +552,6 @@ void runStateMachine(){
         break;
       }
 
-      // Reset semua counter sebelum mulai perjalanan baru
       intersectionCount = 0;
       onIntersection    = false;
       tLineLost         = 0;
@@ -511,17 +563,15 @@ void runStateMachine(){
       publishEvent("MOVING","AGV starting, following line");
       break;
 
-    // ── FOLLOW_LINE (pergi ke tujuan) ────────────────────────────────────────
-    // intersectionCount=0 → belum ketemu apapun
-    // intersectionCount=1 → sudah lewat pertigaan, menuju kotak tujuan
+    // ── FOLLOW_LINE ──────────────────────────────────────────────────────────
     case FOLLOW_LINE:{
       char db[32]; snprintf(db,sizeof(db),"-> %s [X:%d]",destStr(currentDest),intersectionCount);
       drawOLED("MOVING",db,"Follow line...");
 
-      // ── Obstacle via ML ──────────────────────────────────────────────────
-      if(mlState==OBSTACLE_DETECTED){
+      // ── Obstacle via ultrasonic + ML ─────────────────────────────────────
+      if(mlState==OBSTACLE_DETECTED || distanceCm < OBSTACLE_DIST_CM){
         motorStop(); currentState=ERROR_STATE;
-        publishEvent("OBSTACLE_DETECTED","TinyML stop");
+        publishEvent("OBSTACLE_DETECTED","Obstacle di depan!");
         beeper.start(300); break;
       }
 
@@ -538,7 +588,7 @@ void runStateMachine(){
       }
       noObjectCount = 0;
 
-      // ── Deteksi L=1,M=1,R=1 ─────────────────────────────────────────────
+      // ── Deteksi pertigaan / kotak ─────────────────────────────────────────
       if(isAllSensor()){
         if(!onIntersection){
           onIntersection = true;
@@ -546,13 +596,11 @@ void runStateMachine(){
           Serial.printf("[INTERSECT] Count=%d\n", intersectionCount);
 
           if(intersectionCount == 1){
-            // ── Pertigaan pertama → belok sesuai tujuan ──────────────────
             motorStop();
             currentState = DECISION_AT_INTERSECTION;
             tIntersectionTurn = 0;
             publishEvent("INTERSECTION","Pertigaan ke-1, belok sesuai tujuan");
           } else {
-            // ── Intersection ke-2 → kotak tujuan → stop ──────────────────
             motorStop();
             publishEvent("ARRIVED","Arrived at destination");
             beeper.start(300);
@@ -561,14 +609,11 @@ void runStateMachine(){
             tTurn180Start = 0;
           }
         }
-        // Masih di atas garis yang sama → onIntersection=true, tidak increment lagi
         break;
       } else {
-        // Sudah keluar dari garis kotak → reset flag
         onIntersection = false;
       }
 
-      // ── Follow line normal ────────────────────────────────────────────────
       bool lineOk = doLineFollow();
       if(!lineOk){
         if(tLineLost==0) tLineLost=millis();
@@ -583,17 +628,10 @@ void runStateMachine(){
       break;
     }
 
-    // ── DECISION_AT_INTERSECTION (pergi ke tujuan) ───────────────────────────
-    // AGV sudah berhenti di pertigaan, sekarang belok sesuai tujuan
-    // lalu langsung lanjut FOLLOW_LINE tanpa menunggu
+    // ── DECISION_AT_INTERSECTION ─────────────────────────────────────────────
     case DECISION_AT_INTERSECTION:{
       if(tIntersectionTurn==0){
         tIntersectionTurn = millis();
-        // Tentukan arah belok berdasarkan tujuan
-        // Dari BASE (bawah) menuju:
-        //   A (kiri)  → belok kiri  (spinLeft)
-        //   B (atas)  → lurus       (forward)
-        //   C (kanan) → belok kanan (spinRight)
         switch(currentDest){
           case DEST_A:
             motorSpinLeft(SPD_SPIN);
@@ -613,10 +651,9 @@ void runStateMachine(){
         }
       }
 
-      // Setelah durasi belok selesai → lanjut follow line
       if(millis()-tIntersectionTurn >= TURN_AT_INTERSECTION_MS){
         tIntersectionTurn = 0;
-        onIntersection    = false;  // reset agar bisa deteksi kotak tujuan
+        onIntersection    = false;
         currentState      = FOLLOW_LINE;
         publishEvent("TURN_DONE","Selesai belok, lanjut follow line");
       }
@@ -624,8 +661,6 @@ void runStateMachine(){
     }
 
     // ── TURN_180_AT_DEST ─────────────────────────────────────────────────────
-    // Fase 1: diam STOP_AT_DEST_MS (atau skip jika OBJECT_PICKED)
-    // Fase 2: putar TURN_180_MS tanpa cek IR
     case TURN_180_AT_DEST:
       if(tStopAtDest==0){
         tStopAtDest=millis();
@@ -633,7 +668,6 @@ void runStateMachine(){
         drawOLED("ARRIVED",destStr(currentDest),"Tunggu unload...");
       }
 
-      // Early-exit: objek sudah diambil sebelum timeout
       if(mlState==OBJECT_PICKED){
         drawOLED("ARRIVED",destStr(currentDest),"Objek diambil!");
         tStopAtDest = millis() - STOP_AT_DEST_MS;
@@ -651,7 +685,6 @@ void runStateMachine(){
         motorStop();
         tStopAtDest   = 0;
         tTurn180Start = 0;
-        // Reset intersection counter untuk perjalanan pulang
         intersectionCount = 0;
         onIntersection    = false;
         tIntersectionTurn = 0;
@@ -662,20 +695,16 @@ void runStateMachine(){
       break;
 
     // ── RETURN_TO_BASE ───────────────────────────────────────────────────────
-    // intersectionCount=0 → belum ketemu apapun saat pulang
-    // intersectionCount=1 → sudah lewat pertigaan, menuju kotak base
     case RETURN_TO_BASE:{
       char db[32]; snprintf(db,sizeof(db),"-> BASE [X:%d]",intersectionCount);
       drawOLED("RETURNING",db,"Follow line...");
 
-      // Obstacle check saat kembali
-      if(mlState==OBSTACLE_DETECTED){
+      if(mlState==OBSTACLE_DETECTED || distanceCm < OBSTACLE_DIST_CM){
         motorStop(); currentState=ERROR_STATE;
         publishEvent("OBSTACLE_DETECTED","Stop on return");
         beeper.start(300); break;
       }
 
-      // ── Deteksi L=1,M=1,R=1 saat kembali ───────────────────────────────
       if(isAllSensor()){
         if(!onIntersection){
           onIntersection = true;
@@ -683,13 +712,11 @@ void runStateMachine(){
           Serial.printf("[INTERSECT RETURN] Count=%d\n", intersectionCount);
 
           if(intersectionCount == 1){
-            // ── Pertigaan pertama saat pulang → belok reverse ────────────
             motorStop();
             currentState      = DECISION_AT_INTERSECTION_RETURN;
             tIntersectionTurn = 0;
             publishEvent("INTERSECTION_RETURN","Pertigaan ke-1 pulang, belok reverse");
           } else {
-            // ── Intersection ke-2 saat pulang → kotak base → stop ────────
             motorStop();
             publishEvent("AT_BASE","Arrived at base");
             beeper.start(200);
@@ -717,10 +744,6 @@ void runStateMachine(){
     }
 
     // ── DECISION_AT_INTERSECTION_RETURN ──────────────────────────────────────
-    // Logika belok kebalikan dari saat berangkat:
-    //   A (dari kiri menuju base/bawah) → belok kanan (spinRight)
-    //   B (dari atas menuju base/bawah) → lurus       (forward)
-    //   C (dari kanan menuju base/bawah)→ belok kiri  (spinLeft)
     case DECISION_AT_INTERSECTION_RETURN:{
       if(tIntersectionTurn==0){
         tIntersectionTurn = millis();
@@ -745,7 +768,7 @@ void runStateMachine(){
 
       if(millis()-tIntersectionTurn >= TURN_AT_INTERSECTION_MS){
         tIntersectionTurn = 0;
-        onIntersection    = false;  // reset agar bisa deteksi kotak base
+        onIntersection    = false;
         currentState      = RETURN_TO_BASE;
         publishEvent("TURN_RETURN_DONE","Selesai belok, menuju base");
       }
@@ -789,64 +812,43 @@ void runStateMachine(){
 
 // ─── LOOP ─────────────────────────────────────────────────────────────────────
 void loop(){
-  unsigned long now=millis();
+  unsigned long now = millis();
 
+  // ── WiFi & MQTT ────────────────────────────────────────────────────────────
   if(WiFi.status()==WL_CONNECTED){
     if(!mqtt.connected()) mqttConnect();
     mqtt.loop();
   }
 
   beeper.tick();
-  distanceCm=readDistance();
-  readIR();  // irL, irM, irR diperbarui sekali per loop
 
-  if(currentMode!=MODE_MANUAL){
-    // ── DUMMY LOADCELL MODE ───────────────────────────────────────────────────
-    // Loadcell belum siap digunakan — mlState di-hardcode OBJECT_PRESENT
-    // agar AGV selalu anggap sedang membawa barang dan tidak trigger error.
-    // Untuk mengaktifkan loadcell nyata: hapus blok #define DUMMY_LOADCELL
-    // dan uncomment blok scale.is_ready() di bawah ini.
-    #define DUMMY_LOADCELL
-    #ifdef DUMMY_LOADCELL
-      loadGrams = 100.0f;           // dummy berat 100g
-      mlState   = OBJECT_PRESENT;   // selalu anggap ada barang
-    #else
-      if(scale.is_ready()){
-        float rawWeight  = scale.get_units(1);
-        float weight     = weightFilter.update(rawWeight);
-        float delta      = weight - lastWeight;
-        lastWeight       = weight;
-        loadGrams        = weight;
-        tLastScaleReady  = now;
-        scaleWarned      = false;
+  // ── Baca sensor ────────────────────────────────────────────────────────────
+  distanceCm = readDistance();
+  readIR();
+  readBattery();
 
-        mlState = predictML(weight, delta, distanceCm);
-
-      } else if(now - tLastScaleReady > LOADCELL_TIMEOUT_MS){
-        mlState = predictML(lastWeight, 0.0f, distanceCm);
-
-        if(!scaleWarned){
-          scaleWarned = true;
-          publishEvent("SCALE_TIMEOUT","Loadcell not responding, using fallback");
-          Serial.println("[WARN] Loadcell timeout — ML running on last known weight");
-        }
-      }
-    #endif
+  // ── Loadcell + TinyML (hanya di luar mode manual) ─────────────────────────
+  if(currentMode != MODE_MANUAL){
+    updateLoadcell(now);
   }
 
+  // ── State machine ──────────────────────────────────────────────────────────
   runStateMachine();
 
-  if(currentState!=prevState){
+  // ── Publish perubahan state ────────────────────────────────────────────────
+  if(currentState != prevState){
     publishState();
-    Serial.printf("[STATE] %s -> %s | Dest:%s | Mode:%s | ML:%s | X:%d\n",
-      stateStr(prevState),stateStr(currentState),
-      destStr(currentDest),modeStr(currentMode),mlStateStr(mlState),
+    Serial.printf("[STATE] %s -> %s | Dest:%s | Mode:%s | ML:%s | Berat:%.1fg | Jarak:%.1fcm | X:%d\n",
+      stateStr(prevState), stateStr(currentState),
+      destStr(currentDest), modeStr(currentMode),
+      mlStateStr(mlState), loadGrams, distanceCm,
       intersectionCount);
-    prevState=currentState;
+    prevState = currentState;
   }
 
-  if(now-tLastSensorPublish>=SENSOR_INTERVAL){
-    tLastSensorPublish=now;
+  // ── Publish sensor berkala ────────────────────────────────────────────────
+  if(now - tLastSensorPublish >= SENSOR_INTERVAL){
+    tLastSensorPublish = now;
     if(mqtt.connected()){
       publishSensors();
       mqtt.publish(TOPIC_ML_STATE, mlStateStr(mlState));

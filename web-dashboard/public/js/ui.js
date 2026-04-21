@@ -36,6 +36,7 @@ window.applyState = function (raw) {
   const s = typeof raw === "string" ? raw : raw.state || raw;
   const prev = prevState;
   prevState = s;
+  window.prevState = s; // expose for Robo Eyes
 
   // Header state chip
   const hst = document.getElementById("h-state");
@@ -61,6 +62,9 @@ window.applyState = function (raw) {
 
   // AGV visual
   updateAGVVisual(s);
+
+  // Robo Eyes sync
+  if (window.updateRoboEyes) updateRoboEyes(s);
 
   // ── Alert logic ───────────────────────────────────────────────────────────
   const alertError = document.getElementById("toggle-alert-error")?.checked;
@@ -183,7 +187,20 @@ window.applyMode = function (raw) {
 ══════════════════════════════════════════════════════════════════════════════ */
 window.applyBat = function (v) {
   if (v == null) return;
-  const pct = Math.max(0, Math.min(100, Number(v)));
+
+  // Support both object {v, pct} and plain number
+  let pctRaw, voltage;
+  if (typeof v === "object" && "pct" in v) {
+    pctRaw  = v.pct;
+    voltage = v.v;
+  } else {
+    pctRaw  = v;
+    voltage = null;
+  }
+
+  const pct = Math.max(0, Math.min(100, Number(pctRaw)));
+  if (isNaN(pct)) return;
+
   const col =
     pct > 40
       ? "var(--clr-green)"
@@ -194,15 +211,19 @@ window.applyBat = function (v) {
   // Header
   const pctEl = document.getElementById("bat-pct");
   const fill = document.getElementById("bat-fill");
+  const voltEl = document.getElementById("bat-volt");
   if (pctEl) pctEl.textContent = pct + "%";
   if (fill) {
     fill.style.width = pct + "%";
     fill.style.background = col;
   }
+  if (voltEl && voltage != null && !isNaN(voltage)) {
+    voltEl.textContent = Number(voltage).toFixed(1) + "V";
+  }
 
   // System page
   const sysBat = document.getElementById("sys-bat");
-  if (sysBat) sysBat.textContent = pct + "%";
+  if (sysBat) sysBat.textContent = pct + "%" + (voltage != null && !isNaN(voltage) ? ` (${Number(voltage).toFixed(2)}V)` : "");
 
   // Big gauge (Sensors page)
   const bigBat = document.getElementById("big-bat");

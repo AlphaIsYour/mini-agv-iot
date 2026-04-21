@@ -213,6 +213,14 @@ window.navTo = function (page) {
   // Lazy load analytics / eventlog
   if (page === "analytics" || page === "eventlog") loadAnalytics();
 
+  // When entering Robo Eyes page, ensure videos are playing and state is current
+  if (page === "roboeyes") {
+    ["eyes-video-ready","eyes-video-moving","eyes-video-error"].forEach(id => {
+      document.getElementById(id)?.play().catch(() => {});
+    });
+    if (window.updateRoboEyes && window.prevState) updateRoboEyes(window.prevState);
+  }
+
   // Clear error badge when visiting eventlog
   if (page === "eventlog") {
     const badge = document.getElementById("err-badge");
@@ -588,3 +596,124 @@ function bindUI() {
     if (el) el.textContent = this.value;
   });
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   ROBO EYES
+   Menampilkan video ekspresi berdasarkan state AGV.
+   Video: ready.mp4 | moving.mp4 | error.mp4
+══════════════════════════════════════════════════════════════════════════════ */
+
+// Mapping state → expression
+function stateToExpression(state) {
+  const MOVING_STATES = [
+    "FOLLOW_LINE", "RETURN_TO_BASE",
+    "DECISION_AT_INTERSECTION", "INTERSECTION_GO",
+    "DECISION_AT_INTERSECTION_RETURN", "INTERSECTION_RETURN",
+    "TURN_AT_DEST", "TURN_AT_BASE",
+    "TURN_180_AT_DEST", "TURN_180_AT_BASE",
+  ];
+  const ERROR_STATES = ["ERROR_STATE", "MANUAL_OVERRIDE"];
+
+  if (ERROR_STATES.includes(state))  return "error";
+  if (MOVING_STATES.includes(state)) return "moving";
+  return "ready"; // IDLE, READY, ARRIVED, LOAD_UNLOAD, RETURNED, etc.
+}
+
+let currentExpression = "ready";
+
+window.updateRoboEyes = function (state) {
+  if (!state) return;
+
+  const expr = stateToExpression(state);
+
+  // Update chip & overlay info
+  const chip = document.getElementById("eyes-state-chip");
+  const infoState = document.getElementById("eyes-info-state");
+  const infoExpr  = document.getElementById("eyes-info-expr");
+  if (chip)      { chip.textContent = state.replace(/_/g, " "); chip.className = "h-state " + state; }
+  if (infoState) infoState.textContent = state.replace(/_/g, " ");
+  if (infoExpr)  infoExpr.textContent  = expr.toUpperCase();
+
+  // Update expression map highlight
+  ["ready","moving","error"].forEach(e => {
+    document.getElementById("emap-" + e)?.classList.toggle("active-expr", e === expr);
+  });
+
+  // Live badge on nav item
+  const badge = document.getElementById("eyes-live-badge");
+  if (badge) badge.style.display = "flex";
+
+  // Skip video swap if same expression
+  if (expr === currentExpression) return;
+  currentExpression = expr;
+
+  const videos = {
+    ready:  document.getElementById("eyes-video-ready"),
+    moving: document.getElementById("eyes-video-moving"),
+    error:  document.getElementById("eyes-video-error"),
+  };
+
+  const incoming = videos[expr];
+  if (!incoming) return;
+
+  // Crossfade: fade out all, fade in target
+  Object.entries(videos).forEach(([key, vid]) => {
+    if (!vid) return;
+    if (key === expr) {
+      vid.classList.remove("fading-out");
+      vid.classList.add("active", "fading-in");
+      vid.play().catch(() => {});
+      // Clean up animation class after it ends
+      vid.addEventListener("animationend", () => vid.classList.remove("fading-in"), { once: true });
+    } else {
+      if (vid.classList.contains("active")) {
+        vid.classList.add("fading-out");
+        vid.addEventListener("animationend", () => {
+          vid.classList.remove("active", "fading-out");
+        }, { once: true });
+      }
+    }
+  });
+};
+
+// Fullscreen toggle
+window.toggleEyesFullscreen = function () {
+  const container = document.getElementById("eyes-container");
+  if (!container) return;
+
+  const isFull = container.classList.toggle("fullscreen-mode");
+  const icon = document.querySelector("#btn-eyes-fullscreen i");
+  if (icon) icon.className = isFull ? "fa-solid fa-compress" : "fa-solid fa-expand";
+
+  // Try native fullscreen API on mobile
+  if (isFull) {
+    container.requestFullscreen?.().catch(() => {});
+  } else {
+    document.exitFullscreen?.().catch(() => {});
+  }
+};
+
+// Tap on container juga toggle fullscreen
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("eyes-container")?.addEventListener("click", (e) => {
+    // Only if clicking the container itself (not buttons inside)
+    if (e.target.closest("button")) return;
+    toggleEyesFullscreen();
+  });
+
+  // Sync native fullscreen exit (e.g. pressing Escape)
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement) {
+      const container = document.getElementById("eyes-container");
+      container?.classList.remove("fullscreen-mode");
+      const icon = document.querySelector("#btn-eyes-fullscreen i");
+      if (icon) icon.className = "fa-solid fa-expand";
+    }
+  });
+
+  // Make sure all videos are preloaded and looping
+  ["eyes-video-ready","eyes-video-moving","eyes-video-error"].forEach(id => {
+    const v = document.getElementById(id);
+    if (v) { v.loop = true; v.muted = true; v.preload = "auto"; }
+  });
+});
