@@ -11,6 +11,8 @@ window.applySnapshot = function (s) {
   applyDest(s.destination);
   applyMode(s.mode);
   applyBat(s.battery);
+  if (s.blackboxCount != null) applyBlackbox(s.blackboxCount);
+  if (s.waiting != null) applyWaiting(s.waiting);
   if (s.sensors) {
     applyIR(s.sensors.ir);
     applyUS(s.sensors.ultrasonic);
@@ -60,8 +62,9 @@ window.applyState = function (raw) {
   const sfState = document.getElementById("sf-state");
   if (sfState) sfState.textContent = s;
 
-  // AGV visual
-  updateAGVVisual(s);
+  // AGV visual — pass mission for animation
+  const missionNum = window.currentMission || 0;
+  updateAGVVisual(s, missionNum);
 
   // Robo Eyes sync
   if (window.updateRoboEyes) updateRoboEyes(s);
@@ -74,25 +77,20 @@ window.applyState = function (raw) {
     beepError();
     toast("ERROR STATE", "AGV entered error state!", "error");
   }
-  if (
-    (s === "ARRIVED_AT_DESTINATION" || s === "LOAD_UNLOAD") &&
-    prev !== s &&
-    alertArrived
-  ) {
+  if (s === "SAMPAI" && prev !== s && alertArrived) {
     beepSuccess();
-    toast("Arrived", "AGV reached destination", "success");
+    toast("Sampai!", "AGV sudah di titik tujuan", "success");
   }
-  if (s === "MANUAL_OVERRIDE" && prev !== s) {
-    beepWarn();
-    toast("Manual Mode", "AGV switched to manual override", "warning", 3000);
+  if (s === "SELESAI" && prev !== s && alertArrived) {
+    beepSuccess();
+    toast("Selesai!", "AGV sudah kembali ke base", "success");
   }
 };
 
 function stateClass(s) {
   if (s === "ERROR_STATE") return "err";
-  if (s === "ARRIVED_AT_DESTINATION" || s === "LOAD_UNLOAD") return "ok";
-  if (s === "MANUAL_OVERRIDE") return "warn";
-  if (s === "RETURN_TO_BASE") return "purple";
+  if (s === "SAMPAI" || s === "SELESAI") return "ok";
+  if (s === "KEBERANGKATAN" || s === "PULANG") return "purple";
   return "";
 }
 
@@ -104,8 +102,13 @@ let prevDest = "BASE";
 window.applyDest = function (raw) {
   if (!raw) return;
   const d = typeof raw === "string" ? raw : raw.destination || raw;
-  const prev = prevDest;
   prevDest = d;
+
+  // Track current mission number for animation
+  if (d === "A") window.currentMission = 1;
+  else if (d === "B") window.currentMission = 2;
+  else if (d === "C") window.currentMission = 3;
+  else window.currentMission = 0;
 
   const curDest = document.getElementById("cur-dest");
   const sfDest = document.getElementById("sf-dest");
@@ -121,7 +124,6 @@ window.applyDest = function (raw) {
     const zone = document.getElementById("zone-" + n);
     if (!node) return;
     const active = n === d;
-    // Use CSS var so it works in both themes
     const accentColor = getComputedStyle(document.documentElement)
       .getPropertyValue("--accent")
       .trim();
@@ -144,9 +146,6 @@ window.applyDest = function (raw) {
   ["A", "B", "C"].forEach((l) => {
     document.getElementById("btn-" + l)?.classList.toggle("active", l === d);
   });
-
-  // Animate AGV
-  animateAGVAlongTrack(prev, d);
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -322,6 +321,27 @@ window.applyLC = function (v) {
   }
 
   pushSpark("lc", g);
+};
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   BLACKBOX COUNT
+══════════════════════════════════════════════════════════════════════════════ */
+window.applyBlackbox = function (count) {
+  const el = document.getElementById("bb-count");
+  if (el) el.textContent = count;
+  const sf = document.getElementById("sf-bb");
+  if (sf) sf.textContent = count;
+};
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   WAITING STATUS
+══════════════════════════════════════════════════════════════════════════════ */
+window.applyWaiting = function (waiting) {
+  const el = document.getElementById("waiting-status");
+  if (el) {
+    el.textContent = waiting ? "Ya" : "Tidak";
+    el.style.color = waiting ? "var(--clr-amber)" : "";
+  }
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════

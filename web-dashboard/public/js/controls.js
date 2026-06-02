@@ -1,74 +1,53 @@
 /* ══════════════════════════════════════════════════════════════════════════════
    CONTROLS.JS — D-Pad, Keyboard, Arena AGV Animation
+   Arena: Track lurus BASE → A → B → C
 ══════════════════════════════════════════════════════════════════════════════ */
 
 /* ══════════════════════════════════════════════════════════════════════════════
    ARENA — Node positions & track routes
+   Koordinat sesuai SVG viewBox="0 0 200 200":
+   BASE : (100, 170)
+   A    : (100, 130)
+   B    : (100, 80)
+   C    : (100, 30)
 ══════════════════════════════════════════════════════════════════════════════ */
 const NODE_POS = {
-  BASE: { x: 100, y: 160 },
-  A: { x: 40, y: 40 },
-  B: { x: 100, y: 40 },
-  C: { x: 160, y: 40 },
+  BASE: { x: 100, y: 170 },
+  A: { x: 100, y: 130 },
+  B: { x: 100, y: 80 },
+  C: { x: 100, y: 30 },
 };
 
-const TRACK_ROUTES = {
-  "BASE-A": [
-    { x: 100, y: 160 },
-    { x: 40, y: 160 },
-    { x: 40, y: 40 },
-  ],
-  "BASE-B": [
-    { x: 100, y: 160 },
-    { x: 100, y: 40 },
-  ],
-  "BASE-C": [
-    { x: 100, y: 160 },
-    { x: 160, y: 160 },
-    { x: 160, y: 40 },
-  ],
-  "A-BASE": [
-    { x: 40, y: 40 },
-    { x: 40, y: 160 },
-    { x: 100, y: 160 },
-  ],
-  "B-BASE": [
-    { x: 100, y: 40 },
-    { x: 100, y: 160 },
-  ],
-  "C-BASE": [
-    { x: 160, y: 40 },
-    { x: 160, y: 160 },
-    { x: 100, y: 160 },
-  ],
-  "A-B": [
-    { x: 40, y: 40 },
-    { x: 100, y: 40 },
-  ],
-  "A-C": [
-    { x: 40, y: 40 },
-    { x: 160, y: 40 },
-  ],
-  "B-A": [
-    { x: 100, y: 40 },
-    { x: 40, y: 40 },
-  ],
-  "B-C": [
-    { x: 100, y: 40 },
-    { x: 160, y: 40 },
-  ],
-  "C-A": [
-    { x: 160, y: 40 },
-    { x: 40, y: 40 },
-  ],
-  "C-B": [
-    { x: 160, y: 40 },
-    { x: 100, y: 40 },
-  ],
-};
+// Rute pergi: BASE → tujuan
+const ROUTE_TO_A = [
+  { x: 100, y: 170 },
+  { x: 100, y: 130 },
+];
+const ROUTE_TO_B = [
+  { x: 100, y: 170 },
+  { x: 100, y: 80 },
+];
+const ROUTE_TO_C = [
+  { x: 100, y: 170 },
+  { x: 100, y: 30 },
+];
+
+// Rute pulang: tujuan → BASE
+const ROUTE_FROM_A = [
+  { x: 100, y: 130 },
+  { x: 100, y: 170 },
+];
+const ROUTE_FROM_B = [
+  { x: 100, y: 80 },
+  { x: 100, y: 170 },
+];
+const ROUTE_FROM_C = [
+  { x: 100, y: 30 },
+  { x: 100, y: 170 },
+];
 
 /* ── Animation state ─────────────────────────────────────────────────────── */
-let agvPos = { x: 100, y: 160 };
+let agvPos = { x: 100, y: 170 };
 let animFrame = null;
 let currentWaypoints = null;
 let animStartTime = null;
@@ -78,73 +57,75 @@ window.currentMode = "AUTO";
 
 /* ══════════════════════════════════════════════════════════════════════════════
    AGV VISUAL STATE
+   Dipanggil dari ui.js setiap kali state berubah
 ══════════════════════════════════════════════════════════════════════════════ */
-window.updateAGVVisual = function (state) {
+window.updateAGVVisual = function (state, mission) {
   const marker = document.getElementById("agv-marker");
   const trail = document.getElementById("agv-trail");
   if (!marker) return;
 
-  // Reset classes
   marker.className = "";
 
-  if (
-    state === "FOLLOW_LINE" ||
-    state === "DECISION_AT_INTERSECTION" ||
-    state === "RETURN_TO_BASE"
-  ) {
+  // Moving states
+  if (state === "KEBERANGKATAN" || state === "PULANG") {
     marker.classList.add("agv-moving");
-    trail?.classList.add("visible");
-  } else if (state === "ERROR_STATE") {
-    marker.classList.add("agv-error");
-    stopAnimation();
-  } else if (state === "ARRIVED_AT_DESTINATION" || state === "LOAD_UNLOAD") {
+    if (trail) trail.classList.add("visible");
+
+    if (state === "KEBERANGKATAN") {
+      // Pergi ke tujuan
+      if (mission === 1) animateAGVAlongTrack(ROUTE_TO_A);
+      else if (mission === 2) animateAGVAlongTrack(ROUTE_TO_B);
+      else if (mission === 3) animateAGVAlongTrack(ROUTE_TO_C);
+    } else if (state === "PULANG") {
+      // Pulang ke base
+      if (mission === 1) animateAGVAlongTrack(ROUTE_FROM_A);
+      else if (mission === 2) animateAGVAlongTrack(ROUTE_FROM_B);
+      else if (mission === 3) animateAGVAlongTrack(ROUTE_FROM_C);
+    }
+  } else if (state === "SAMPAI") {
     marker.classList.add("agv-arrived");
     stopAnimation();
-  } else {
+    // Snap ke posisi tujuan
+    if (mission === 1) snapAGV(NODE_POS.A);
+    else if (mission === 2) snapAGV(NODE_POS.B);
+    else if (mission === 3) snapAGV(NODE_POS.C);
+  } else if (state === "SELESAI") {
+    marker.classList.add("agv-arrived");
     stopAnimation();
-    trail?.classList.remove("visible");
+    snapAGV(NODE_POS.BASE);
+  } else {
+    // IDLE
+    stopAnimation();
+    if (trail) trail.classList.remove("visible");
+    snapAGV(NODE_POS.BASE);
   }
 };
 
+/* ── Snap AGV ke posisi tanpa animasi ────────────────────────────────────── */
+function snapAGV(pos) {
+  agvPos = { ...pos };
+  document
+    .getElementById("agv-marker")
+    ?.setAttribute("transform", `translate(${pos.x},${pos.y})`);
+}
+
 /* ══════════════════════════════════════════════════════════════════════════════
-   AGV ANIMATION
+   AGV ANIMATION — bergerak sepanjang waypoints
 ══════════════════════════════════════════════════════════════════════════════ */
-window.animateAGVAlongTrack = function (from, to) {
-  if (!from || !to || from === to) return;
+window.animateAGVAlongTrack = function (waypoints) {
+  if (!waypoints || waypoints.length < 2) return;
 
-  let waypoints = TRACK_ROUTES[`${from}-${to}`];
-
-  // Fallback: route via BASE
-  if (!waypoints) {
-    const toBase = TRACK_ROUTES[`${from}-BASE`];
-    const fromBase = TRACK_ROUTES[`BASE-${to}`];
-    if (toBase && fromBase) {
-      waypoints = [...toBase, ...fromBase.slice(1)];
-    } else {
-      // No route found — teleport
-      const t = NODE_POS[to] || NODE_POS.BASE;
-      agvPos = { ...t };
-      document
-        .getElementById("agv-marker")
-        ?.setAttribute("transform", `translate(${t.x},${t.y})`);
-      return;
-    }
-  }
-
-  // Draw trail path
-  const trail = document.getElementById("agv-trail");
-  if (trail) trail.setAttribute("d", pointsToPath(waypoints));
-
-  // Prepend current AGV position if far from first waypoint
   const dx0 = agvPos.x - waypoints[0].x;
   const dy0 = agvPos.y - waypoints[0].y;
   const fullPath =
-    Math.sqrt(dx0 * dx0 + dy0 * dy0) > 2
+    Math.sqrt(dx0 * dx0 + dy0 * dy0) > 3
       ? [{ ...agvPos }, ...waypoints]
       : waypoints;
 
-  // Duration based on distance
-  animDuration = Math.max(600, (routeLength(fullPath) / 80) * 1000);
+  const trail = document.getElementById("agv-trail");
+  if (trail) trail.setAttribute("d", pointsToPath(waypoints));
+
+  animDuration = Math.max(800, (routeLength(fullPath) / 80) * 1000);
   currentWaypoints = fullPath;
   animStartTime = null;
 
@@ -227,15 +208,41 @@ function easeInOut(t) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
+   sendCmd — kirim command ke server via WebSocket
+══════════════════════════════════════════════════════════════════════════════ */
+window.sendCmd = function (cmd) {
+  if (typeof window.wsSend === "function") {
+    window.wsSend({
+      type: "command",
+      command: cmd,
+    });
+    console.log(`[CMD] Sent: ${cmd}`);
+  } else {
+    console.warn("[CMD] wsSend not available — WebSocket belum siap?");
+  }
+};
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   sendManual — kirim command manual drive
+══════════════════════════════════════════════════════════════════════════════ */
+window.sendManual = function (cmd) {
+  if (typeof window.wsSend === "function") {
+    window.wsSend({
+      type: "manual",
+      command: cmd,
+    });
+  }
+};
+
+/* ══════════════════════════════════════════════════════════════════════════════
    D-PAD CONTROLS
 ══════════════════════════════════════════════════════════════════════════════ */
 document.addEventListener("DOMContentLoaded", () => {
-  // D-pad buttons
+  // ── D-pad buttons ──────────────────────────────────────────────────────────
   document.querySelectorAll(".dpad-btn").forEach((btn) => {
     const cmd = btn.dataset.cmd;
     if (!cmd) return;
 
-    // Mouse
     btn.addEventListener("mousedown", () => {
       btn.classList.add("pressed");
       sendManual(cmd);
@@ -248,7 +255,6 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.classList.remove("pressed");
     });
 
-    // Touch
     btn.addEventListener(
       "touchstart",
       (e) => {
@@ -270,7 +276,7 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   });
 
-  // Keyboard controls (only in MANUAL mode)
+  // ── Keyboard controls ─────────────────────────────────────────────────────
   const KEY_MAP = {
     ArrowUp: "FORWARD",
     ArrowDown: "BACKWARD",
@@ -286,10 +292,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const activeKeys = new Set();
 
   document.addEventListener("keydown", (e) => {
-    if (window.currentMode !== "MANUAL") return;
-    // Don't fire on input/textarea
     if (["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
-
     const cmd = KEY_MAP[e.key];
     if (!cmd) return;
     e.preventDefault();
@@ -297,23 +300,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!activeKeys.has(e.key)) {
       activeKeys.add(e.key);
       sendManual(cmd);
-
-      // Visual feedback on dpad btn
-      const btn = document.querySelector(`.dpad-btn[data-cmd="${cmd}"]`);
-      btn?.classList.add("pressed");
     }
   });
 
   document.addEventListener("keyup", (e) => {
-    if (window.currentMode !== "MANUAL") return;
     const cmd = KEY_MAP[e.key];
     if (!cmd) return;
-
     activeKeys.delete(e.key);
-
-    const btn = document.querySelector(`.dpad-btn[data-cmd="${cmd}"]`);
-    btn?.classList.remove("pressed");
-
     if (cmd !== "STOP" && activeKeys.size === 0) {
       sendManual("STOP");
     }

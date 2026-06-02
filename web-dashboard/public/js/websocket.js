@@ -84,18 +84,36 @@ window.connectWS = async function () {
 
 /* ══════════════════════════════════════════════════════════════════════════════
    SEND HELPERS
+   wsSend  — dipanggil dari controls.js dengan { type, command }
+   sendCmd / sendManual TIDAK didefinisikan di sini karena controls.js
+   yang mendefinisikan keduanya (di-load terakhir, jadi berlaku).
 ══════════════════════════════════════════════════════════════════════════════ */
-window.sendCmd = function (cmd) {
+
+/**
+ * window.wsSend — entry point tunggal dari controls.js
+ * Format dari controls.js:
+ *   { type: "command", command: "START" }   → kirim { command }
+ *   { type: "manual",  command: "FORWARD" } → kirim { manualCmd }
+ */
+window.wsSend = function (payload) {
   if (!ws || ws.readyState !== WebSocket.OPEN) {
-    toast("Not Connected", "WebSocket not ready", "warning", 2000);
+    if (typeof toast === "function") {
+      toast("Not Connected", "WebSocket not ready", "warning", 2000);
+    }
+    console.warn("[WS] wsSend called but WS not open:", payload);
     return;
   }
-  ws.send(JSON.stringify({ command: cmd }));
-};
 
-window.sendManual = function (cmd) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify({ manualCmd: cmd }));
+  let msg;
+  if (payload.type === "manual") {
+    msg = { manualCmd: payload.command };
+  } else {
+    // type === "command" atau format lain
+    msg = { command: payload.command };
+  }
+
+  ws.send(JSON.stringify(msg));
+  console.log("[WS] Sent:", msg);
 };
 
 window.requestAPI = function (api, params = {}) {
@@ -177,6 +195,37 @@ function handleMessage({ topic, data, pong }) {
     case "xora/api":
       handleAPIResponse(data?.api || "", data?.data);
       break;
+
+    // ── AGV Firmware direct topics ────────────────────────────────────────
+    case "agv/agv-01/state":
+    case "agv/agv-01/telemetry":
+      if (typeof data === "object") {
+        if (data.state) applyState(data.state);
+        if (data.mission != null) {
+          const dest = data.mission === 0 ? "BASE" : String.fromCharCode(64 + data.mission);
+          applyDest(dest);
+        }
+        if (data.blackbox_count != null) applyBlackbox(data.blackbox_count);
+        if (data.waiting != null) applyWaiting(data.waiting);
+        if (data.distance_cm != null) applyUS(data.distance_cm);
+        if (data.line_left != null) {
+          applyIR({
+            s1: data.ir_left || 0,
+            s2: data.line_left || 0,
+            s3: data.line_middle || 0,
+            s4: data.line_right || 0,
+            s5: data.ir_right || 0,
+          });
+        }
+      }
+      setMQTTStatus(true);
+      break;
+    case "agv/agv-01/status":
+      if (typeof data === "object" && data.online != null) {
+        setMQTTStatus(data.online);
+      }
+      break;
+
     default:
       break;
   }

@@ -123,6 +123,10 @@ const agvState = {
   destination: "BASE",
   mode: "AUTO",
   battery: 100,
+  blackboxCount: 0,
+  waiting: false,
+  motorLeft: 0,
+  motorRight: 0,
   sensors: {
     ir: { s1: 0, s2: 0, s3: 1, s4: 0, s5: 0 },
     ultrasonic: 50,
@@ -136,6 +140,8 @@ const agvState = {
 const MQTT_BROKER = process.env.MQTT_BROKER || "mqtt://broker.hivemq.com:1883";
 const MQTT_CLIENT_ID = `xora-bridge-${Math.random().toString(16).slice(2, 8)}`;
 
+const DEVICE_ID = "agv-01";
+
 const TOPICS_SUB = [
   "xora/state",
   "xora/destination",
@@ -145,9 +151,13 @@ const TOPICS_SUB = [
   "xora/event",
   "xora/mode",
   "xora/battery",
+  `agv/${DEVICE_ID}/state`,
+  `agv/${DEVICE_ID}/telemetry`,
+  `agv/${DEVICE_ID}/status`,
 ];
 const TOPIC_CMD = "xora/command";
-const TOPIC_MANUAL = "agv/xora/cmd";
+const TOPIC_MANUAL = `agv/${DEVICE_ID}/cmd`;
+const TOPIC_AGV_CMD = `agv/${DEVICE_ID}/cmd`;
 
 console.log(`[MQTT] Connecting → ${MQTT_BROKER}`);
 const mqttClient = mqtt.connect(MQTT_BROKER, {
@@ -223,6 +233,43 @@ mqttClient.on("message", (topic, payload) => {
       agvState.events.unshift(event);
       if (agvState.events.length > 50) agvState.events.pop();
       insertEvent(event);
+      break;
+    }
+
+    // ── AGV Firmware State ─────────────────────────────────────────────────
+    case `agv/${DEVICE_ID}/state`: {
+      if (typeof data === "object") {
+        if (data.state) agvState.state = data.state;
+        if (data.mission != null) agvState.destination = data.mission === 0 ? "BASE" : String.fromCharCode(64 + data.mission);
+        if (data.blackbox_count != null) agvState.blackboxCount = data.blackbox_count;
+        if (data.distance_cm != null) agvState.sensors.ultrasonic = data.distance_cm;
+        if (data.waiting != null) agvState.waiting = data.waiting;
+      }
+      break;
+    }
+    case `agv/${DEVICE_ID}/telemetry`: {
+      if (typeof data === "object") {
+        if (data.state) agvState.state = data.state;
+        if (data.mission != null) agvState.destination = data.mission === 0 ? "BASE" : String.fromCharCode(64 + data.mission);
+        if (data.blackbox_count != null) agvState.blackboxCount = data.blackbox_count;
+        if (data.distance_cm != null) agvState.sensors.ultrasonic = data.distance_cm;
+        if (data.line_left != null) agvState.sensors.ir = {
+          s1: data.ir_left || 0,
+          s2: data.line_left || 0,
+          s3: data.line_middle || 0,
+          s4: data.line_right || 0,
+          s5: data.ir_right || 0,
+        };
+        if (data.motor_left != null) agvState.motorLeft = data.motor_left;
+        if (data.motor_right != null) agvState.motorRight = data.motor_right;
+        if (data.waiting != null) agvState.waiting = data.waiting;
+      }
+      break;
+    }
+    case `agv/${DEVICE_ID}/status`: {
+      if (typeof data === "object" && data.online != null) {
+        agvState.agvOnline = data.online;
+      }
       break;
     }
   }
@@ -540,11 +587,25 @@ wss.on("connection", (ws, req) => {
         const cmd = sanitizeCmd(msg.command);
         if (!cmd) return;
         console.log(`[WS→MQTT] Command: ${cmd} (by ${ws.username})`);
-        mqttClient.publish(
-          TOPIC_CMD,
-          JSON.stringify({ command: cmd, ts: new Date().toISOString() }),
-          { qos: 1 },
-        );
+
+        // Map GOTO commands to firmware MQTT topic
+        const GOTO_MAP = {
+          "GOTO_A": "goto:A",
+          "GOTO_B": "goto:B",
+          "GOTO_C": "goto:C",
+          "RETURN": "return",
+          "EMERGENCY_STOP": "stop",
+        };
+
+        if (GOTO_MAP[cmd]) {
+          mqttClient.publish(TOPIC_AGV_CMD, GOTO_MAP[cmd], { qos: 1 });
+        } else {
+          mqttClient.publish(
+            TOPIC_CMD,
+            JSON.stringify({ command: cmd, ts: new Date().toISOString() }),
+            { qos: 1 },
+          );
+        }
         const event = {
           code: "CMD_SENT",
           message: `Command: ${cmd}`,
@@ -589,6 +650,7 @@ wss.on("connection", (ws, req) => {
 
 // ─── Input Sanitizer ─────────────────────────────────────────────────────────
 const ALLOWED_COMMANDS = new Set([
+  "START",
   "SET_DEST_A",
   "SET_DEST_B",
   "SET_DEST_C",
@@ -603,6 +665,10 @@ const ALLOWED_COMMANDS = new Set([
   "LEFT",
   "RIGHT",
   "STOP",
+  "GOTO_A",
+  "GOTO_B",
+  "GOTO_C",
+  "RETURN",
 ]);
 
 function sanitizeCmd(cmd) {

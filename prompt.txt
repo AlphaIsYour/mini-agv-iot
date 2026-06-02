@@ -1,1 +1,0 @@
-cek folder zip yang memuat halaman dari web dashboard untuk iot ku, kali ini aku ingin kamu fokus untuk membantuku mengupgrade dan memperbaiki beberapa fitur yang aku rasa perlu ada dan perlu diperbaiki, jadi begini untuk saat ini aku rasa masih belum ada yang perlu diperbaiki, tapi aku menginginkan 
