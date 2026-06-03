@@ -42,11 +42,12 @@ const IS_PROD = process.env.NODE_ENV === "production";
 const HTTP_PORT = parseInt(process.env.PORT) || 3000;
 const WS_PORT = parseInt(process.env.WS_PORT) || 3001;
 
-// ─── NeonDB ───────────────────────────────────────────────────────────────────
+// ─── Database ─────────────────────────────────────────────────────────────────
+const useSSL = process.env.DB_SSL !== "false";
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 5,
-  ssl: { rejectUnauthorized: false },
+  ssl: useSSL ? { rejectUnauthorized: false } : false,
 });
 
 async function initDB() {
