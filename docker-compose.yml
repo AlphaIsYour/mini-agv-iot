@@ -1,0 +1,63 @@
+services:
+  app:
+    image: ghcr.io/alphaisyour/mini-agv-iot:latest
+    # For local build, comment the line above and uncomment below:
+    # build:
+    #   context: ./web-dashboard
+    #   dockerfile: Dockerfile
+    container_name: agv_bridge_server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    networks:
+      - agv_network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: agv_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-agv_db}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - agv_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-agv_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: agv_mqtt_broker
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    networks:
+      - agv_network
+
+networks:
+  agv_network:
+    driver: bridge
+
+volumes:
+  pgdata:
+  mosquitto_data:
+  mosquitto_log:
