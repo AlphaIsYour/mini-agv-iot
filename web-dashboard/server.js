@@ -263,6 +263,7 @@ mqttClient.on("message", (topic, payload) => {
         if (data.motor_left != null) agvState.motorLeft = data.motor_left;
         if (data.motor_right != null) agvState.motorRight = data.motor_right;
         if (data.waiting != null) agvState.waiting = data.waiting;
+        if (data.loadcell_g != null) agvState.sensors.loadcell = data.loadcell_g;
       }
       break;
     }
@@ -578,8 +579,13 @@ wss.on("connection", (ws, req) => {
       if (msg.manualCmd) {
         const cmd = sanitizeCmd(msg.manualCmd);
         if (!cmd) return;
-        console.log(`[WS→MQTT] Manual: ${cmd} (by ${ws.username})`);
-        mqttClient.publish(TOPIC_MANUAL, cmd, { qos: 0 });
+        const manualMap = {
+          "FORWARD": "forward", "BACKWARD": "backward",
+          "LEFT": "left", "RIGHT": "right", "STOP": "stop",
+        };
+        const mapped = manualMap[cmd] || cmd.toLowerCase();
+        console.log(`[WS→MQTT] Manual: ${mapped} (by ${ws.username})`);
+        mqttClient.publish(TOPIC_MANUAL, mapped, { qos: 0 });
         return;
       }
 
@@ -595,6 +601,11 @@ wss.on("connection", (ws, req) => {
           "GOTO_C": "goto:C",
           "RETURN": "return",
           "EMERGENCY_STOP": "stop",
+          "FORWARD": "forward",
+          "BACKWARD": "backward",
+          "LEFT": "left",
+          "RIGHT": "right",
+          "STOP": "stop",
         };
 
         if (GOTO_MAP[cmd]) {

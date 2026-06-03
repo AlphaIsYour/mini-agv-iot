@@ -398,6 +398,43 @@
                   </div>
                 </div>
 
+                <!-- Manual Control -->
+                <div style="margin-top: 8px">
+                  <div class="dest-label">Manual Control</div>
+                  <div class="qa-row" style="margin-bottom: 8px">
+                    <button class="btn-qa" id="btn-manual-toggle" onclick="toggleManual()">
+                      <i class="fa-solid fa-gamepad icon"></i><span id="manual-toggle-txt">Show D-Pad</span>
+                    </button>
+                  </div>
+                  <div class="dpad-wrap" id="dpad" style="display: none">
+                    <div class="dpad-row">
+                      <div class="dpad-empty"></div>
+                      <button class="dpad-btn up" data-cmd="FORWARD">
+                        <i class="fa-solid fa-arrow-up icon"></i>
+                      </button>
+                      <div class="dpad-empty"></div>
+                    </div>
+                    <div class="dpad-row">
+                      <button class="dpad-btn left-btn" data-cmd="LEFT">
+                        <i class="fa-solid fa-arrow-left icon"></i>
+                      </button>
+                      <button class="dpad-btn center" data-cmd="STOP">
+                        <i class="fa-solid fa-circle-stop icon"></i>
+                      </button>
+                      <button class="dpad-btn right-btn" data-cmd="RIGHT">
+                        <i class="fa-solid fa-arrow-right icon"></i>
+                      </button>
+                    </div>
+                    <div class="dpad-row">
+                      <div class="dpad-empty"></div>
+                      <button class="dpad-btn down" data-cmd="BACKWARD">
+                        <i class="fa-solid fa-arrow-down icon"></i>
+                      </button>
+                      <div class="dpad-empty"></div>
+                    </div>
+                  </div>
+                </div>
+
                 <button class="btn-estop" onclick="sendCmd('EMERGENCY_STOP')">
                   <i class="fa-solid fa-ban icon"></i>EMERGENCY STOP
                 </button>
@@ -470,6 +507,18 @@
                   <span id="obs-dist">—</span><span class="sunit">cm</span>
                 </div>
                 <div class="obs-warn" id="obs-status">CLEAR</div>
+              </div>
+
+              <!-- Load Cell -->
+              <div class="scard" style="margin-top: 8px">
+                <div class="sname">Load Cell</div>
+                <div class="sval">
+                  <span id="lc-val">—</span><span class="sunit">g</span>
+                </div>
+                <div class="sbar">
+                  <div class="sbar-fill" id="lc-bar"></div>
+                </div>
+                <div class="load-tag" id="lc-tag">NO LOAD</div>
               </div>
             </div>
 

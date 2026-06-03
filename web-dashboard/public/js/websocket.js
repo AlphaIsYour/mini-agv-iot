@@ -208,6 +208,7 @@ function handleMessage({ topic, data, pong }) {
         if (data.blackbox_count != null) applyBlackbox(data.blackbox_count);
         if (data.waiting != null) applyWaiting(data.waiting);
         if (data.distance_cm != null) applyUS(data.distance_cm);
+        if (data.loadcell_g != null) applyLC(data.loadcell_g);
         if (data.line_left != null) {
           applyIR({
             s1: data.ir_left || 0,

@@ -235,6 +235,19 @@ window.sendManual = function (cmd) {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
+   TOGGLE MANUAL D-PAD
+══════════════════════════════════════════════════════════════════════════════ */
+window.toggleManual = function () {
+  const dpad = document.getElementById("dpad");
+  const txt = document.getElementById("manual-toggle-txt");
+  if (!dpad) return;
+
+  const visible = dpad.style.display !== "none";
+  dpad.style.display = visible ? "none" : "flex";
+  if (txt) txt.textContent = visible ? "Show D-Pad" : "Hide D-Pad";
+};
+
+/* ══════════════════════════════════════════════════════════════════════════════
    D-PAD CONTROLS
 ══════════════════════════════════════════════════════════════════════════════ */
 document.addEventListener("DOMContentLoaded", () => {
