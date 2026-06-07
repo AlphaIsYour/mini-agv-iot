@@ -26,6 +26,12 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+# ── Deploy scripts (contain credentials) ───────────────────────────────────────
+scripts/deploy-*.py
+scripts/check-*.py
+scripts/test-*.py
+scripts/update-*.py
+
 # ── ML artifacts ───────────────────────────────────────────────────────────────
 *.pkl
 *.csv
