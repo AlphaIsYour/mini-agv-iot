@@ -17,6 +17,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   // 1. Load saved settings (theme, accent, font size, etc)
   loadSettings();
 
+  // 2. Restore last active page
+  let savedPage = "control";
+  try { savedPage = localStorage.getItem("xora-page") || "control"; } catch {}
+  // Validate the page exists before navigating
+  if (document.getElementById("page-" + savedPage)) {
+    navTo(savedPage);
+  }
+
   // 3. Fetch session user
   await fetchMe();
 
@@ -211,7 +219,10 @@ window.navTo = function (page) {
     document.getElementById("sidebar").classList.remove("open");
 
   // Lazy load analytics / eventlog
-  if (page === "analytics" || page === "eventlog") loadAnalytics();
+  if (page === "analytics") loadAnalytics();
+  if (page === "eventlog") loadEventLog();
+  if (page === "missions") loadMissions();
+  if (page === "system") loadSystemInfo();
 
   // When entering Robo Eyes page, ensure videos are playing and state is current
   if (page === "roboeyes") {
@@ -226,6 +237,9 @@ window.navTo = function (page) {
     const badge = document.getElementById("err-badge");
     if (badge) badge.style.display = "none";
   }
+
+  // Persist active page across refresh
+  try { localStorage.setItem("xora-page", page); } catch {}
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -246,7 +260,11 @@ window.switchTheme = function (theme) {
     },
     tableau: {
       label: "LOADING TABLEAU",
-      sub: "Initializing formal layout engine...",
+      sub: "Initializing clean layout engine...",
+    },
+    xora: {
+      label: "LOADING XORA",
+      sub: "Initializing warm dark engine...",
     },
   };
 
@@ -264,8 +282,10 @@ window.switchTheme = function (theme) {
     // Step 3: toggle stylesheet disabled state
     const cpSheet = document.getElementById("theme-cyberpunk");
     const tbSheet = document.getElementById("theme-tableau");
+    const xoSheet = document.getElementById("theme-xora");
     if (cpSheet) cpSheet.disabled = theme !== "cyberpunk";
     if (tbSheet) tbSheet.disabled = theme !== "tableau";
+    if (xoSheet) xoSheet.disabled = theme !== "xora";
 
     // Step 4: show/hide accent picker (only for cyberpunk)
     const accentField = document.getElementById("accent-field");
@@ -377,6 +397,25 @@ function saveSettings() {
 }
 window.saveSettings = saveSettings;
 
+window.resetSettings = function () {
+  try { localStorage.removeItem("xora-settings"); } catch {}
+  // Reset to defaults
+  switchTheme("cyberpunk");
+  applyAccent("#00d4ff", false);
+  applyFontSize(13, false);
+  XA.soundEnabled = true;
+  const soundIcon = document.getElementById("sound-icon-el");
+  if (soundIcon) soundIcon.className = "fa-solid fa-volume-high icon";
+  setToggle("toggle-sparklines", true);
+  setToggle("toggle-toast", true);
+  setToggle("toggle-alert-error", true);
+  setToggle("toggle-alert-arrived", true);
+  setToggle("toggle-sound", true);
+  setToggle("toggle-sidebar-default", false);
+  document.getElementById("app")?.classList.remove("sb-col");
+  toast("Settings Reset", "All settings restored to defaults", "info", 2500);
+};
+
 function loadSettings() {
   let s = {};
   try {
@@ -390,8 +429,10 @@ function loadSettings() {
 
   const cpSheet = document.getElementById("theme-cyberpunk");
   const tbSheet = document.getElementById("theme-tableau");
+  const xoSheet = document.getElementById("theme-xora");
   if (cpSheet) cpSheet.disabled = theme !== "cyberpunk";
   if (tbSheet) tbSheet.disabled = theme !== "tableau";
+  if (xoSheet) xoSheet.disabled = theme !== "xora";
 
   document
     .querySelectorAll(".theme-opt")

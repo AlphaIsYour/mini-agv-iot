@@ -1,14 +1,4 @@
 // XORA AGV — Mission-Based Firmware PERFECT/STABLE VERSION
-// ESP32 + L298N + MQTT + OLED + Ultrasonic + Servo
-//
-// Basis: kode lama yang sensor garisnya sudah terbukti jalan.
-// Revisi aman:
-// 1. Follow line tetap boleh reverse saat koreksi tajam.
-// 2. Power kiri/kanan bisa dikalibrasi.
-// 3. Belok kiri diperkuat sedikit tanpa merusak PID.
-// 4. Ada command tuning serial tambahan.
-// ================================================
-
 // ================= PIN MOTOR (L298N) =================
 #define ENA 25
 #define IN1 26
@@ -23,6 +13,10 @@
 #define S_KANAN  33
 #define IR_KIRI  23
 #define IR_KANAN 32
+
+// Logic firmware: hitam = 1, putih = 0.
+// Ubah ke true hanya jika sensor tengah terbukti kebalik dari sensor lain.
+#define S_TENGAH_ACTIVE_LOW false
 
 // ================= PIN MODUL =================
 #define SERVO_PIN  4
@@ -80,27 +74,47 @@ Servo servoScan;
 // ================= LOADCELL =================
 HX711 scale;
 float loadcellGram      = 0;
-float loadcellThreshold = 50.0;  // dianggap "ada barang" jika > 50 gram
 bool  cargoDetected     = false;
 unsigned long loadcellTimer = 0;
-const unsigned long LOADCELL_INTERVAL_MS = 200;
+const unsigned long LOADCELL_INTERVAL_MS = 120;
+float loadcellCalibration = 420.0;
+const float LOADCELL_ZERO_DEADBAND = 5.0;
+const float LOADCELL_CARGO_ON_GRAM = 50.0;
+const float LOADCELL_CARGO_OFF_GRAM = 35.0;
+const float LOADCELL_EMA_ALPHA = 0.20;
+const byte LOADCELL_TARE_READS = 20;
+const byte LOADCELL_CARGO_CONFIRM_SAMPLES = 4;
+const byte LOADCELL_EMPTY_CONFIRM_SAMPLES = 4;
+long loadcellRawOffset = 0;
+bool loadcellFilterReady = false;
+bool lastCargoDetected = false;
+byte loadcellCargoConfirm = 0;
+byte loadcellEmptyConfirm = 0;
+unsigned long cargoStateChangedAt = 0;
+const unsigned long CARGO_STABLE_MS = 500;
 
 // ================= PARAMETER PWM =================
-const int PWM_FREQ = 1000;
+const int PWM_FREQ = 1000;  // 1kHz optimal untuk L298N (BJT-based)
 const int PWM_RES  = 8;
 
 // ================= PARAMETER KONTROL =================
 // Ini dibuat dekat dengan kode lama, karena kode lama sudah terbukti membaca garis.
-int baseSpeed = 155;
-int maxSpeed  = 210;
-int speedMin  = 0;
+int baseSpeed = 145;
+int curveSpeed = 145;
+int sharpCurveSpeed = 130;
+int maxSpeed  = 220;
+int speedMin  = 88;
+int curveTurnMin = 108;
+int sharpTurnMin = 126;
 
-// PID lama dipertahankan karena cocok dengan sensor/arena kamu.
-float Kp = 110.0;
-float Kd = 45.0;
+// PID dibuat lebih responsif untuk jalur melengkung.
+float Kp = 135.0;
+float Kd = 62.0;
 
 float lastError  = 0;
 int lastLineSide = 0;
+const float FULL_BLACK_MEMORY_GAIN = 0.78;
+const float LOST_LINE_ERROR = 3.0;
 
 // Kalibrasi motor.
 // Kalau AGV berat belok kiri, biasanya motor kanan/kiri tidak seimbang.
@@ -110,10 +124,19 @@ float trimKanan = 1.00;
 
 // Boost khusus kondisi tertentu.
 int speedBoostKiri = 0;
+int rightTurnBoost = 20;  // Max boost roda kiri saat belok kanan (adaptif)
+
+// Fase sederhana khusus pulang dari titik B:
+// setelah belok kanan, cari garis dengan arc kanan tetap dulu, baru PID normal.
+bool bReturnSearchLine = false;
+unsigned long bReturnSearchStartedAt = 0;
+unsigned long bReturnSearchMaxMs = 1800;
+int bReturnSearchLeftPwm = 150;
+int bReturnSearchRightPwm = -80;
 
 // Power belok titik/mission.
 int turnPowerKiri  = 220;
-int turnPowerKanan = 205;
+int turnPowerKanan = 230;
 
 // ================= MISSION STATE =================
 enum MissionState {
@@ -139,19 +162,37 @@ const unsigned long WAIT_AT_DEST_MS = 3000;
 // ================= BLACKBOX & FOLLOW LINE =================
 bool blackboxArmed = false;
 bool newBlackboxDetected = false;
-unsigned long stateTimer = 0;
-const int KELUAR_BOX_MS  = 500;
+unsigned long lastBlackboxAt = 0;
+unsigned long boxClearStartedAt = 0;
+unsigned long boxSeenStartedAt = 0;
+const unsigned long BLACKBOX_EXIT_STABLE_MS = 250;
+const unsigned long BLACKBOX_ENTER_STABLE_MS = 80;
+const unsigned long BLACKBOX_DEBOUNCE_MS = 250;
 
 // ================= OBSTACLE =================
 #define JARAK_HALANGAN_CM 25
-#define AVOID_STEP_MS     600
+const int AVOID_TURN_POWER = 175;
+const int AVOID_FORWARD_SPEED = 145;
+const unsigned long OBSTACLE_COOLDOWN_MS = 1200;
+int avoidTurn60Ms = 600;
+int avoidTurnLeftMs = 700;   // durasi pivot/arc kiri saat hindari
+int avoidForward1Ms = 900;
+int avoidForward2Ms = 700;
+int avoidLeftInnerPwm = 110; // roda kiri mundur saat balik kiri
+int avoidLeftOuterPwm = 210; // roda kanan maju saat balik kiri
+int obstacleServoStepDeg = 10;
+int obstacleServoStepDelayMs = 18;
+int returnTurnAms = 600;
+int returnTurnBms = 750;
+int returnTurnCms = 650;
 
 unsigned long jarakTimer   = 0;
 long jarakTerakhir         = 999;
 unsigned long durasiEchoTerakhir = 0;
+unsigned long obstacleCooldownUntil = 0;
 
 unsigned long telemetryTimer = 0;
-const unsigned long TELEMETRY_INTERVAL_MS = 200;
+const unsigned long TELEMETRY_INTERVAL_MS = 500;
 
 int motorKiriTerakhir  = 0;
 int motorKananTerakhir = 0;
@@ -165,9 +206,13 @@ void putarKanan(int spd);
 void putarKiri(int spd);
 long bacaJarak();
 void servoKe(int sudut, int tunda);
+void servoSweepHalangan();
 void scanDanHindari();
 void oledTulis(String b1, String b2, String b3);
 void buzzerBeep(int durasi);
+bool tareLoadcell(const char* reason);
+int bacaSensorTengah();
+void resetBlackbox();
 void kirimState();
 void kirimTelemetry(int vL, int vM, int vR, int irL, int irR, bool blackbox);
 void setupJaringan();
@@ -180,11 +225,17 @@ void mulaiMisi(int target);
 void mulaiPulang();
 void hitungBlackbox(bool blackbox);
 bool stateCekHalangan();
+bool cargoStablePresent();
+bool cargoStableAbsent();
+int durasiBelokPulang();
+void mulaiCariGarisPulangB();
 
 // ================================================
 void setup() {
   Serial.begin(115200);
   delay(2000);  // Tunggu power stabil (penting saat pakai baterai!)
+  Serial.println();
+  Serial.println("=== XORA AGV BOOT ===");
 
   setupJaringan();
 
@@ -221,9 +272,12 @@ void setup() {
 
   // OLED
   Wire.begin(OLED_SDA, OLED_SCL);
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  display.clearDisplay();
-  display.display();
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("OLED: init failed, lanjut tanpa display");
+  } else {
+    display.clearDisplay();
+    display.display();
+  }
 
   // HX711 Loadcell
   Serial.println("HX711: Init...");
@@ -242,9 +296,8 @@ void setup() {
   Serial.print("HX711: is_ready = ");
   Serial.println(scale.is_ready() ? "YES" : "NO");
 
-  scale.set_scale(420.0);
-  scale.tare();
-  Serial.println("HX711: TARED");
+  scale.set_scale(loadcellCalibration);
+  tareLoadcell("BOOT");
   long raw = scale.read();
   Serial.print("HX711: raw read = ");
   Serial.println(raw);
@@ -287,14 +340,26 @@ void setup() {
 
   Serial.println("=== XORA AGV STABLE VERSION READY ===");
   Serial.println("Tuning serial:");
-  Serial.println("s155 = baseSpeed");
-  Serial.println("p110 = Kp");
-  Serial.println("d45  = Kd");
-  Serial.println("m210 = maxSpeed");
+  Serial.println("s145 = baseSpeed");
+  Serial.println("cs145 = curveSpeed");
+  Serial.println("ss130 = sharpCurveSpeed");
+  Serial.println("p135 = Kp");
+  Serial.println("d62  = Kd");
+  Serial.println("n88  = speedMin");
+  Serial.println("ct108 = curveTurnMin");
+  Serial.println("st126 = sharpTurnMin");
+  Serial.println("m220 = maxSpeed");
   Serial.println("l220 = turnPowerKiri");
-  Serial.println("r205 = turnPowerKanan");
+  Serial.println("r230 = turnPowerKanan");
   Serial.println("tk1.00 = trimKiri");
   Serial.println("tn1.00 = trimKanan");
+  Serial.println("tb25 = rightTurnBoost");
+  Serial.println("bl150/br-80/bt1800 = cari garis pulang B");
+  Serial.println("ra1250/rb1250/rc1150 = durasi belok pulang A/B/C");
+  Serial.println("av1050/al1200 = obstacle belok kanan/kiri");
+  Serial.println("af850/ag820 = obstacle maju 1/2");
+  Serial.println("ai110/ao210 = obstacle balik kiri");
+  Serial.println("os10/od18 = servo sweep halangan");
 }
 
 // ================================================
@@ -332,7 +397,7 @@ void loop() {
 
   // ===== BACA SENSOR GARIS =====
   int vL  = digitalRead(S_KIRI);
-  int vM  = digitalRead(S_TENGAH);
+  int vM  = bacaSensorTengah();
   int vR  = digitalRead(S_KANAN);
   int irL = digitalRead(IR_KIRI);
   int irR = digitalRead(IR_KANAN);
@@ -340,13 +405,16 @@ void loop() {
   bool blackbox = (vL == 1 && vM == 1 && vR == 1 && irL == 1 && irR == 1);
 
   // ===== CEK HALANGAN =====
-  if (stateCekHalangan()) {
+  if (stateCekHalangan() && millis() >= obstacleCooldownUntil) {
     if (jarakTerakhir > 0 && jarakTerakhir <= JARAK_HALANGAN_CM) {
       stopMotor();
       buzzerBeep(300);
       oledTulis("HALANGAN!", String(jarakTerakhir) + " cm", "Scan...");
       jarakTerakhir = 999;
       scanDanHindari();
+      obstacleCooldownUntil = millis() + OBSTACLE_COOLDOWN_MS;
+      lastError = 0;
+      lastLineSide = 0;
       kirimState();
     }
   }
@@ -376,12 +444,11 @@ void loop() {
     case MENUNGGU_BARANG:
       stopMotor();
       // Cek loadcell terus — kalau barang ditaruh, langsung berangkat
-      if (cargoDetected) {
+      if (cargoStablePresent()) {
         buzzerBeep(200);
         String nama = (missionTarget == 1) ? "A" : (missionTarget == 2) ? "B" : "C";
         oledTulis("BARANG ADA", "Ke titik " + nama, "Berangkat!");
         missionState = KEBERANGKATAN;
-        stateTimer   = millis();
         kirimState();
         Serial.println("Barang terdeteksi — berangkat!");
       }
@@ -414,7 +481,7 @@ void loop() {
 
       // Tunggu barang diambil dulu
       if (waitingAtDest) {
-        if (cargoDetected) {
+        if (!cargoStableAbsent()) {
           // Masih ada barang — tampilkan di OLED
           oledTulis("SAMPAI!", "Barang: " + String(loadcellGram, 0) + "g", "Tunggu diambil...");
         } else {
@@ -434,7 +501,7 @@ void loop() {
               oledTulis("MAJU", "Sedikit...", "");
               majuLurus(baseSpeed);
 
-              int majuMs = (missionTarget == 3) ? 200 : 600;
+              int majuMs = (missionTarget == 3) ? 200 : 400;
               delay(majuMs);
 
               stopMotor();
@@ -449,21 +516,23 @@ void loop() {
               putarKiri(turnPowerKiri);
             }
 
-            // Untuk A kiri biasanya perlu lebih lama.
-            int turnMs = (missionTarget == 1) ? 2200 : 1700;
+            int turnMs = durasiBelokPulang();
             delay(turnMs);
 
             stopMotor();
             delay(200);
 
-            blackboxCount = 0;
-            blackboxArmed = false;
-            newBlackboxDetected = false;
+            resetBlackbox();
             lastError = 0;
             lastLineSide = 0;
+            speedBoostKiri = 0;
+            if (missionTarget == 2) {
+              mulaiCariGarisPulangB();
+            } else {
+              bReturnSearchLine = false;
+            }
 
-            // Khusus pulang dari B, boost kiri.
-            speedBoostKiri = (missionTarget == 2) ? 70 : 0;
+            // Khusus B: cari garis dengan arc kanan dulu, lalu PID normal.
 
             missionState = PULANG;
             kirimState();
@@ -476,11 +545,30 @@ void loop() {
       break;
 
     case PULANG:
+      if (bReturnSearchLine) {
+        bool anyLineSensor = (irL == 1 || vL == 1 || vM == 1 || vR == 1 || irR == 1);
+        bool lineSeen = anyLineSensor && !blackbox;
+        bool searchTimeout = (millis() - bReturnSearchStartedAt >= bReturnSearchMaxMs);
+
+        if (!lineSeen && !searchTimeout) {
+          setMotors(bReturnSearchLeftPwm, bReturnSearchRightPwm);
+          oledTulis("PULANG B", "Cari garis", "kanan...");
+          break;
+        }
+
+        bReturnSearchLine = false;
+        stopMotor();
+        delay(80);
+        lastError = 0;
+        lastLineSide = 1;
+      }
+
       hitungBlackbox(blackbox);
 
       if (newBlackboxDetected && blackboxCount >= 1) {
         stopMotor();
         buzzerBeep(200);
+        bReturnSearchLine = false;
 
         missionState = SELESAI;
         oledTulis("PULANG!", "Sampai base", ":)");
@@ -515,8 +603,7 @@ void loop() {
     Serial.print(" MQTT="); Serial.print(mqttClient.connected() ? "OK" : "FAIL");
     Serial.print(" US="); Serial.print(jarakTerakhir);
     Serial.print("cm LC="); Serial.print(loadcellGram, 1);
-    Serial.print("g HX="); Serial.print(scale.is_ready() ? "OK" : "FAIL");
-    Serial.print(" V="); Serial.println(analogRead(34));  // baca voltage reference
+    Serial.print("g HX="); Serial.println(scale.is_ready() ? "OK" : "FAIL");
   }
 
   delay(2);
@@ -525,12 +612,11 @@ void loop() {
 // ================= MISSION CONTROL =================
 void mulaiMisi(int target) {
   missionTarget    = target;
-  blackboxCount    = 0;
-  blackboxArmed    = false;
-  newBlackboxDetected = false;
+  resetBlackbox();
   lastError        = 0;
   lastLineSide     = 0;
   waitingAtDest    = false;
+  bReturnSearchLine = false;
 
   // A=left, B=right, C=left
   turnDirection    = (target == 2) ? 1 : -1;
@@ -539,8 +625,9 @@ void mulaiMisi(int target) {
   String nama = (target == 1) ? "A" : (target == 2) ? "B" : "C";
 
   // Cek loadcell — kalau tidak ada barang, tunggu dulu
+  loadcellTimer = 0;
   bacaLoadcell();
-  if (!cargoDetected) {
+  if (!cargoStablePresent()) {
     missionState = MENUNGGU_BARANG;
     oledTulis("MISI " + nama, "Tunggu barang", "ditaruh...");
     kirimState();
@@ -549,7 +636,6 @@ void mulaiMisi(int target) {
   }
 
   missionState = KEBERANGKATAN;
-  stateTimer   = millis();
 
   oledTulis("MISI", "Ke titik " + nama, "Berangkat!");
   kirimState();
@@ -559,11 +645,13 @@ void mulaiMisi(int target) {
 }
 
 void mulaiPulang() {
-  blackboxCount    = 0;
-  blackboxArmed    = false;
-  newBlackboxDetected = false;
+  resetBlackbox();
   lastError        = 0;
   lastLineSide     = 0;
+
+  if (turnDirection == 0) {
+    turnDirection = (missionTarget == 2) ? 1 : -1;
+  }
 
   oledTulis("BELOK", (turnDirection == 1) ? "Kanan 90" : "Kiri 90", "");
 
@@ -573,9 +661,16 @@ void mulaiPulang() {
     putarKiri(turnPowerKiri);
   }
 
-  delay(1300);
+  delay(durasiBelokPulang());
   stopMotor();
   delay(200);
+
+  speedBoostKiri = 0;
+  if (missionTarget == 2) {
+    mulaiCariGarisPulangB();
+  } else {
+    bReturnSearchLine = false;
+  }
 
   missionState = PULANG;
   kirimState();
@@ -584,24 +679,76 @@ void mulaiPulang() {
   Serial.println("PULANG ke base");
 }
 
+void mulaiCariGarisPulangB() {
+  bReturnSearchLine = true;
+  bReturnSearchStartedAt = millis();
+  lastError = 0;
+  lastLineSide = 1;
+}
+
+int durasiBelokPulang() {
+  // Pivot lama terlalu besar untuk titik A/C dan bisa berubah jadi ~180 derajat.
+  // Angka ini dibuat konservatif agar mendekati 90 derajat dulu, lalu PID mencari garis.
+  if (missionTarget == 1) return returnTurnAms; // A: kiri ke jalur balik
+  if (missionTarget == 2) return returnTurnBms; // B: kanan
+  if (missionTarget == 3) return returnTurnCms; // C: kiri, biasanya butuh lebih singkat
+  return 1100;
+}
+
 // ================= BLACKBOX COUNTER =================
 void hitungBlackbox(bool blackbox) {
   newBlackboxDetected = false;
+  unsigned long now = millis();
 
   if (!blackboxArmed && !blackbox) {
-    blackboxArmed = true;
+    if (boxClearStartedAt == 0) boxClearStartedAt = now;
+    boxSeenStartedAt = 0;
+
+    if (now - boxClearStartedAt >= BLACKBOX_EXIT_STABLE_MS) {
+      blackboxArmed = true;
+    }
+    return;
   }
 
-  if (blackboxArmed && blackbox) {
+  if (!blackbox) {
+    boxSeenStartedAt = 0;
+    return;
+  }
+
+  boxClearStartedAt = 0;
+
+  if (!blackboxArmed) {
+    boxSeenStartedAt = 0;
+    return;
+  }
+
+  if (boxSeenStartedAt == 0) boxSeenStartedAt = now;
+
+  if (now - boxSeenStartedAt >= BLACKBOX_ENTER_STABLE_MS &&
+      now - lastBlackboxAt >= BLACKBOX_DEBOUNCE_MS) {
     blackboxCount++;
     blackboxArmed = false;
     newBlackboxDetected = true;
+    lastBlackboxAt = now;
+    boxSeenStartedAt = 0;
 
     Serial.print("BLACKBOX #");
     Serial.println(blackboxCount);
-
-    delay(300);  // debounce
   }
+}
+
+void resetBlackbox() {
+  blackboxCount = 0;
+  blackboxArmed = false;
+  newBlackboxDetected = false;
+  lastBlackboxAt = 0;
+  boxClearStartedAt = 0;
+  boxSeenStartedAt = 0;
+}
+
+int bacaSensorTengah() {
+  int raw = digitalRead(S_TENGAH);
+  return S_TENGAH_ACTIVE_LOW ? !raw : raw;
 }
 
 // ================= FOLLOW LINE PID — STABLE =================
@@ -609,42 +756,97 @@ void hitungBlackbox(bool blackbox) {
 // Versi ini sengaja mempertahankan kemampuan reverse dari kode lama.
 // Jangan kunci constrain ke speedMin positif, karena itu membuat AGV gagal ambil tikungan tajam.
 void followLine(int vL, int vM, int vR, int irL, int irR) {
-  int sum = vL + vM + vR;
+  int sum = irL + vL + vM + vR + irR;
   float error = 0;
 
-  if (sum > 0) {
-    error = ((-1.0 * vL) + (0.0 * vM) + (1.0 * vR)) / sum;
+  if (sum >= 5) {
+    // Pada tikungan tebal, semua sensor kadang membaca hitam.
+    // Pertahankan arah koreksi terakhir agar robot tidak tiba-tiba lurus.
+    if (lastLineSide != 0 && (lastError > 0.15 || lastError < -0.15)) {
+      error = lastError * FULL_BLACK_MEMORY_GAIN;
+    } else {
+      error = 0;
+    }
+  }
+  else if (sum > 0) {
+    error =
+      ((-3.5 * irL) + (-1.4 * vL) + (0.0 * vM) + (1.4 * vR) + (3.5 * irR)) /
+      sum;
 
     if (error < 0) lastLineSide = -1;
     else if (error > 0) lastLineSide = 1;
   }
-  else if (irL == 1) {
-    lastLineSide = -1;
-    error = -1.5;
-  }
-  else if (irR == 1) {
-    lastLineSide = 1;
-    error = 1.5;
-  }
   else {
-    if (lastLineSide == 0) error = 0;
-    else error = (lastLineSide == -1) ? -1.5 : 1.5;
+    if (lastLineSide == 0) {
+      error = 0;
+    } else {
+      error = (lastLineSide == -1) ? -LOST_LINE_ERROR : LOST_LINE_ERROR;
+    }
   }
 
-  float derivative = error - lastError;
+  float absError = (error < 0) ? -error : error;
+  int driveSpeed = baseSpeed;
+  int turnMin = 0;
+  if (sum == 0 || absError >= 1.35) {
+    driveSpeed = sharpCurveSpeed;
+    turnMin = sharpTurnMin;
+  } else if (absError >= 0.30) {
+    driveSpeed = curveSpeed;
+    turnMin = curveTurnMin;
+  }
+
+  float derivative = constrain(error - lastError, -2.2, 2.2);
   float correction = (Kp * error) + (Kd * derivative);
 
-  int leftSpeed  = baseSpeed + speedBoostKiri + (int)correction;
-  int rightSpeed = baseSpeed - (int)correction;
+  int leftSpeed  = driveSpeed + speedBoostKiri + (int)correction;
+  int rightSpeed = driveSpeed - (int)correction;
+
+  // Boost adaptif roda kiri saat belok kanan — makin besar belokan, makin besar boost.
+  // Ini menghindari on/off tiba-tiba yang bikin goyang.
+  if (correction > 3) {
+    int boost = (int)(correction * 0.25);  // 25% dari correction
+    if (boost > rightTurnBoost) boost = rightTurnBoost;
+    if (boost < 4) boost = 4;  // minimum biar ada efek
+    leftSpeed += boost;
+  }
 
   // Ini bagian paling penting:
   // Nilai negatif tetap diizinkan agar robot bisa pivot saat tikungan tajam.
   leftSpeed  = constrain(leftSpeed,  -maxSpeed, maxSpeed);
   rightSpeed = constrain(rightSpeed, -maxSpeed, maxSpeed);
 
-  // speedMin hanya berlaku untuk nilai positif kecil.
-  if (leftSpeed  > 0 && leftSpeed  < speedMin) leftSpeed  = speedMin;
-  if (rightSpeed > 0 && rightSpeed < speedMin) rightSpeed = speedMin;
+  bool rightInnerLimited = false;
+  bool leftInnerLimited  = false;
+
+  // Saat tikungan, PWM kecil sering tidak cukup melawan beban motor/L298N.
+  // Minimum ini berlaku untuk maju dan mundur, tapi hanya saat mode curve aktif.
+  if (turnMin > 0) {
+    if (error < 0) {
+      // Belok kiri: roda kanan adalah roda luar, roda kiri bebas melambat.
+      if (rightSpeed > 0 && rightSpeed < turnMin) rightSpeed = turnMin;
+      else if (rightSpeed < 0 && rightSpeed > -turnMin) rightSpeed = -turnMin;
+      leftInnerLimited = true;
+    } else {
+      // General case: terapkan turnMin hanya ke roda LUAR.
+      // Roda DALAM dibebaskan agar PID bisa melambatkan/mundur saat belok.
+      if (error < 0) {
+        // Belok KIRI → roda KANAN (luar) perlu minimum power, roda KIRI (dalam) bebas
+        if (rightSpeed > 0 && rightSpeed < turnMin) rightSpeed = turnMin;
+        else if (rightSpeed < 0 && rightSpeed > -turnMin) rightSpeed = -turnMin;
+        leftInnerLimited = true;
+      } else {
+        // Belok KANAN → roda KIRI (luar) perlu minimum power, roda KANAN (dalam) bebas
+        if (leftSpeed > 0 && leftSpeed < turnMin) leftSpeed = turnMin;
+        else if (leftSpeed < 0 && leftSpeed > -turnMin) leftSpeed = -turnMin;
+        rightInnerLimited = true;
+      }
+    }
+  }
+
+  // speedMin hanya berlaku untuk roda LUAR saat belok.
+  // Roda DALAM (inner) dibebaskan agar PID bisa melambatkan sepenuhnya.
+  if (!rightInnerLimited && rightSpeed > 0 && rightSpeed < speedMin) rightSpeed = speedMin;
+  if (!leftInnerLimited  && leftSpeed  > 0 && leftSpeed  < speedMin) leftSpeed  = speedMin;
 
   setMotors(leftSpeed, rightSpeed);
 
@@ -653,55 +855,37 @@ void followLine(int vL, int vM, int vR, int irL, int irR) {
 
 // ================= SCAN & HINDARI =================
 void scanDanHindari() {
-  servoKe(SERVO_KANAN, 500);
-  long jarakKanan = bacaJarak();
+  servoSweepHalangan();
 
-  oledTulis("SCAN KANAN", String(jarakKanan) + " cm", "");
-  delay(300);
-
-  servoKe(SERVO_KIRI, 500);
-  long jarakKiri = bacaJarak();
-
-  oledTulis("SCAN KIRI", String(jarakKiri) + " cm", "");
-  delay(300);
-
-  servoKe(SERVO_DEPAN, 400);
-
-  oledTulis("HINDARI", "KN:" + String(jarakKanan), "KI:" + String(jarakKiri));
+  oledTulis("HINDARI", "Kanan 60", "");
   buzzerBeep(100);
 
-  // Geser kanan
-  digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
-  digitalWrite(IN3, LOW);  digitalWrite(IN4, HIGH);
-  ledcWrite(ENA, 140);
-  ledcWrite(ENB, 140);
-  motorKiriTerakhir  = 140;
-  motorKananTerakhir = -140;
-  delay(AVOID_STEP_MS);
-
+  putarKanan(AVOID_TURN_POWER);
+  delay(avoidTurn60Ms);
   stopMotor();
-  delay(150);
+  delay(120);
 
-  // Maju lewati halangan
-  majuLurus(baseSpeed);
-  delay(400);
-
+  oledTulis("HINDARI", "Maju kanan", "");
+  majuLurus(AVOID_FORWARD_SPEED);
+  delay(avoidForward1Ms);
   stopMotor();
-  delay(150);
+  delay(120);
 
-  // Geser kiri balik ke jalur
-  digitalWrite(IN1, LOW);  digitalWrite(IN2, HIGH);
-  digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
-  ledcWrite(ENA, 140);
-  ledcWrite(ENB, 140);
-  motorKiriTerakhir  = -140;
-  motorKananTerakhir = 140;
-  delay(AVOID_STEP_MS);
-
+  oledTulis("HINDARI", "Balik kiri", "");
+  setMotors(-avoidLeftInnerPwm, avoidLeftOuterPwm);
+  delay(avoidTurnLeftMs);
   stopMotor();
-  delay(150);
+  delay(120);
 
-  servoKe(SERVO_DEPAN, 500);
+  oledTulis("HINDARI", "Cari garis", "");
+  majuLurus(AVOID_FORWARD_SPEED);
+  delay(avoidForward2Ms);
+  stopMotor();
+  delay(120);
+
+  lastError = 0;
+  lastLineSide = 0;
+  jarakTerakhir = 999;
   oledTulis("LANJUT", "Follow line...", "");
 }
 
@@ -727,6 +911,22 @@ long bacaJarak() {
 void servoKe(int sudut, int tunda) {
   servoScan.write(sudut);
   if (tunda > 0) delay(tunda);
+}
+
+void servoSweepHalangan() {
+  int stepDeg = constrain(obstacleServoStepDeg, 1, 45);
+  int stepDelay = constrain(obstacleServoStepDelayMs, 5, 80);
+
+  oledTulis("HALANGAN", "Scan servo", "0 -> 180");
+  servoKe(SERVO_KANAN, 120);
+
+  for (int sudut = SERVO_KANAN; sudut <= SERVO_KIRI; sudut += stepDeg) {
+    servoScan.write(sudut);
+    delay(stepDelay);
+  }
+
+  servoKe(SERVO_KIRI, 80);
+  servoKe(SERVO_DEPAN, 120);
 }
 
 // ================= OLED =================
@@ -771,9 +971,8 @@ void bacaLoadcell() {
       scale.begin(HX711_DT, HX711_SCK);
       delay(100);
       if (scale.is_ready()) {
-        scale.set_scale(420.0);
-        scale.tare();
-        Serial.println("HX711: Reconnected & tared");
+        scale.set_scale(loadcellCalibration);
+        tareLoadcell("RECONNECT");
         ready = true;
       } else {
         Serial.println("HX711: Masih belum terdeteksi");
@@ -782,20 +981,114 @@ void bacaLoadcell() {
   }
 
   if (ready) {
-    loadcellGram = scale.get_units(3);  // baca 3x, rata-rata
-    if (loadcellGram < 0) loadcellGram = 0;
-    cargoDetected = (loadcellGram > loadcellThreshold);
+    long raw = scale.read();
+    float sampleGram = (raw - loadcellRawOffset) / loadcellCalibration;
+    if (sampleGram < 0) sampleGram = 0;
+
+    if (!loadcellFilterReady) {
+      loadcellGram = sampleGram;
+      loadcellFilterReady = true;
+    } else {
+      loadcellGram = (LOADCELL_EMA_ALPHA * sampleGram) + ((1.0 - LOADCELL_EMA_ALPHA) * loadcellGram);
+    }
+
+    float filteredGram = loadcellGram;
+    if (filteredGram < LOADCELL_ZERO_DEADBAND) filteredGram = 0;
+
+    if (!cargoDetected) {
+      if (filteredGram > LOADCELL_CARGO_ON_GRAM) {
+        if (loadcellCargoConfirm < LOADCELL_CARGO_CONFIRM_SAMPLES) loadcellCargoConfirm++;
+      } else {
+        loadcellCargoConfirm = 0;
+      }
+      loadcellEmptyConfirm = 0;
+
+      if (loadcellCargoConfirm >= LOADCELL_CARGO_CONFIRM_SAMPLES) {
+        cargoDetected = true;
+        loadcellGram = filteredGram;
+      } else {
+        loadcellGram = 0;
+      }
+    } else {
+      loadcellGram = filteredGram;
+
+      if (filteredGram < LOADCELL_CARGO_OFF_GRAM) {
+        if (loadcellEmptyConfirm < LOADCELL_EMPTY_CONFIRM_SAMPLES) loadcellEmptyConfirm++;
+      } else {
+        loadcellEmptyConfirm = 0;
+      }
+      loadcellCargoConfirm = 0;
+
+      if (loadcellEmptyConfirm >= LOADCELL_EMPTY_CONFIRM_SAMPLES) {
+        cargoDetected = false;
+        loadcellGram = 0;
+      }
+    }
+
+    if (cargoDetected != lastCargoDetected) {
+      lastCargoDetected = cargoDetected;
+      cargoStateChangedAt = millis();
+    }
 
     // Debug setiap 2 detik
     static unsigned long lastDebug = 0;
     if (millis() - lastDebug >= 2000) {
       lastDebug = millis();
-      long raw = scale.read();
       Serial.print("HX711: raw="); Serial.print(raw);
+      Serial.print(" offset="); Serial.print(loadcellRawOffset);
       Serial.print(" gram="); Serial.print(loadcellGram, 1);
       Serial.print(" cargo="); Serial.println(cargoDetected ? "YES" : "NO");
     }
   }
+}
+
+bool tareLoadcell(const char* reason) {
+  if (!scale.is_ready()) {
+    Serial.print("HX711: TARE gagal");
+    if (reason) {
+      Serial.print(" (");
+      Serial.print(reason);
+      Serial.print(")");
+    }
+    Serial.println(" - NOT READY");
+    return false;
+  }
+
+  delay(250);
+  long rawBefore = scale.read_average(5);
+  loadcellRawOffset = scale.read_average(LOADCELL_TARE_READS);
+  scale.set_offset(loadcellRawOffset);
+  delay(100);
+  long rawAfter = scale.read_average(5);
+
+  loadcellGram = 0;
+  loadcellFilterReady = false;
+  cargoDetected = false;
+  lastCargoDetected = false;
+  loadcellCargoConfirm = 0;
+  loadcellEmptyConfirm = 0;
+  cargoStateChangedAt = millis() - CARGO_STABLE_MS;
+
+  Serial.print("HX711: TARE OK");
+  if (reason) {
+    Serial.print(" (");
+    Serial.print(reason);
+    Serial.print(")");
+  }
+  Serial.print(" rawBefore=");
+  Serial.print(rawBefore);
+  Serial.print(" rawAfter=");
+  Serial.print(rawAfter);
+  Serial.println();
+  return true;
+}
+
+bool cargoStablePresent() {
+  return cargoDetected && (millis() - cargoStateChangedAt >= CARGO_STABLE_MS);
+}
+
+bool cargoStableAbsent() {
+  return !cargoDetected && (millis() - cargoStateChangedAt >= CARGO_STABLE_MS);
 }
 
 // ================= WIFI & MQTT =================
@@ -860,6 +1153,9 @@ void reconnectMqtt() {
 
   if (connected) {
     mqttClient.subscribe(mqttTopicCmd.c_str());
+    String onlinePayload = String("{\"device_id\":\"") + DEVICE_ID + "\",\"online\":true}";
+    mqttClient.publish(mqttTopicStatus.c_str(), onlinePayload.c_str(), true);
+    kirimState();
     Serial.println("MQTT Connected & subscribed to: " + mqttTopicCmd);
   }
 }
@@ -907,6 +1203,10 @@ void prosesPerintah(String input) {
   if (input == "stop" || input == "emergency_stop") {
     missionState = IDLE;
     missionTarget = 0;
+    waitingAtDest = false;
+    speedBoostKiri = 0;
+    bReturnSearchLine = false;
+    resetBlackbox();
     stopMotor();
     oledTulis("STOP", "Emergency!", "");
     kirimState();
@@ -916,6 +1216,7 @@ void prosesPerintah(String input) {
   // Manual motor commands
   if (input == "forward") {
     missionState = MANUAL;
+    speedBoostKiri = 0;
     majuLurus(baseSpeed);
     oledTulis("MANUAL", "Maju", "");
     kirimState();
@@ -924,6 +1225,7 @@ void prosesPerintah(String input) {
 
   if (input == "backward") {
     missionState = MANUAL;
+    speedBoostKiri = 0;
     setMotors(-baseSpeed, -baseSpeed);
     oledTulis("MANUAL", "Mundur", "");
     kirimState();
@@ -932,6 +1234,7 @@ void prosesPerintah(String input) {
 
   if (input == "left") {
     missionState = MANUAL;
+    speedBoostKiri = 0;
     putarKiri(turnPowerKiri);
     oledTulis("MANUAL", "Kiri", "");
     kirimState();
@@ -940,6 +1243,7 @@ void prosesPerintah(String input) {
 
   if (input == "right") {
     missionState = MANUAL;
+    speedBoostKiri = 0;
     putarKanan(turnPowerKanan);
     oledTulis("MANUAL", "Kanan", "");
     kirimState();
@@ -953,6 +1257,63 @@ void prosesPerintah(String input) {
   else if (input.startsWith("tn")) {
     trimKanan = input.substring(2).toFloat();
   }
+  else if (input.startsWith("tb")) {
+    rightTurnBoost = input.substring(2).toInt();
+  }
+  else if (input.startsWith("bl")) {
+    bReturnSearchLeftPwm = input.substring(2).toInt();
+  }
+  else if (input.startsWith("br")) {
+    bReturnSearchRightPwm = input.substring(2).toInt();
+  }
+  else if (input.startsWith("bt")) {
+    bReturnSearchMaxMs = input.substring(2).toInt();
+  }
+  else if (input.startsWith("ra")) {
+    returnTurnAms = input.substring(2).toInt();
+  }
+  else if (input.startsWith("rb")) {
+    returnTurnBms = input.substring(2).toInt();
+  }
+  else if (input.startsWith("rc")) {
+    returnTurnCms = input.substring(2).toInt();
+  }
+  else if (input.startsWith("av")) {
+    avoidTurn60Ms = input.substring(2).toInt();
+  }
+  else if (input.startsWith("af")) {
+    avoidForward1Ms = input.substring(2).toInt();
+  }
+  else if (input.startsWith("ag")) {
+    avoidForward2Ms = input.substring(2).toInt();
+  }
+  else if (input.startsWith("al")) {
+    avoidTurnLeftMs = input.substring(2).toInt();
+  }
+  else if (input.startsWith("ai")) {
+    avoidLeftInnerPwm = input.substring(2).toInt();
+  }
+  else if (input.startsWith("ao")) {
+    avoidLeftOuterPwm = input.substring(2).toInt();
+  }
+  else if (input.startsWith("os")) {
+    obstacleServoStepDeg = input.substring(2).toInt();
+  }
+  else if (input.startsWith("od")) {
+    obstacleServoStepDelayMs = input.substring(2).toInt();
+  }
+  else if (input.startsWith("cs")) {
+    curveSpeed = input.substring(2).toInt();
+  }
+  else if (input.startsWith("ss")) {
+    sharpCurveSpeed = input.substring(2).toInt();
+  }
+  else if (input.startsWith("ct")) {
+    curveTurnMin = input.substring(2).toInt();
+  }
+  else if (input.startsWith("st")) {
+    sharpTurnMin = input.substring(2).toInt();
+  }
   else if (input.startsWith("p")) {
     Kp = input.substring(1).toFloat();
   }
@@ -961,6 +1322,9 @@ void prosesPerintah(String input) {
   }
   else if (input.startsWith("s")) {
     baseSpeed = input.substring(1).toInt();
+  }
+  else if (input.startsWith("n")) {
+    speedMin = input.substring(1).toInt();
   }
   else if (input.startsWith("m")) {
     maxSpeed = input.substring(1).toInt();
@@ -972,30 +1336,49 @@ void prosesPerintah(String input) {
     turnPowerKanan = input.substring(1).toInt();
   }
   else if (input == "tare") {
-    if (scale.is_ready()) {
-      scale.tare();
-      Serial.println("HX711: TARE OK");
-    } else {
-      Serial.println("HX711: NOT READY");
+    if (tareLoadcell("CMD")) {
+      kirimState();
+      kirimTelemetry(digitalRead(S_KIRI), bacaSensorTengah(), digitalRead(S_KANAN), digitalRead(IR_KIRI), digitalRead(IR_KANAN), false);
     }
   }
   else if (input.startsWith("c")) {
     float cal = input.substring(1).toFloat();
     if (cal > 0) {
-      scale.set_scale(cal);
+      loadcellCalibration = cal;
+      scale.set_scale(loadcellCalibration);
       Serial.print("HX711: Calibration factor = ");
-      Serial.println(cal);
+      Serial.println(loadcellCalibration);
     }
   }
 
   Serial.print("Kp="); Serial.print(Kp);
   Serial.print(" Kd="); Serial.print(Kd);
   Serial.print(" base="); Serial.print(baseSpeed);
+  Serial.print(" curve="); Serial.print(curveSpeed);
+  Serial.print(" sharp="); Serial.print(sharpCurveSpeed);
+  Serial.print(" min="); Serial.print(speedMin);
+  Serial.print(" curveTurnMin="); Serial.print(curveTurnMin);
+  Serial.print(" sharpTurnMin="); Serial.print(sharpTurnMin);
   Serial.print(" max="); Serial.print(maxSpeed);
   Serial.print(" turnL="); Serial.print(turnPowerKiri);
   Serial.print(" turnR="); Serial.print(turnPowerKanan);
   Serial.print(" trimL="); Serial.print(trimKiri, 2);
-  Serial.print(" trimR="); Serial.println(trimKanan, 2);
+  Serial.print(" trimR="); Serial.print(trimKanan, 2);
+  Serial.print(" rtb="); Serial.print(rightTurnBoost);
+  Serial.print(" bLeft="); Serial.print(bReturnSearchLeftPwm);
+  Serial.print(" bRight="); Serial.print(bReturnSearchRightPwm);
+  Serial.print(" bTime="); Serial.print(bReturnSearchMaxMs);
+  Serial.print(" retA="); Serial.print(returnTurnAms);
+  Serial.print(" retB="); Serial.print(returnTurnBms);
+  Serial.print(" retC="); Serial.print(returnTurnCms);
+  Serial.print(" av="); Serial.print(avoidTurn60Ms);
+  Serial.print(" al="); Serial.print(avoidTurnLeftMs);
+  Serial.print(" af="); Serial.print(avoidForward1Ms);
+  Serial.print(" ag="); Serial.print(avoidForward2Ms);
+  Serial.print(" ai="); Serial.print(avoidLeftInnerPwm);
+  Serial.print(" ao="); Serial.print(avoidLeftOuterPwm);
+  Serial.print(" os="); Serial.print(obstacleServoStepDeg);
+  Serial.print(" od="); Serial.println(obstacleServoStepDelayMs);
 }
 
 // ================= STATE & TELEMETRY =================
@@ -1009,7 +1392,9 @@ void kirimState() {
   payload += ",\"blackbox_count\":"; payload += blackboxCount;
   payload += ",\"distance_cm\":"; payload += jarakTerakhir;
   payload += ",\"waiting\":"; payload += (waitingAtDest ? "true" : "false");
-  payload += ",\"turn\":\""; payload += (turnDirection == -1 ? "left" : "right"); payload += "\"";
+  payload += ",\"turn\":\"";
+  payload += (turnDirection == -1 ? "left" : (turnDirection == 1 ? "right" : "none"));
+  payload += "\"";
   payload += ",\"loadcell_g\":"; payload += String(loadcellGram, 1);
   payload += ",\"cargo\":"; payload += (cargoDetected ? "true" : "false");
   payload += ",\"wifi_rssi\":"; payload += (WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0);
@@ -1040,7 +1425,7 @@ const char* namaState(MissionState s) {
 
 void kirimTelemetry(int vL, int vM, int vR, int irL, int irR, bool blackbox) {
   String payload;
-  payload.reserve(650);
+  payload.reserve(420);
 
   payload += "{\"device_id\":\""; payload += DEVICE_ID;
   payload += "\",\"ms\":"; payload += millis();
@@ -1048,28 +1433,16 @@ void kirimTelemetry(int vL, int vM, int vR, int irL, int irR, bool blackbox) {
   payload += ",\"mission\":"; payload += missionTarget;
   payload += ",\"blackbox_count\":"; payload += blackboxCount;
   payload += ",\"distance_cm\":"; payload += jarakTerakhir;
-  payload += ",\"echo_us\":"; payload += durasiEchoTerakhir;
   payload += ",\"obstacle\":"; payload += ((jarakTerakhir > 0 && jarakTerakhir <= JARAK_HALANGAN_CM) ? "true" : "false");
-  payload += ",\"threshold_cm\":"; payload += JARAK_HALANGAN_CM;
   payload += ",\"line_left\":"; payload += vL;
   payload += ",\"line_middle\":"; payload += vM;
   payload += ",\"line_right\":"; payload += vR;
   payload += ",\"ir_left\":"; payload += irL;
   payload += ",\"ir_right\":"; payload += irR;
   payload += ",\"blackbox\":"; payload += (blackbox ? "true" : "false");
-  payload += ",\"kp\":"; payload += String(Kp, 2);
-  payload += ",\"kd\":"; payload += String(Kd, 2);
-  payload += ",\"base_speed\":"; payload += baseSpeed;
-  payload += ",\"max_speed\":"; payload += maxSpeed;
-  payload += ",\"speed_min\":"; payload += speedMin;
-  payload += ",\"turn_power_left\":"; payload += turnPowerKiri;
-  payload += ",\"turn_power_right\":"; payload += turnPowerKanan;
-  payload += ",\"trim_left\":"; payload += String(trimKiri, 2);
-  payload += ",\"trim_right\":"; payload += String(trimKanan, 2);
   payload += ",\"motor_left\":"; payload += motorKiriTerakhir;
   payload += ",\"motor_right\":"; payload += motorKananTerakhir;
   payload += ",\"waiting\":"; payload += (waitingAtDest ? "true" : "false");
-  payload += ",\"turn\":\""; payload += (turnDirection == -1 ? "left" : "right"); payload += "\"";
   payload += ",\"loadcell_g\":"; payload += String(loadcellGram, 1);
   payload += ",\"cargo\":"; payload += (cargoDetected ? "true" : "false");
   payload += ",\"wifi_rssi\":"; payload += (WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0);
@@ -1080,7 +1453,11 @@ void kirimTelemetry(int vL, int vM, int vR, int irL, int irR, bool blackbox) {
   Serial.println(payload);
 
   if (mqttClient.connected()) {
-    mqttClient.publish(mqttTopicTelemetry.c_str(), payload.c_str());
+    bool ok = mqttClient.publish(mqttTopicTelemetry.c_str(), payload.c_str());
+    if (!ok) {
+      Serial.print("MQTT telemetry publish failed, len=");
+      Serial.println(payload.length());
+    }
   }
 }
 

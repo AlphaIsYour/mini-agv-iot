@@ -1,0 +1,558 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   XORA.CSS — Warm dark theme (antara cyberpunk dan tableau)
+   Aktif saat: [data-theme="xora"]
+   Gelap tapi hangat — tidak neon, tidak menyilaukan
+══════════════════════════════════════════════════════════════════════════════ */
+
+[data-theme="xora"] {
+  /* ── Fonts ─────────────────────────────────────────────────────────────── */
+  --font-ui: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-brand: "JetBrains Mono", monospace;
+  --mono: "JetBrains Mono", monospace;
+
+  /* ── Sizing ────────────────────────────────────────────────────────────── */
+  --sidebar-w: 224px;
+  --sidebar-col: 52px;
+  --header-h: 48px;
+  --r: 6px;
+
+  /* ── Core backgrounds (warm dark) ──────────────────────────────────────── */
+  --bg: #1a1a2e;
+  --bg2: #16213e;
+  --bg3: #1f2b47;
+  --bg4: #253555;
+
+  /* ── Surfaces ──────────────────────────────────────────────────────────── */
+  --header-bg: #16213e;
+  --sidebar-bg: #16213e;
+  --panel-bg: #1a1f35;
+  --badge-bg: #1f2b47;
+  --btn-bg: #1f2b47;
+  --toast-bg: #1f2b47;
+  --overlay-bg: rgba(26, 26, 46, 0.95);
+  --tt-bg: #1a1a2e;
+
+  /* ── Borders ───────────────────────────────────────────────────────────── */
+  --border: #2a3550;
+  --border2: #354463;
+
+  /* ── Scrollbar ─────────────────────────────────────────────────────────── */
+  --scrollbar-track: var(--bg2);
+  --scrollbar-thumb: var(--border2);
+
+  /* ── Text (warm whites, easy on eyes) ──────────────────────────────────── */
+  --text: #e2e8f0;
+  --text-mid: #94a3b8;
+  --text-dim: #64748b;
+
+  /* ── Accent (warm amber-orange) ────────────────────────────────────────── */
+  --accent: #f59e0b;
+  --accent-dim: rgba(245, 158, 11, 0.2);
+  --accent-glow: rgba(245, 158, 11, 0.1);
+  --accent-glow2: rgba(245, 158, 11, 0.05);
+
+  /* ── Semantic colors ───────────────────────────────────────────────────── */
+  --clr-green: #34d399;
+  --clr-amber: #fbbf24;
+  --clr-red: #f87171;
+  --clr-purple: #a78bfa;
+
+  --green-dim: rgba(52, 211, 153, 0.15);
+  --green-glow: rgba(52, 211, 153, 0.08);
+  --amber-dim: rgba(251, 191, 36, 0.15);
+  --amber-glow: rgba(251, 191, 36, 0.08);
+  --red-dim: rgba(248, 113, 113, 0.15);
+  --red-glow: rgba(248, 113, 113, 0.08);
+  --purple-dim: rgba(167, 139, 250, 0.15);
+  --purple-glow: rgba(167, 139, 250, 0.08);
+
+  /* ── Arena SVG ─────────────────────────────────────────────────────────── */
+  --arena-border: #2a3550;
+  --arena-grid: #1f2b47;
+  --arena-track: #354463;
+  --arena-zone: #16213e;
+  --arena-node-fill: #1a1f35;
+  --arena-node-stroke: #354463;
+  --arena-lbl: #94a3b8;
+
+  /* ── Nav ───────────────────────────────────────────────────────────────── */
+  --nav-hover-bg: #1f2b47;
+  --nav-active-bg: rgba(245, 158, 11, 0.08);
+
+  /* ── Shadows ───────────────────────────────────────────────────────────── */
+  --header-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --toast-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --brand-glow: none;
+
+  /* ── Font size base ────────────────────────────────────────────────────── */
+  --font-size-base: 13px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   XORA OVERRIDES
+══════════════════════════════════════════════════════════════════════════════ */
+
+[data-theme="xora"] body {
+  background: var(--bg);
+}
+
+[data-theme="xora"] .header {
+  box-shadow: var(--header-shadow);
+  border-bottom-color: var(--border);
+}
+
+[data-theme="xora"] .brand-name {
+  font-size: 17px;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  text-shadow: none;
+}
+[data-theme="xora"] .brand-tag {
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+}
+
+[data-theme="xora"] .sidebar {
+  border-right: 1px solid var(--border);
+}
+[data-theme="xora"] .nav-item {
+  border-radius: var(--r);
+  margin: 0 6px;
+}
+[data-theme="xora"] .nav-item.active {
+  box-shadow: none;
+}
+[data-theme="xora"] .nav-label {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  text-transform: none;
+  font-size: 12px;
+}
+[data-theme="xora"] .nav-section-label {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+[data-theme="xora"] .sidebar-footer {
+  background: var(--bg3);
+}
+[data-theme="xora"] .sf-item {
+  color: var(--text-mid);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+[data-theme="xora"] .page-header {
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+[data-theme="xora"] .page-title,
+[data-theme="xora"] .page-active {
+  font-family: var(--font-ui);
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+[data-theme="xora"] .page-sep {
+  color: var(--text-dim);
+}
+
+[data-theme="xora"] .panel {
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+[data-theme="xora"] .ptitle {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-mid);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+[data-theme="xora"] .ptitle::after {
+  background: var(--border);
+}
+
+[data-theme="xora"] .stat-card,
+[data-theme="xora"] .chart-card,
+[data-theme="xora"] .sensor-big-card,
+[data-theme="xora"] .system-card,
+[data-theme="xora"] .settings-card,
+[data-theme="xora"] .err-list-card,
+[data-theme="xora"] .evlog-card,
+[data-theme="xora"] .ir-big-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  border-radius: var(--r);
+}
+[data-theme="xora"] .stat-card:hover,
+[data-theme="xora"] .sensor-big-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: var(--border2);
+}
+
+[data-theme="xora"] .stat-label {
+  font-family: var(--font-ui);
+  color: var(--text-mid);
+  font-size: 11px;
+  text-transform: none;
+  font-weight: 600;
+}
+[data-theme="xora"] .stat-val {
+  font-size: 32px;
+  color: var(--text);
+  font-weight: 700;
+}
+[data-theme="xora"] .stat-sub {
+  color: var(--text-dim);
+}
+
+[data-theme="xora"] .btn-icon {
+  border-radius: var(--r);
+  border-color: var(--border);
+  color: var(--text-mid);
+}
+[data-theme="xora"] .btn-icon:hover {
+  background: var(--nav-active-bg);
+  border-color: var(--accent);
+  box-shadow: none;
+}
+[data-theme="xora"] .btn-sm {
+  border-radius: var(--r);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-mid);
+  font-weight: 500;
+}
+[data-theme="xora"] .btn-sm:hover {
+  background: var(--nav-active-bg);
+  color: var(--accent);
+}
+[data-theme="xora"] .btn-dest {
+  border-radius: 8px;
+}
+[data-theme="xora"] .btn-dest:hover,
+[data-theme="xora"] .btn-dest.active {
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+}
+[data-theme="xora"] .btn-qa {
+  border-radius: var(--r);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+}
+[data-theme="xora"] .btn-estop {
+  border-radius: 8px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+}
+[data-theme="xora"] .btn-save {
+  border-radius: var(--r);
+  font-family: var(--font-ui);
+  font-weight: 600;
+}
+[data-theme="xora"] .btn-save:hover {
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+  transform: none;
+}
+[data-theme="xora"] .btn-danger {
+  border-radius: var(--r);
+  font-family: var(--font-ui);
+  font-weight: 600;
+}
+
+[data-theme="xora"] .range-btn {
+  border-radius: var(--r);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+}
+[data-theme="xora"] .range-btn.active {
+  background: var(--accent);
+  color: #1a1a2e;
+  border-color: var(--accent);
+}
+
+[data-theme="xora"] .state-badge {
+  border-radius: var(--r);
+  background: var(--bg3);
+}
+[data-theme="xora"] .sb-label {
+  font-family: var(--font-ui);
+  text-transform: none;
+  font-size: 9px;
+  font-weight: 500;
+}
+[data-theme="xora"] .sb-val {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+[data-theme="xora"] .mchip {
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  text-transform: none;
+  font-size: 10px;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+[data-theme="xora"] .scard {
+  border-radius: var(--r);
+}
+[data-theme="xora"] .sname {
+  font-family: var(--font-ui);
+  text-transform: none;
+  font-size: 10px;
+  color: var(--text-mid);
+  font-weight: 600;
+}
+[data-theme="xora"] .sval {
+  font-size: 22px;
+  color: var(--accent);
+}
+
+[data-theme="xora"] .log-entry {
+  background: var(--bg3);
+  border-radius: 3px;
+}
+[data-theme="xora"] .log-ts {
+  color: var(--text-dim);
+}
+[data-theme="xora"] .log-code {
+  color: var(--accent);
+}
+
+[data-theme="xora"] .h-state {
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  text-transform: none;
+  font-weight: 600;
+}
+
+[data-theme="xora"] .data-table th {
+  font-family: var(--font-ui);
+  background: var(--bg3);
+  text-transform: none;
+  font-size: 10px;
+  color: var(--text-mid);
+  font-weight: 600;
+}
+[data-theme="xora"] .data-table td {
+  font-size: 11px;
+  color: var(--text);
+}
+[data-theme="xora"] .data-table tr:hover td {
+  background: var(--nav-active-bg);
+}
+[data-theme="xora"] .data-table .code-cell {
+  color: var(--accent);
+}
+
+[data-theme="xora"] .settings-input {
+  border-radius: var(--r);
+  background: var(--bg3);
+  border-color: var(--border);
+  font-size: 12px;
+  color: var(--text);
+}
+[data-theme="xora"] .settings-input:focus {
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+  border-color: var(--accent);
+}
+[data-theme="xora"] .evlog-filter {
+  border-radius: var(--r);
+  background: var(--bg3);
+}
+[data-theme="xora"] .evlog-filter:focus {
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+  border-color: var(--accent);
+}
+
+[data-theme="xora"] .settings-label,
+[data-theme="xora"] .settings-card-title {
+  font-family: var(--font-ui);
+  text-transform: none;
+  font-weight: 600;
+}
+[data-theme="xora"] .settings-row-label {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+[data-theme="xora"] .toggle-track {
+  background: var(--border);
+  border-color: var(--border2);
+}
+[data-theme="xora"] .toggle-thumb {
+  background: var(--text-dim);
+}
+[data-theme="xora"] .toggle input:checked ~ .toggle-track {
+  background: var(--accent);
+}
+[data-theme="xora"] .toggle input:checked ~ .toggle-thumb {
+  background: #fff;
+}
+
+[data-theme="xora"] ::-webkit-scrollbar-track {
+  background: var(--bg2);
+}
+[data-theme="xora"] ::-webkit-scrollbar-thumb {
+  background: var(--border2);
+}
+
+[data-theme="xora"] #theme-transition {
+  background: var(--bg);
+}
+[data-theme="xora"] .tt-label {
+  color: var(--accent);
+}
+[data-theme="xora"] .tt-spinner {
+  border-color: var(--border2);
+  border-top-color: var(--accent);
+}
+
+[data-theme="xora"] .toast {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border-color: var(--border);
+}
+[data-theme="xora"] .dropdown {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border-color: var(--border);
+}
+
+[data-theme="xora"] .gauge-track {
+  stroke: var(--border2);
+}
+[data-theme="xora"] .gauge-val {
+  color: var(--accent);
+}
+
+[data-theme="xora"] .ptitle .icon,
+[data-theme="xora"] .chart-title .icon,
+[data-theme="xora"] .system-card-title .icon,
+[data-theme="xora"] .settings-card-title .icon,
+[data-theme="xora"] .big-label .icon {
+  color: var(--accent);
+  opacity: 1;
+}
+
+[data-theme="xora"] .h-sep {
+  background: var(--border);
+}
+
+[data-theme="xora"] .chart-title {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-mid);
+  font-weight: 700;
+}
+[data-theme="xora"] .system-card-title {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  text-transform: none;
+  color: var(--text-mid);
+  font-weight: 700;
+}
+[data-theme="xora"] .settings-card-title {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  text-transform: none;
+  color: var(--text-mid);
+  font-weight: 700;
+}
+[data-theme="xora"] .big-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-mid);
+  font-weight: 700;
+}
+[data-theme="xora"] .sys-key {
+  color: var(--text-mid);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+[data-theme="xora"] .range-label {
+  color: var(--text-mid);
+}
+[data-theme="xora"] .dest-label {
+  color: var(--text-mid);
+}
+[data-theme="xora"] .obs-warn {
+  color: var(--text-mid);
+  font-family: var(--font-ui);
+  font-weight: 600;
+}
+[data-theme="xora"] .obs-warn.alert {
+  color: var(--clr-red);
+  background: var(--red-dim);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+[data-theme="xora"] .ir-big-chip {
+  background: var(--bg3);
+  color: var(--text-mid);
+  border-color: var(--border);
+}
+[data-theme="xora"] .ir-big-chip.on {
+  background: var(--amber-dim);
+  color: var(--clr-amber);
+  border-color: var(--clr-amber);
+}
+[data-theme="xora"] .ir-dot {
+  background: var(--border2);
+}
+[data-theme="xora"] .ir-dot.on {
+  background: var(--clr-amber);
+}
+[data-theme="xora"] .load-tag {
+  background: var(--bg3);
+  color: var(--text-mid);
+}
+[data-theme="xora"] .load-tag.loaded {
+  background: var(--green-dim);
+  color: var(--clr-green);
+}
+[data-theme="xora"] .nav-badge {
+  background: var(--red-dim);
+  color: var(--clr-red);
+}
+
+[data-theme="xora"] .h-pill {
+  color: var(--text-mid);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+[data-theme="xora"] .h-clock {
+  color: var(--text-mid);
+  font-family: var(--mono);
+}
+[data-theme="xora"] .h-username {
+  color: var(--text-mid);
+  font-family: var(--font-ui);
+  font-weight: 500;
+}
+[data-theme="xora"] .brand-tag {
+  color: var(--text-dim);
+}
+
+[data-theme="xora"] #accent-field {
+  display: none;
+}
+
+[data-theme="xora"] .sys-val.ok { color: var(--clr-green); }
+[data-theme="xora"] .sys-val.err { color: var(--clr-red); }
+[data-theme="xora"] .sys-val.warn { color: var(--clr-amber); }
+
+[data-theme="xora"] .source-badge.esp32 {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+[data-theme="xora"] .source-badge.dashboard {
+  background: var(--purple-dim);
+  color: var(--clr-purple);
+}

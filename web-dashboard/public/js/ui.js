@@ -58,6 +58,18 @@ window.applyState = function (raw) {
   const sysState = document.getElementById("sys-state");
   if (sysState) sysState.textContent = s;
 
+  // Sensor page
+  const sensorChip = document.getElementById("sensor-state-chip");
+  if (sensorChip) {
+    sensorChip.textContent = s.replace(/_/g, " ");
+    sensorChip.className = "h-state " + s;
+  }
+  const sensorFsm = document.getElementById("sensor-fsm");
+  if (sensorFsm) {
+    sensorFsm.textContent = s;
+    sensorFsm.className = "status-val " + stateClass(s);
+  }
+
   // Sidebar footer
   const sfState = document.getElementById("sf-state");
   if (sfState) sfState.textContent = s;
@@ -113,9 +125,11 @@ window.applyDest = function (raw) {
   const curDest = document.getElementById("cur-dest");
   const sfDest = document.getElementById("sf-dest");
   const sysDest = document.getElementById("sys-dest");
+  const sensorDest = document.getElementById("sensor-dest");
   if (curDest) curDest.textContent = d;
   if (sfDest) sfDest.textContent = d;
   if (sysDest) sysDest.textContent = d;
+  if (sensorDest) sensorDest.textContent = d;
 
   // Highlight arena nodes
   ["A", "B", "C", "BASE"].forEach((n) => {
@@ -154,7 +168,11 @@ window.applyDest = function (raw) {
 window.applyMode = function (raw) {
   if (!raw) return;
   const m = typeof raw === "string" ? raw : raw.mode || raw;
-  window.currentMode = m;
+  if (typeof window.setControlMode === "function") {
+    window.setControlMode(m);
+  } else {
+    window.currentMode = m;
+  }
 
   document
     .querySelectorAll(".mchip")
@@ -167,16 +185,21 @@ window.applyMode = function (raw) {
 
   const sfMode = document.getElementById("sf-mode");
   const sysMode = document.getElementById("sys-mode");
+  const sensorMode = document.getElementById("sensor-mode");
   if (sfMode) sfMode.textContent = m;
   if (sysMode) sysMode.textContent = m;
+  if (sensorMode) sensorMode.textContent = m;
 
   // Show/hide d-pad
   const dpad = document.getElementById("dpad");
+  const txt = document.getElementById("manual-toggle-txt");
   if (dpad) {
     if (m === "MANUAL") {
       dpad.style.display = "flex";
+      if (txt) txt.textContent = "Hide D-Pad";
     } else {
       dpad.style.display = "none";
+      if (txt) txt.textContent = "Show D-Pad";
     }
   }
 };
@@ -236,6 +259,10 @@ window.applyBat = function (v) {
         pct > 40 ? "NORMAL" : pct > 20 ? "LOW" : "CRITICAL";
       batStatus.style.color = col;
     }
+    const batVoltBig = document.getElementById("bat-volt-big");
+    if (batVoltBig && voltage != null && !isNaN(voltage)) {
+      batVoltBig.textContent = Number(voltage).toFixed(2) + "V";
+    }
   }
 
   pushSpark("bat", pct);
@@ -265,7 +292,11 @@ window.applyUS = function (v) {
   const usVal = document.getElementById("us-val");
   const usBar = document.getElementById("us-bar");
   const obsW = document.getElementById("obs-warn");
+  const obsDist = document.getElementById("obs-dist");
+  const obsStatus = document.getElementById("obs-status");
+  const sysObstacle = document.getElementById("sys-obstacle");
   if (usVal) usVal.textContent = cm.toFixed(0);
+  if (obsDist) obsDist.textContent = cm.toFixed(0);
   if (usBar) {
     usBar.style.width = pct + "%";
     usBar.style.background = col;
@@ -274,6 +305,26 @@ window.applyUS = function (v) {
     obsW.textContent = cm > 0 && cm < 15 ? "OBSTACLE DETECTED" : "CLEAR";
     obsW.className = "obs-warn" + (cm > 0 && cm < 15 ? " alert" : "");
   }
+  if (obsStatus) {
+    obsStatus.textContent = cm > 0 && cm < 15 ? "OBSTACLE" : "CLEAR";
+    obsStatus.className = "obs-warn" + (cm > 0 && cm < 15 ? " alert" : "");
+  }
+  if (sysObstacle) {
+    sysObstacle.textContent = cm > 0 && cm < 15 ? `${cm.toFixed(0)} cm` : "Clear";
+    sysObstacle.className = "sys-val " + (cm > 0 && cm < 15 ? "err" : "ok");
+  }
+
+  // Sensor page obstacle status
+  const sensorObs = document.getElementById("sensor-obstacle");
+  if (sensorObs) {
+    const isObs = cm > 0 && cm < 25;
+    sensorObs.textContent = isObs ? `${cm.toFixed(0)} cm` : "Clear";
+    sensorObs.className = "status-val " + (isObs ? "err" : "ok");
+  }
+
+  // System page
+  const sysUS = document.getElementById("sys-us");
+  if (sysUS) sysUS.textContent = cm.toFixed(0) + " cm";
 
   // Big gauge (Sensors page)
   const bigUS = document.getElementById("big-us");
@@ -288,20 +339,66 @@ window.applyUS = function (v) {
     }
   }
 
+  const bigObsDist = document.getElementById("big-obs-dist");
+  const bigObsStatus = document.getElementById("big-obs-status");
+  if (bigObsDist) {
+    bigObsDist.textContent = cm.toFixed(0);
+    bigObsDist.style.color = col;
+    setGaugeArc("gauge-obs-arc", pct / 100, col);
+  }
+  if (bigObsStatus) {
+    bigObsStatus.textContent = cm > 0 && cm < 15 ? "OBSTACLE" : "CLEAR";
+    bigObsStatus.className = "obs-warn" + (cm > 0 && cm < 15 ? " alert" : "");
+  }
+
   pushSpark("us", cm);
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
    LOAD CELL
 ══════════════════════════════════════════════════════════════════════════════ */
+let lastLCGrams = 0;
+
+window.tareLoadCellUI = function () {
+  localStorage.removeItem("xora-lc-offset");
+  if (typeof window.wsSend === "function") {
+    window.wsSend({ type: "command", command: "TARE" });
+  }
+  if (typeof toast === "function") {
+    toast("Tare Dikirim", "Menunggu nilai baru dari AGV", "success", 1800);
+  }
+};
+
+window.resetLoadCellUI = function () {
+  localStorage.removeItem("xora-lc-offset");
+  applyLC(lastLCGrams);
+  if (typeof toast === "function") {
+    toast("Load Cell Reset", "Tampilan mengikuti telemetry AGV", "info", 1800);
+  }
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("btn-lc-tare")?.addEventListener("click", tareLoadCellUI);
+  document.getElementById("btn-lc-reset")?.addEventListener("click", resetLoadCellUI);
+  document.querySelectorAll(".lc-tare-btn").forEach(b => b.addEventListener("click", tareLoadCellUI));
+  document.querySelectorAll(".lc-reset-btn").forEach(b => b.addEventListener("click", resetLoadCellUI));
+});
+
 window.applyLC = function (v) {
   if (v == null) return;
-  const g = Number(v);
+  const raw = Number(v);
+  if (!Number.isFinite(raw)) return;
+
+  const g = Math.max(0, raw);
+  lastLCGrams = g;
 
   const lcVal = document.getElementById("lc-val");
   const lcBar = document.getElementById("lc-bar");
   const lcTag = document.getElementById("lc-tag");
-  if (lcVal) lcVal.textContent = g.toFixed(0);
+  if (lcVal) {
+    lcVal.textContent = g.toFixed(0);
+    lcVal.title = raw !== g ? `Raw: ${raw}` : "";
+  }
   if (lcBar) lcBar.style.width = Math.min(100, (g / 1000) * 100) + "%";
   if (lcTag) {
     lcTag.textContent = g > 50 ? "LOADED" : "NO LOAD";
@@ -312,6 +409,7 @@ window.applyLC = function (v) {
   const bigLC = document.getElementById("big-lc");
   if (bigLC) {
     bigLC.textContent = g.toFixed(0);
+    bigLC.title = raw !== g ? `Raw: ${raw}` : "";
     setGaugeArc("gauge-lc-arc", Math.min(1, g / 1000), "var(--clr-green)");
     const bigTag = document.getElementById("big-lc-tag");
     if (bigTag) {
@@ -321,6 +419,59 @@ window.applyLC = function (v) {
   }
 
   pushSpark("lc", g);
+
+  // System page
+  const sysLC = document.getElementById("sys-lc");
+  if (sysLC) sysLC.textContent = g.toFixed(0) + " g";
+};
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   MOTOR PWM
+══════════════════════════════════════════════════════════════════════════════ */
+window.applyMotor = function (left, right) {
+  if (left == null || right == null) return;
+  const l = Number(left);
+  const r = Number(right);
+  if (isNaN(l) || isNaN(r)) return;
+
+  const maxPWM = 255;
+
+  // Left motor
+  const lBar = document.getElementById("motor-left-bar");
+  const lVal = document.getElementById("motor-left-val");
+  if (lBar) {
+    const lPct = Math.min(100, (Math.abs(l) / maxPWM) * 100);
+    lBar.style.width = lPct + "%";
+    lBar.style.background = l < 0 ? "var(--clr-amber)" : "var(--accent)";
+  }
+  if (lVal) lVal.textContent = l;
+
+  // Right motor
+  const rBar = document.getElementById("motor-right-bar");
+  const rVal = document.getElementById("motor-right-val");
+  if (rBar) {
+    const rPct = Math.min(100, (Math.abs(r) / maxPWM) * 100);
+    rBar.style.width = rPct + "%";
+    rBar.style.background = r < 0 ? "var(--clr-amber)" : "var(--accent)";
+  }
+  if (rVal) rVal.textContent = r;
+
+  // Direction
+  const dirEl = document.getElementById("motor-direction");
+  if (dirEl) {
+    if (l === 0 && r === 0) dirEl.textContent = "STOP";
+    else if (l > 0 && r > 0) dirEl.textContent = "MAJU";
+    else if (l < 0 && r < 0) dirEl.textContent = "MUNDUR";
+    else if (l < 0 && r > 0) dirEl.textContent = "BELOK KIRI";
+    else if (l > 0 && r < 0) dirEl.textContent = "BELOK KANAN";
+    else dirEl.textContent = `${l}, ${r}`;
+  }
+
+  // System page
+  const sysML = document.getElementById("sys-motor-l");
+  const sysMR = document.getElementById("sys-motor-r");
+  if (sysML) sysML.textContent = l;
+  if (sysMR) sysMR.textContent = r;
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -331,6 +482,10 @@ window.applyBlackbox = function (count) {
   if (el) el.textContent = count;
   const sf = document.getElementById("sf-bb");
   if (sf) sf.textContent = count;
+  const sensorBb = document.getElementById("sensor-bb");
+  if (sensorBb) sensorBb.textContent = count;
+  const sysBb = document.getElementById("sys-bb");
+  if (sysBb) sysBb.textContent = count;
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -342,6 +497,16 @@ window.applyWaiting = function (waiting) {
     el.textContent = waiting ? "Ya" : "Tidak";
     el.style.color = waiting ? "var(--clr-amber)" : "";
   }
+  const sensorW = document.getElementById("sensor-waiting");
+  if (sensorW) {
+    sensorW.textContent = waiting ? "Ya" : "Tidak";
+    sensorW.className = "status-val" + (waiting ? " warn" : "");
+  }
+  const sysW = document.getElementById("sys-waiting");
+  if (sysW) {
+    sysW.textContent = waiting ? "Ya" : "Tidak";
+    sysW.className = "sys-val " + (waiting ? "warn" : "ok");
+  }
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -352,17 +517,59 @@ window.applyIR = function (d) {
   const keys = ["s1", "s2", "s3", "s4", "s5"];
   keys.forEach((k) => {
     const on = !!d[k] || d[k] === 1;
-    // Small dots
+    // Small dots (Control page — uses old IDs for backward compat)
     document.getElementById("ir-" + k)?.classList.toggle("on", on);
-    // Big chips
+    // Big chips (Sensors Live page — 5 channel)
     document.getElementById("big-ir-" + k)?.classList.toggle("on", on);
   });
+
+  // Backward compat: update old 3-channel chips if they exist
+  const oldKeys = [["s2","L"], ["s3","M"], ["s4","R"]];
+  oldKeys.forEach(([k, id]) => {
+    const on = !!d[k] || d[k] === 1;
+    document.getElementById("ir-" + id)?.classList.toggle("on", on);
+    document.getElementById("big-ir-" + id)?.classList.toggle("on", on);
+  });
+
   const pat = keys.map((k) => (d[k] ? "■" : "□")).join(" ");
   const irPat = document.getElementById("ir-pat");
-  const bigIrPat = document.getElementById("big-ir-pat");
+  const bigIrPatInline = document.getElementById("big-ir-pat-inline");
   if (irPat) irPat.textContent = pat;
-  if (bigIrPat) bigIrPat.textContent = pat;
+  if (bigIrPatInline) bigIrPatInline.textContent = pat;
+
+  // System page
+  const sysIR = document.getElementById("sys-ir");
+  if (sysIR) sysIR.textContent = pat;
+
+  // 5-bit IR interpretation
+  const bits = keys.map((k) => (d[k] ? 1 : 0)).join("");
+  const interpret = document.getElementById("ir-interpret");
+  if (interpret) {
+    const info = interpretIR5(bits);
+    interpret.textContent = info.text;
+    interpret.className = "ir-interpret " + info.cls;
+  }
 };
+
+function interpretIR5(bits) {
+  // bits = "s1s2s3s4s5" = "ir_left line_left line_middle line_right ir_right"
+  switch (bits) {
+    case "01110": return { text: "On Track — Lurus", cls: "on-track" };
+    case "00110": return { text: "Geser Kanan", cls: "turning" };
+    case "01100": return { text: "Geser Kiri", cls: "turning" };
+    case "00100": return { text: "Tengah Saja — Lurus", cls: "on-track" };
+    case "11111": return { text: "⬛ BLACKBOX — Intersection", cls: "blackbox" };
+    case "00000": return { text: "⚠ Garis Hilang — ERROR", cls: "lost" };
+    case "10001": return { text: "Sensor Luar Saja — Koreksi", cls: "turning" };
+    case "11000": return { text: "Belok Kiri Tajam", cls: "turning" };
+    case "00011": return { text: "Belok Kanan Tajam", cls: "turning" };
+    case "11100": return { text: "Tikungan Kiri", cls: "turning" };
+    case "00111": return { text: "Tikungan Kanan", cls: "turning" };
+    default:
+      if (bits.includes("1")) return { text: "Pola: " + bits.split("").join(" "), cls: "" };
+      return { text: "—", cls: "" };
+  }
+}
 
 /* ══════════════════════════════════════════════════════════════════════════════
    EVENTS
@@ -533,6 +740,68 @@ window.pushSpark = function (key, val) {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
+   SYSTEM INFO — apply server-side data to System page
+══════════════════════════════════════════════════════════════════════════════ */
+window.applySystemInfo = function (d) {
+  if (!d) return;
+
+  // Server
+  if (d.server) {
+    const uptime = document.getElementById("sys-server-uptime");
+    if (uptime && d.server.uptime) {
+      const ms = Date.now() - new Date(d.server.uptime).getTime();
+      const h = Math.floor(ms / 3600000);
+      const m = Math.floor((ms % 3600000) / 60000);
+      uptime.textContent = `${h}h ${m}m`;
+    }
+    const nodeEl = document.getElementById("sys-node");
+    if (nodeEl) nodeEl.textContent = d.server.nodeVersion || "—";
+    const platEl = document.getElementById("sys-platform");
+    if (platEl) platEl.textContent = d.server.platform || "—";
+  }
+
+  // Database
+  if (d.database) {
+    const dbEl = document.getElementById("sys-db");
+    if (dbEl) {
+      dbEl.textContent = d.database.connected ? "Connected" : "Disconnected";
+      dbEl.className = "sys-val " + (d.database.connected ? "ok" : "err");
+    }
+    const dbVer = document.getElementById("sys-db-version");
+    if (dbVer) dbVer.textContent = d.database.version || "—";
+    const totalEv = document.getElementById("sys-total-events");
+    if (totalEv) totalEv.textContent = d.database.totalEvents || "0";
+    const totalLogs = document.getElementById("sys-total-logs");
+    if (totalLogs) totalLogs.textContent = d.database.totalSensorLogs || "0";
+  }
+
+  // MQTT
+  if (d.mqtt) {
+    const mqttEl = document.getElementById("sys-mqtt");
+    if (mqttEl) {
+      mqttEl.textContent = d.mqtt.connected ? "Connected" : "Disconnected";
+      mqttEl.className = "sys-val " + (d.mqtt.connected ? "ok" : "err");
+    }
+    const mqttClient = document.getElementById("sys-mqtt-client");
+    if (mqttClient) mqttClient.textContent = d.mqtt.clientId || "—";
+    const deviceEl = document.getElementById("sys-device");
+    if (deviceEl) deviceEl.textContent = d.mqtt.deviceId || "—";
+  }
+
+  // WebSocket
+  if (d.websocket) {
+    const wsClients = document.getElementById("sys-ws-clients");
+    if (wsClients) {
+      wsClients.textContent = `${d.websocket.authenticated} / ${d.websocket.clients}`;
+    }
+  }
+};
+
+window.loadSystemInfo = function () {
+  requestAPI("system_info");
+};
+
+/* ══════════════════════════════════════════════════════════════════════════════
    API RESPONSE ROUTER (called from websocket.js)
 ══════════════════════════════════════════════════════════════════════════════ */
 window.handleAPIResponse = function (api, data) {
@@ -551,6 +820,15 @@ window.handleAPIResponse = function (api, data) {
       break;
     case "event_log":
       renderEventLog(data);
+      break;
+    case "state_distribution":
+      renderStateChart(data);
+      break;
+    case "system_info":
+      applySystemInfo(data);
+      break;
+    case "mission_log":
+      renderMissionLog(data);
       break;
   }
 };

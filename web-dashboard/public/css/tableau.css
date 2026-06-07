@@ -1,12 +1,12 @@
 /* ══════════════════════════════════════════════════════════════════════════════
-   TABLEAU.CSS — Light formal theme variables
+   TABLEAU.CSS — Clean, warm light theme
    Aktif saat: [data-theme="tableau"]
-   Font utama: Xora (custom woff2) untuk heading/brand
+   Dirancang untuk kenyamanan mata: warm whites, kontras baik, tidak menyilaukan
 ══════════════════════════════════════════════════════════════════════════════ */
 
 [data-theme="tableau"] {
   /* ── Fonts ─────────────────────────────────────────────────────────────── */
-  --font-ui: "Xora", "Inter", sans-serif;
+  --font-ui: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-brand: "Xora", "Inter", sans-serif;
   --mono: "JetBrains Mono", monospace;
 
@@ -14,74 +14,74 @@
   --sidebar-w: 240px;
   --sidebar-col: 56px;
   --header-h: 50px;
-  --r: 4px;
+  --r: 6px;
 
-  /* ── Core backgrounds ──────────────────────────────────────────────────── */
-  --bg: #f4f6f9;
+  /* ── Core backgrounds (warm, not pure white) ───────────────────────────── */
+  --bg: #f7f8fa;
   --bg2: #ffffff;
-  --bg3: #f0f2f5;
-  --bg4: #e8ecf2;
+  --bg3: #f0f1f5;
+  --bg4: #e8eaef;
 
   /* ── Surfaces ──────────────────────────────────────────────────────────── */
   --header-bg: #ffffff;
-  --sidebar-bg: #ffffff;
+  --sidebar-bg: #fafbfc;
   --panel-bg: #ffffff;
-  --badge-bg: #f4f6f9;
-  --btn-bg: #f0f2f5;
+  --badge-bg: #f0f1f5;
+  --btn-bg: #f0f1f5;
   --toast-bg: #ffffff;
-  --overlay-bg: rgba(244, 246, 249, 0.95);
-  --tt-bg: #f4f6f9;
+  --overlay-bg: rgba(247, 248, 250, 0.96);
+  --tt-bg: #f7f8fa;
 
-  /* ── Borders ───────────────────────────────────────────────────────────── */
-  --border: #ced4de;
-  --border2: #b8c2ce;
+  /* ── Borders (lighter, less harsh) ─────────────────────────────────────── */
+  --border: #e5e8ee;
+  --border2: #d4d9e2;
 
   /* ── Scrollbar ─────────────────────────────────────────────────────────── */
-  --scrollbar-track: #e8ecf2;
-  --scrollbar-thumb: #b8c2ce;
+  --scrollbar-track: #f0f1f5;
+  --scrollbar-thumb: #d4d9e2;
 
-  /* ── Text ──────────────────────────────────────────────────────────────── */
-  --text: #1a2433;
-  --text-mid: #3d5068;
-  --text-dim: #6b7e94;
+  /* ── Text (better contrast for readability) ────────────────────────────── */
+  --text: #1e293b;
+  --text-mid: #475569;
+  --text-dim: #7c8ba0;
 
-  /* ── Accent (Tableau blue) ─────────────────────────────────────────────── */
-  --accent: #1a73e8;
-  --accent-dim: rgba(26, 115, 232, 0.2);
-  --accent-glow: rgba(26, 115, 232, 0.1);
-  --accent-glow2: rgba(26, 115, 232, 0.05);
+  /* ── Accent (warm blue) ────────────────────────────────────────────────── */
+  --accent: #2563eb;
+  --accent-dim: rgba(37, 99, 235, 0.15);
+  --accent-glow: rgba(37, 99, 235, 0.08);
+  --accent-glow2: rgba(37, 99, 235, 0.04);
 
-  /* ── Semantic colors ───────────────────────────────────────────────────── */
-  --clr-green: #0f9d58;
-  --clr-amber: #f9ab00;
-  --clr-red: #d93025;
-  --clr-purple: #7c4dff;
+  /* ── Semantic colors (vibrant, clear feedback) ─────────────────────────── */
+  --clr-green: #16a34a;
+  --clr-amber: #d97706;
+  --clr-red: #dc2626;
+  --clr-purple: #7c3aed;
 
-  --green-dim: rgba(15, 157, 88, 0.15);
-  --green-glow: rgba(15, 157, 88, 0.08);
-  --amber-dim: rgba(249, 171, 0, 0.2);
-  --amber-glow: rgba(249, 171, 0, 0.1);
-  --red-dim: rgba(217, 48, 37, 0.15);
-  --red-glow: rgba(217, 48, 37, 0.08);
-  --purple-dim: rgba(124, 77, 255, 0.15);
-  --purple-glow: rgba(124, 77, 255, 0.08);
+  --green-dim: rgba(22, 163, 74, 0.12);
+  --green-glow: rgba(22, 163, 74, 0.06);
+  --amber-dim: rgba(217, 119, 6, 0.12);
+  --amber-glow: rgba(217, 119, 6, 0.06);
+  --red-dim: rgba(220, 38, 38, 0.12);
+  --red-glow: rgba(220, 38, 38, 0.06);
+  --purple-dim: rgba(124, 58, 237, 0.12);
+  --purple-glow: rgba(124, 58, 237, 0.06);
 
   /* ── Arena SVG ─────────────────────────────────────────────────────────── */
-  --arena-border: #ced4de;
-  --arena-grid: #e4e8f0;
-  --arena-track: #b0bece;
-  --arena-zone: #eef1f7;
+  --arena-border: #d4d9e2;
+  --arena-grid: #e8eaef;
+  --arena-track: #c4cad4;
+  --arena-zone: #f0f1f5;
   --arena-node-fill: #ffffff;
-  --arena-node-stroke: #b8c2ce;
-  --arena-lbl: #6b7e94;
+  --arena-node-stroke: #c4cad4;
+  --arena-lbl: #64748b;
 
   /* ── Nav ───────────────────────────────────────────────────────────────── */
-  --nav-hover-bg: #f4f6f9;
-  --nav-active-bg: rgba(26, 115, 232, 0.08);
+  --nav-hover-bg: #f0f1f5;
+  --nav-active-bg: rgba(37, 99, 235, 0.08);
 
-  /* ── Shadows ───────────────────────────────────────────────────────────── */
-  --header-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --toast-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  /* ── Shadows (softer, more depth) ──────────────────────────────────────── */
+  --header-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --toast-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
   --brand-glow: none;
 
   /* ── Font size base ────────────────────────────────────────────────────── */
@@ -89,7 +89,7 @@
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   TABLEAU OVERRIDES — Komponen yang tampilannya beda dari cyberpunk
+   TABLEAU OVERRIDES — Component adjustments
 ══════════════════════════════════════════════════════════════════════════════ */
 
 [data-theme="tableau"] body {
@@ -117,26 +117,37 @@
 /* ── Sidebar ────────────────────────────────────────────────────────────── */
 [data-theme="tableau"] .sidebar {
   border-right: 1px solid var(--border);
-  box-shadow: 1px 0 4px rgba(0, 0, 0, 0.04);
+  box-shadow: 1px 0 4px rgba(0, 0, 0, 0.03);
+}
+[data-theme="tableau"] .nav-item {
+  border-radius: var(--r);
+  margin: 0 6px;
 }
 [data-theme="tableau"] .nav-item.active {
   box-shadow: none;
+  background: var(--nav-active-bg);
 }
 [data-theme="tableau"] .nav-label {
-  font-family: "Xora", "Inter", sans-serif;
-  font-weight: 600;
-  letter-spacing: 0.03em;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  letter-spacing: 0.01em;
   text-transform: none;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 [data-theme="tableau"] .nav-section-label {
-  font-family: "Xora", "Inter", sans-serif;
+  font-family: var(--font-ui);
   font-size: 9px;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.12em;
   color: var(--text-dim);
+  text-transform: uppercase;
 }
 [data-theme="tableau"] .sidebar-footer {
   background: var(--bg3);
+}
+[data-theme="tableau"] .sf-item {
+  color: var(--text-mid);
+  font-family: var(--mono);
+  font-size: 10px;
 }
 
 /* ── Page header ────────────────────────────────────────────────────────── */
@@ -146,8 +157,9 @@
 }
 [data-theme="tableau"] .page-title,
 [data-theme="tableau"] .page-active {
-  font-family: "Xora", "Inter", sans-serif;
-  letter-spacing: 0.04em;
+  font-family: var(--font-ui);
+  letter-spacing: 0.03em;
+  font-weight: 600;
 }
 [data-theme="tableau"] .page-sep {
   color: var(--text-dim);
@@ -159,17 +171,18 @@
   border-bottom: 1px solid var(--border);
 }
 [data-theme="tableau"] .ptitle {
-  font-family: "Xora", "Inter", sans-serif;
+  font-family: var(--font-ui);
   font-size: 10px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   color: var(--text-mid);
   font-weight: 700;
+  text-transform: uppercase;
 }
 [data-theme="tableau"] .ptitle::after {
   background: var(--border);
 }
 
-/* ── Cards ──────────────────────────────────────────────────────────────── */
+/* ── Cards (warm shadow, subtle) ────────────────────────────────────────── */
 [data-theme="tableau"] .stat-card,
 [data-theme="tableau"] .chart-card,
 [data-theme="tableau"] .sensor-big-card,
@@ -178,21 +191,21 @@
 [data-theme="tableau"] .err-list-card,
 [data-theme="tableau"] .evlog-card,
 [data-theme="tableau"] .ir-big-card {
-  box-shadow:
-    0 1px 4px rgba(0, 0, 0, 0.06),
-    0 1px 2px rgba(0, 0, 0, 0.04);
-  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  border-radius: var(--r);
+  border-color: var(--border);
 }
 [data-theme="tableau"] .stat-card:hover,
 [data-theme="tableau"] .sensor-big-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  border-color: var(--border2);
 }
 
 /* ── Stat card ──────────────────────────────────────────────────────────── */
 [data-theme="tableau"] .stat-label {
-  font-family: "Xora", "Inter", sans-serif;
+  font-family: var(--font-ui);
   color: var(--text-mid);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   font-size: 11px;
   text-transform: none;
   font-weight: 600;
@@ -200,14 +213,16 @@
 [data-theme="tableau"] .stat-val {
   font-size: 32px;
   color: var(--text);
+  font-weight: 700;
 }
 [data-theme="tableau"] .stat-sub {
   color: var(--text-dim);
+  font-size: 10px;
 }
 
 /* ── Buttons ────────────────────────────────────────────────────────────── */
 [data-theme="tableau"] .btn-icon {
-  border-radius: 6px;
+  border-radius: var(--r);
   border-color: var(--border);
   color: var(--text-mid);
 }
@@ -217,10 +232,11 @@
   box-shadow: none;
 }
 [data-theme="tableau"] .btn-sm {
-  border-radius: 6px;
-  font-family: "Xora", "Inter", sans-serif;
+  border-radius: var(--r);
+  font-family: var(--font-ui);
   font-size: 11px;
   color: var(--text-mid);
+  font-weight: 500;
 }
 [data-theme="tableau"] .btn-sm:hover {
   background: var(--nav-active-bg);
@@ -228,51 +244,57 @@
 }
 [data-theme="tableau"] .btn-dest {
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 [data-theme="tableau"] .btn-dest:hover,
 [data-theme="tableau"] .btn-dest.active {
-  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.2);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
 }
 [data-theme="tableau"] .btn-qa {
-  border-radius: 6px;
-  font-family: "Xora", "Inter", sans-serif;
+  border-radius: var(--r);
+  font-family: var(--font-ui);
   font-size: 11px;
+  font-weight: 500;
 }
 [data-theme="tableau"] .btn-mode {
-  border-radius: 6px;
-  font-family: "Xora", "Inter", sans-serif;
+  border-radius: var(--r);
+  font-family: var(--font-ui);
   font-size: 11px;
+  font-weight: 500;
 }
 [data-theme="tableau"] .btn-mode.active {
   box-shadow: none;
 }
 [data-theme="tableau"] .btn-estop {
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(217, 48, 37, 0.2);
-  letter-spacing: 0.08em;
-  font-family: "Xora", "Inter", sans-serif;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+  letter-spacing: 0.06em;
+  font-family: var(--font-ui);
+  font-weight: 700;
 }
 [data-theme="tableau"] .btn-save {
-  border-radius: 6px;
-  font-family: "Xora", "Inter", sans-serif;
-  letter-spacing: 0.04em;
+  border-radius: var(--r);
+  font-family: var(--font-ui);
+  letter-spacing: 0.02em;
+  font-weight: 600;
 }
 [data-theme="tableau"] .btn-save:hover {
-  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.2);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
   transform: none;
 }
 [data-theme="tableau"] .btn-danger {
-  border-radius: 6px;
-  font-family: "Xora", "Inter", sans-serif;
-  letter-spacing: 0.04em;
+  border-radius: var(--r);
+  font-family: var(--font-ui);
+  letter-spacing: 0.02em;
+  font-weight: 600;
 }
 
 /* ── Range buttons ──────────────────────────────────────────────────────── */
 [data-theme="tableau"] .range-btn {
-  border-radius: 6px;
-  font-family: "Xora", "Inter", sans-serif;
+  border-radius: var(--r);
+  font-family: var(--font-ui);
   font-size: 11px;
+  font-weight: 500;
 }
 [data-theme="tableau"] .range-btn.active {
   background: var(--accent);
@@ -282,40 +304,43 @@
 
 /* ── State badge ────────────────────────────────────────────────────────── */
 [data-theme="tableau"] .state-badge {
-  border-radius: 6px;
+  border-radius: var(--r);
   background: var(--bg3);
 }
 [data-theme="tableau"] .sb-label {
-  font-family: "Xora", "Inter", sans-serif;
+  font-family: var(--font-ui);
   text-transform: none;
   font-size: 9px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
+  font-weight: 500;
 }
 [data-theme="tableau"] .sb-val {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* ── Mode chips ─────────────────────────────────────────────────────────── */
 [data-theme="tableau"] .mchip {
   border-radius: 4px;
-  font-family: "Xora", "Inter", sans-serif;
+  font-family: var(--font-ui);
   text-transform: none;
   font-size: 10px;
   box-shadow: none;
+  font-weight: 600;
 }
 
 /* ── Sensor cards ───────────────────────────────────────────────────────── */
 [data-theme="tableau"] .scard {
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border-radius: var(--r);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 [data-theme="tableau"] .sname {
-  font-family: "Xora", "Inter", sans-serif;
+  font-family: var(--font-ui);
   text-transform: none;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   font-size: 10px;
   color: var(--text-mid);
+  font-weight: 600;
 }
 [data-theme="tableau"] .sval {
   font-size: 22px;
@@ -338,20 +363,22 @@
 /* ── H-state chips ──────────────────────────────────────────────────────── */
 [data-theme="tableau"] .h-state {
   border-radius: 4px;
-  font-family: "Xora", "Inter", sans-serif;
+  font-family: var(--font-ui);
   font-size: 11px;
   text-transform: none;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+  font-weight: 600;
 }
 
 /* ── Data table ─────────────────────────────────────────────────────────── */
 [data-theme="tableau"] .data-table th {
-  font-family: "Xora", "Inter", sans-serif;
+  font-family: var(--font-ui);
   background: var(--bg3);
   text-transform: none;
-  letter-spacing: 0.03em;
-  font-size: 11px;
+  letter-spacing: 0.02em;
+  font-size: 10px;
   color: var(--text-mid);
+  font-weight: 600;
 }
 [data-theme="tableau"] .data-table td {
   font-size: 11px;
@@ -366,42 +393,46 @@
 
 /* ── Inputs ─────────────────────────────────────────────────────────────── */
 [data-theme="tableau"] .settings-input {
-  border-radius: 6px;
+  border-radius: var(--r);
   background: var(--bg3);
   border-color: var(--border);
   font-size: 12px;
   color: var(--text);
 }
 [data-theme="tableau"] .settings-input:focus {
-  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+  border-color: var(--accent);
 }
 [data-theme="tableau"] .evlog-filter {
-  border-radius: 6px;
+  border-radius: var(--r);
   background: var(--bg3);
 }
 [data-theme="tableau"] .evlog-filter:focus {
-  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+  border-color: var(--accent);
 }
 
 /* ── Settings labels ────────────────────────────────────────────────────── */
 [data-theme="tableau"] .settings-label,
 [data-theme="tableau"] .settings-card-title {
-  font-family: "Xora", "Inter", sans-serif;
+  font-family: var(--font-ui);
   text-transform: none;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
+  font-weight: 600;
 }
 [data-theme="tableau"] .settings-row-label {
-  font-family: "Xora", "Inter", sans-serif;
+  font-family: var(--font-ui);
   font-size: 12px;
+  font-weight: 500;
 }
 
 /* ── Toggle ─────────────────────────────────────────────────────────────── */
 [data-theme="tableau"] .toggle-track {
-  background: #d0d6e0;
+  background: #d5dae3;
   border-color: var(--border);
 }
 [data-theme="tableau"] .toggle-thumb {
-  background: #94a3b8;
+  background: #9ca8b9;
 }
 [data-theme="tableau"] .toggle input:checked ~ .toggle-track {
   background: var(--accent);
@@ -412,36 +443,33 @@
 
 /* ── Scrollbar ──────────────────────────────────────────────────────────── */
 [data-theme="tableau"] ::-webkit-scrollbar-track {
-  background: #f0f2f5;
+  background: var(--bg3);
 }
 [data-theme="tableau"] ::-webkit-scrollbar-thumb {
-  background: #d0d6e0;
+  background: var(--border2);
 }
 
-/* ── Theme transition overlay (light version) ───────────────────────────── */
+/* ── Theme transition overlay ───────────────────────────────────────────── */
 [data-theme="tableau"] #theme-transition {
-  background: #f4f6f9;
+  background: var(--bg);
 }
 [data-theme="tableau"] .tt-label {
   color: var(--accent);
 }
 [data-theme="tableau"] .tt-spinner {
-  border-top-color: var(--accent);
   border-color: var(--border2);
   border-top-color: var(--accent);
 }
 
-/* ── Toast (light shadow) ───────────────────────────────────────────────── */
+/* ── Toast ──────────────────────────────────────────────────────────────── */
 [data-theme="tableau"] .toast {
-  box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.1),
-    0 2px 6px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
   border-color: var(--border);
 }
 
 /* ── Dropdown ───────────────────────────────────────────────────────────── */
 [data-theme="tableau"] .dropdown {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   border-color: var(--border);
 }
 
@@ -453,7 +481,7 @@
   color: var(--accent);
 }
 
-/* ── PTITLE icon ────────────────────────────────────────────────────────── */
+/* ── Icon colors ────────────────────────────────────────────────────────── */
 [data-theme="tableau"] .ptitle .icon,
 [data-theme="tableau"] .chart-title .icon,
 [data-theme="tableau"] .system-card-title .icon,
@@ -468,36 +496,36 @@
   background: var(--border);
 }
 
-/* ── Chart title, system card title, settings card title readability ─────── */
+/* ── Typography overrides ───────────────────────────────────────────────── */
 [data-theme="tableau"] .chart-title {
-  font-family: "Xora", "Inter", sans-serif;
+  font-family: var(--font-ui);
   font-size: 10px;
-  letter-spacing: 0.05em;
-  text-transform: none;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--text-mid);
   font-weight: 700;
 }
 [data-theme="tableau"] .system-card-title {
-  font-family: "Xora", "Inter", sans-serif;
+  font-family: var(--font-ui);
   font-size: 11px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   text-transform: none;
   color: var(--text-mid);
   font-weight: 700;
 }
 [data-theme="tableau"] .settings-card-title {
-  font-family: "Xora", "Inter", sans-serif;
+  font-family: var(--font-ui);
   font-size: 11px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   text-transform: none;
   color: var(--text-mid);
   font-weight: 700;
 }
 [data-theme="tableau"] .big-label {
-  font-family: "Xora", "Inter", sans-serif;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: none;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   color: var(--text-mid);
   font-weight: 700;
 }
@@ -507,6 +535,8 @@
 }
 [data-theme="tableau"] .sys-key {
   color: var(--text-mid);
+  font-family: var(--mono);
+  font-size: 10px;
 }
 [data-theme="tableau"] .range-label {
   color: var(--text-mid);
@@ -516,44 +546,61 @@
 }
 [data-theme="tableau"] .obs-warn {
   color: var(--text-mid);
+  font-family: var(--font-ui);
+  font-weight: 600;
 }
 [data-theme="tableau"] .ir-big-chip {
-  background: #e4e8f0;
+  background: var(--bg3);
   color: var(--text-mid);
   border-color: var(--border);
 }
+[data-theme="tableau"] .ir-big-chip.on {
+  background: var(--amber-dim);
+  color: var(--clr-amber);
+  border-color: var(--clr-amber);
+}
 [data-theme="tableau"] .ir-dot {
-  background: #c8d0dc;
+  background: var(--border2);
+}
+[data-theme="tableau"] .ir-dot.on {
+  background: var(--clr-amber);
 }
 [data-theme="tableau"] .load-tag {
-  background: #dde2ea;
+  background: var(--bg3);
   color: var(--text-mid);
+}
+[data-theme="tableau"] .load-tag.loaded {
+  background: var(--green-dim);
+  color: var(--clr-green);
 }
 [data-theme="tableau"] .log-entry {
   border-left-width: 3px;
 }
 [data-theme="tableau"] .nav-badge {
-  background: rgba(217, 48, 37, 0.12);
+  background: var(--red-dim);
+  color: var(--clr-red);
 }
 
-/* ── H-pill & clock readability ─────────────────────────────────────────── */
+/* ── Header pills & clock ───────────────────────────────────────────────── */
 [data-theme="tableau"] .h-pill {
   color: var(--text-mid);
+  font-family: var(--mono);
+  font-size: 10px;
 }
 [data-theme="tableau"] .h-clock {
   color: var(--text-mid);
+  font-family: var(--mono);
 }
 [data-theme="tableau"] .h-bat {
   color: var(--text-mid);
 }
 [data-theme="tableau"] .h-username {
   color: var(--text-mid);
-}
-[data-theme="tableau"] .sf-item {
-  color: var(--text-mid);
+  font-family: var(--font-ui);
+  font-weight: 500;
 }
 [data-theme="tableau"] .sidebar-footer {
-  background: #edf0f5;
+  background: var(--bg3);
 }
 [data-theme="tableau"] .brand-tag {
   color: var(--text-dim);
@@ -562,4 +609,52 @@
 /* ── Accent (tableau tidak punya color picker — fixed blue) ─────────────── */
 [data-theme="tableau"] #accent-field {
   display: none;
+}
+
+/* ── H-state color coding (lebih vibrant di light theme) ────────────────── */
+[data-theme="tableau"] .h-state.IDLE {
+  background: var(--bg3);
+  color: var(--text-mid);
+}
+[data-theme="tableau"] .h-state.KEBERANGKATAN,
+[data-theme="tableau"] .h-state.PULANG {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+[data-theme="tableau"] .h-state.SAMPAI,
+[data-theme="tableau"] .h-state.SELESAI {
+  background: var(--green-dim);
+  color: var(--clr-green);
+}
+[data-theme="tableau"] .h-state.ERROR_STATE,
+[data-theme="tableau"] .h-state.MANUAL {
+  background: var(--red-dim);
+  color: var(--clr-red);
+}
+[data-theme="tableau"] .h-state.MENUNGGU_BARANG {
+  background: var(--amber-dim);
+  color: var(--clr-amber);
+}
+
+/* ── Obs warn states ────────────────────────────────────────────────────── */
+[data-theme="tableau"] .obs-warn.alert {
+  color: var(--clr-red);
+  background: var(--red-dim);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* ── Sys-val states ─────────────────────────────────────────────────────── */
+[data-theme="tableau"] .sys-val.ok { color: var(--clr-green); }
+[data-theme="tableau"] .sys-val.err { color: var(--clr-red); }
+[data-theme="tableau"] .sys-val.warn { color: var(--clr-amber); }
+
+/* ── Evlog source badge ─────────────────────────────────────────────────── */
+[data-theme="tableau"] .source-badge.esp32 {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+[data-theme="tableau"] .source-badge.dashboard {
+  background: var(--purple-dim);
+  color: var(--clr-purple);
 }

@@ -3,8 +3,11 @@
 ══════════════════════════════════════════════════════════════════════════════ */
 
 window.analyticsRange = "24h";
+window.evlogRange = "24h";
 window.evlogPage = 0;
+window.evlogSource = "all";
 let evlogData = [];
+let evlogTotal = 0;
 const charts = {};
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -15,7 +18,15 @@ window.loadAnalytics = function () {
   requestAPI("event_counts", { range: analyticsRange });
   requestAPI("sensor_history", { range: analyticsRange });
   requestAPI("error_summary", { range: analyticsRange });
-  requestAPI("event_log", { range: analyticsRange, page: evlogPage });
+  requestAPI("state_distribution", { range: analyticsRange });
+};
+
+window.loadEventLog = function () {
+  requestAPI("event_log", {
+    range: evlogRange,
+    page: evlogPage,
+    source: evlogSource,
+  });
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -63,9 +74,9 @@ function chartDefaults() {
 ══════════════════════════════════════════════════════════════════════════════ */
 window.renderStats = function (d) {
   if (!d) return;
-  setText("stat-events", d.events_24h || "0");
-  setText("stat-deliveries", d.deliveries_24h || "0");
-  setText("stat-errors", d.errors_24h || "0");
+  setText("stat-events", d.events_range || "0");
+  setText("stat-deliveries", d.deliveries_range || "0");
+  setText("stat-errors", d.errors_range || "0");
   setText("stat-total", d.total_events || "0");
 };
 
@@ -129,6 +140,96 @@ window.renderEventChart = function (rows) {
           ...chartDefaults().plugins.tooltip,
           callbacks: {
             label: (ctx) => ` ${ctx.parsed.x} events`,
+          },
+        },
+      },
+    },
+  });
+};
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   STATE DISTRIBUTION CHART (Doughnut)
+══════════════════════════════════════════════════════════════════════════════ */
+window.renderStateChart = function (rows) {
+  if (!rows || !rows.length) return;
+
+  const style = getComputedStyle(document.documentElement);
+  const accent = style.getPropertyValue("--accent").trim() || "#00d4ff";
+  const green = style.getPropertyValue("--clr-green").trim() || "#00ff88";
+  const amber = style.getPropertyValue("--clr-amber").trim() || "#ffb300";
+  const red = style.getPropertyValue("--clr-red").trim() || "#ff3366";
+
+  const STATE_COLORS = {
+    IDLE: hexAlpha(accent, 0.7),
+    MENUNGGU_BARANG: hexAlpha(amber, 0.7),
+    KEBERANGKATAN: hexAlpha(green, 0.7),
+    SAMPAI: "#a855f7",
+    PULANG: hexAlpha(accent, 0.5),
+    SELESAI: hexAlpha(green, 0.5),
+    MANUAL: hexAlpha(amber, 0.5),
+    ERROR_STATE: hexAlpha(red, 0.7),
+  };
+  const DEFAULT_COLOR = hexAlpha(accent, 0.3);
+
+  const labels = rows.map((r) => (r.state || "UNKNOWN").replace(/_/g, " "));
+  const values = rows.map((r) => parseInt(r.count));
+  const colors = rows.map((r) => STATE_COLORS[r.state] || DEFAULT_COLOR);
+
+  destroyChart("states");
+  const canvas = document.getElementById("chart-states");
+  if (!canvas) return;
+
+  const mono =
+    getComputedStyle(document.documentElement)
+      .getPropertyValue("--mono")
+      .trim() || "JetBrains Mono, monospace";
+
+  charts.states = new Chart(canvas, {
+    type: "doughnut",
+    data: {
+      labels,
+      datasets: [
+        {
+          data: values,
+          backgroundColor: colors,
+          borderColor: "transparent",
+          borderWidth: 0,
+          hoverOffset: 6,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "55%",
+      plugins: {
+        legend: {
+          position: "right",
+          labels: {
+            color:
+              style.getPropertyValue("--text-mid").trim() || "#6a8aaa",
+            font: { family: mono, size: 9 },
+            padding: 8,
+            boxWidth: 10,
+            boxHeight: 10,
+          },
+        },
+        tooltip: {
+          backgroundColor:
+            style.getPropertyValue("--panel-bg").trim() || "#0f1520",
+          borderColor: style.getPropertyValue("--border2").trim() || "#223050",
+          borderWidth: 1,
+          titleColor: style.getPropertyValue("--text").trim() || "#c8daf0",
+          bodyColor: style.getPropertyValue("--text-mid").trim() || "#6a8aaa",
+          titleFont: { family: mono, size: 10 },
+          bodyFont: { family: mono, size: 9 },
+          padding: 8,
+          callbacks: {
+            label: (ctx) => {
+              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+              const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
+              return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`;
+            },
           },
         },
       },
@@ -250,14 +351,27 @@ window.renderErrorTable = function (rows) {
 /* ══════════════════════════════════════════════════════════════════════════════
    EVENT LOG
 ══════════════════════════════════════════════════════════════════════════════ */
-window.renderEventLog = function (rows) {
-  evlogData = rows || [];
+window.renderEventLog = function (data) {
+  // Support both old format (array) and new format ({ rows, total })
+  if (Array.isArray(data)) {
+    evlogData = data;
+    evlogTotal = data.length;
+  } else {
+    evlogData = data?.rows || [];
+    evlogTotal = data?.total || 0;
+  }
   renderFilteredLog();
 
   const prevBtn = document.getElementById("pg-prev");
   const nextBtn = document.getElementById("pg-next");
   if (prevBtn) prevBtn.disabled = evlogPage === 0;
-  if (nextBtn) nextBtn.disabled = rows.length < 40;
+  if (nextBtn) nextBtn.disabled = evlogData.length < 40;
+
+  const pageInfo = document.getElementById("evlog-page-info");
+  if (pageInfo) {
+    const totalPages = Math.max(1, Math.ceil(evlogTotal / 40));
+    pageInfo.textContent = `Page ${evlogPage + 1} of ${totalPages}`;
+  }
 };
 
 window.renderFilteredLog = function () {
@@ -268,12 +382,17 @@ window.renderFilteredLog = function () {
     (r) =>
       !filter ||
       (r.code || "").toLowerCase().includes(filter) ||
-      (r.message || "").toLowerCase().includes(filter),
+      (r.message || "").toLowerCase().includes(filter) ||
+      (r.state || "").toLowerCase().includes(filter) ||
+      (r.destination || "").toLowerCase().includes(filter) ||
+      (r.source || "").toLowerCase().includes(filter),
   );
 
   const infoEl = document.getElementById("evlog-info");
   if (infoEl)
-    infoEl.textContent = `${rows.length} rows (page ${evlogPage + 1})`;
+    infoEl.textContent = filter
+      ? `${rows.length} of ${evlogTotal} events`
+      : `${evlogTotal} events total`;
 
   const wrap = document.getElementById("evlog-wrap");
   if (!wrap) return;
@@ -281,6 +400,26 @@ window.renderFilteredLog = function () {
   if (!rows.length) {
     wrap.innerHTML = `<div class="loading">No events found</div>`;
     return;
+  }
+
+  const ERR_CODES = ["LINE_LOST", "OBSTACLE", "ERROR", "ESTOP", "FAIL", "LOST"];
+  const WARN_CODES = ["WAITING", "NO_OBJECT", "TIMEOUT", "INVALID"];
+  const OK_CODES = ["ARRIVED", "LOADED", "RETURNED", "SAMPAI", "SELESAI"];
+  const CMD_CODES = ["CMD_SENT"];
+
+  function rowClass(code) {
+    if (!code) return "";
+    if (ERR_CODES.some((c) => code.includes(c))) return "row-error";
+    if (WARN_CODES.some((c) => code.includes(c))) return "row-warn";
+    if (OK_CODES.some((c) => code.includes(c))) return "row-ok";
+    if (CMD_CODES.some((c) => code.includes(c))) return "row-cmd";
+    return "";
+  }
+
+  function sourceBadge(src) {
+    if (!src) return "—";
+    const cls = src === "dashboard" ? "dashboard" : "esp32";
+    return `<span class="source-badge ${cls}">${src}</span>`;
   }
 
   wrap.innerHTML = `
@@ -300,13 +439,13 @@ window.renderFilteredLog = function () {
         ${rows
           .map(
             (r) => `
-          <tr>
+          <tr class="${rowClass(r.code)}">
             <td style="color:var(--text-dim)">${r.id}</td>
             <td class="code-cell">${r.code || "—"}</td>
             <td>${(r.message || "").slice(0, 50)}</td>
             <td>${r.state || "—"}</td>
             <td>${r.destination || "—"}</td>
-            <td style="color:var(--text-dim)">${r.source || "—"}</td>
+            <td>${sourceBadge(r.source)}</td>
             <td class="ts-cell">${new Date(r.ts).toLocaleString()}</td>
           </tr>
         `,
@@ -320,7 +459,7 @@ window.renderFilteredLog = function () {
 window.changePage = function (dir) {
   evlogPage = Math.max(0, evlogPage + dir);
   window.evlogPage = evlogPage;
-  requestAPI("event_log", { range: analyticsRange, page: evlogPage });
+  loadEventLog();
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -354,12 +493,81 @@ window.exportCSV = function () {
   a.click();
   URL.revokeObjectURL(a.href);
 
-  toast("Exported", `${evlogData.length} rows downloaded`, "success");
+  toast("Exported", `${evlogData.length} rows downloaded`, "success", 3000);
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
    HELPERS
 ══════════════════════════════════════════════════════════════════════════════ */
+window.exportLogPDF = function () {
+  if (!evlogData.length) {
+    toast("No Data", "Load event log first", "warning");
+    return;
+  }
+
+  const esc = (v) =>
+    String(v ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+
+  const rows = evlogData
+    .map(
+      (r) => `
+        <tr>
+          <td>${esc(r.id)}</td>
+          <td>${esc(r.code)}</td>
+          <td>${esc(String(r.message || "").slice(0, 90))}</td>
+          <td>${esc(r.state)}</td>
+          <td>${esc(r.destination)}</td>
+          <td>${esc(r.source)}</td>
+          <td>${esc(r.ts ? new Date(r.ts).toLocaleString() : "")}</td>
+        </tr>
+      `,
+    )
+    .join("");
+
+  const win = window.open("", "_blank", "width=1100,height=760");
+  if (!win) {
+    toast("Popup Blocked", "Allow popups to export PDF", "warning");
+    return;
+  }
+
+  win.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>XORA Event Log</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #111827; padding: 24px; }
+          h1 { font-size: 20px; margin: 0 0 4px; }
+          p { margin: 0 0 16px; color: #4b5563; font-size: 12px; }
+          table { width: 100%; border-collapse: collapse; font-size: 10px; }
+          th, td { border: 1px solid #d1d5db; padding: 6px; vertical-align: top; }
+          th { background: #f3f4f6; text-align: left; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <h1>XORA AGV Event Log</h1>
+        <p>Generated ${new Date().toLocaleString()} - ${evlogData.length} rows</p>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Code</th><th>Message</th><th>State</th><th>Dest</th><th>Source</th><th>Time</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <script>window.onload = () => { window.print(); };</script>
+      </body>
+    </html>
+  `);
+  win.document.close();
+  toast("PDF Ready", "Print dialog opened", "success", 2500);
+};
+
 function destroyChart(key) {
   if (charts[key]) {
     charts[key].destroy();
@@ -389,3 +597,32 @@ function hexAlpha(color, alpha) {
   }
   return color;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   EVENT LOG FILTERS — Range & Source
+══════════════════════════════════════════════════════════════════════════════ */
+document.addEventListener("DOMContentLoaded", () => {
+  // Event log range buttons
+  document.querySelectorAll(".evlog-range-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document
+        .querySelectorAll(".evlog-range-btn")
+        .forEach((x) => x.classList.remove("active"));
+      btn.classList.add("active");
+      evlogRange = btn.dataset.range;
+      evlogPage = 0;
+      window.evlogRange = evlogRange;
+      window.evlogPage = 0;
+      loadEventLog();
+    });
+  });
+
+  // Source filter
+  document.getElementById("evlog-source")?.addEventListener("change", function () {
+    evlogSource = this.value;
+    evlogPage = 0;
+    window.evlogSource = evlogSource;
+    window.evlogPage = 0;
+    loadEventLog();
+  });
+});

@@ -404,7 +404,7 @@
 /* ── Stats Row ───────────────────────────────────────────────────────────── */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 8px;
   flex-shrink: 0;
 }
@@ -414,6 +414,9 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+.chart-grid-3 {
+  grid-template-columns: 1fr 1fr 1fr;
 }
 
 /* ── Sensor Big Grid ─────────────────────────────────────────────────────── */
@@ -449,7 +452,8 @@
   .sensor-big-grid {
     grid-template-columns: 1fr 1fr;
   }
-  .chart-grid {
+  .chart-grid,
+  .chart-grid-3 {
     grid-template-columns: 1fr;
   }
   .system-grid,
@@ -571,6 +575,7 @@
 
   /* Stack all grids */
   .chart-grid,
+  .chart-grid-3,
   .sensor-big-grid,
   .system-grid,
   .settings-grid {

@@ -30,6 +30,8 @@
     <link rel="stylesheet" href="css/components.css" />
     <link rel="stylesheet" href="css/cyberpunk.css" id="theme-cyberpunk" />
     <link rel="stylesheet" href="css/tableau.css" id="theme-tableau" disabled />
+    <link rel="stylesheet" href="css/xora.css" id="theme-xora" disabled />
+    <link rel="stylesheet" href="css/responsive-polish.css" />
   </head>
   <body>
     <!-- ══ THEME TRANSITION OVERLAY ══════════════════════════════════════════ -->
@@ -125,6 +127,10 @@
           <div class="nav-icon"><i class="fa-solid fa-chart-bar icon"></i></div>
           <div class="nav-label">Analytics</div>
         </div>
+        <div class="nav-item" data-page="missions">
+          <div class="nav-icon"><i class="fa-solid fa-truck-fast icon"></i></div>
+          <div class="nav-label">Missions</div>
+        </div>
         <div class="nav-item" data-page="eventlog">
           <div class="nav-icon">
             <i class="fa-solid fa-clipboard-list icon"></i>
@@ -171,6 +177,9 @@
             <span class="page-sep">/</span>
             <span class="page-active">CONTROL</span>
             <div class="page-actions">
+              <button class="btn-sm" id="btn-demo-mode" type="button" onclick="toggleDemoMode()">
+                <i class="fa-solid fa-vial-circle-check icon"></i>Demo Mode
+              </button>
               <button class="btn-sm" onclick="sendCmd('RESET_ERROR')">
                 <i class="fa-solid fa-rotate-left icon"></i>Reset Error
               </button>
@@ -193,29 +202,50 @@
                   <div class="sb-val accent2" id="cur-dest">BASE</div>
                 </div>
               </div>
+              <div class="decision-panel">
+                <div class="decision-label">Current Decision</div>
+                <div class="decision-value" id="current-decision">WAITING_FOR_TELEMETRY</div>
+                <div class="decision-sub" id="decision-sub">Menunggu data AGV...</div>
+                <div class="decision-counters">
+                  <span>MQTT <b id="cnt-mqtt-lost">0</b></span>
+                  <span>OBS <b id="cnt-obstacle">0</b></span>
+                  <span>LINE <b id="cnt-line-lost">0</b></span>
+                </div>
+              </div>
 
               <div class="arena-wrap">
                 <!--
                   Arena — Track lurus dengan 4 blackbox:
                   BASE (bawah) → A → B → C (atas)
                 -->
-                <svg id="arena-svg" viewBox="0 0 200 200" fill="none">
+                <svg id="arena-svg" viewBox="0 0 120 360" fill="none">
                   <rect
                     x="1"
                     y="1"
-                    width="198"
-                    height="198"
+                    width="118"
+                    height="358"
                     rx="2"
                     class="arena-border"
                   />
-                  <line x1="100" y1="1" x2="100" y2="199" class="arena-grid" />
-                  <line x1="1" y1="100" x2="199" y2="100" class="arena-grid" />
+                  <line x1="70" y1="18" x2="70" y2="340" class="arena-grid" />
+                  <line x1="1" y1="180" x2="119" y2="180" class="arena-grid" />
 
                   <!-- Track lurus: BASE → A → B → C -->
                   <path
-                    d="M100,170 L100,30"
+                    d="M70,332 L70,28"
                     class="arena-track"
-                    stroke-linecap="round"
+                  />
+                  <path
+                    d="M70,332 C34,332 24,316 24,286 L24,62 C24,36 40,28 70,28"
+                    class="arena-track arena-track-secondary"
+                  />
+                  <path
+                    d="M70,248 C42,248 24,260 24,286"
+                    class="arena-track arena-track-secondary"
+                  />
+                  <path
+                    d="M70,150 C104,150 106,176 106,190 L106,294 C106,320 96,332 70,332"
+                    class="arena-track arena-track-secondary"
                   />
 
                   <!-- AGV trail -->
@@ -223,26 +253,26 @@
 
                   <!-- Zone BASE -->
                   <rect
-                    x="82"
-                    y="158"
-                    width="36"
-                    height="18"
+                    x="60"
+                    y="322"
+                    width="20"
+                    height="20"
                     rx="2"
                     class="arena-zone"
                     id="zone-BASE"
                   />
                   <rect
-                    x="84"
-                    y="160"
-                    width="32"
-                    height="14"
+                    x="62"
+                    y="324"
+                    width="16"
+                    height="16"
                     rx="2"
                     class="arena-node"
                     id="node-BASE"
                   />
                   <text
-                    x="100"
-                    y="170"
+                    x="70"
+                    y="336"
                     text-anchor="middle"
                     class="arena-lbl arena-lbl-sm"
                     id="lbl-BASE"
@@ -251,23 +281,27 @@
                   </text>
 
                   <!-- Zone TITIK A -->
-                  <circle
-                    cx="100"
-                    cy="130"
-                    r="16"
+                  <rect
+                    x="60"
+                    y="238"
+                    width="20"
+                    height="20"
+                    rx="2"
                     class="arena-zone"
                     id="zone-A"
                   />
-                  <circle
-                    cx="100"
-                    cy="130"
-                    r="9"
+                  <rect
+                    x="62"
+                    y="240"
+                    width="16"
+                    height="16"
+                    rx="2"
                     class="arena-node"
                     id="node-A"
                   />
                   <text
-                    x="100"
-                    y="134"
+                    x="70"
+                    y="252"
                     text-anchor="middle"
                     class="arena-lbl"
                     id="lbl-A"
@@ -276,23 +310,27 @@
                   </text>
 
                   <!-- Zone TITIK B -->
-                  <circle
-                    cx="100"
-                    cy="80"
-                    r="16"
+                  <rect
+                    x="60"
+                    y="140"
+                    width="20"
+                    height="20"
+                    rx="2"
                     class="arena-zone"
                     id="zone-B"
                   />
-                  <circle
-                    cx="100"
-                    cy="80"
-                    r="9"
+                  <rect
+                    x="62"
+                    y="142"
+                    width="16"
+                    height="16"
+                    rx="2"
                     class="arena-node"
                     id="node-B"
                   />
                   <text
-                    x="100"
-                    y="84"
+                    x="70"
+                    y="154"
                     text-anchor="middle"
                     class="arena-lbl"
                     id="lbl-B"
@@ -301,23 +339,27 @@
                   </text>
 
                   <!-- Zone TITIK C -->
-                  <circle
-                    cx="100"
-                    cy="30"
-                    r="16"
+                  <rect
+                    x="60"
+                    y="18"
+                    width="20"
+                    height="20"
+                    rx="2"
                     class="arena-zone"
                     id="zone-C"
                   />
-                  <circle
-                    cx="100"
-                    cy="30"
-                    r="9"
+                  <rect
+                    x="62"
+                    y="20"
+                    width="16"
+                    height="16"
+                    rx="2"
                     class="arena-node"
                     id="node-C"
                   />
                   <text
-                    x="100"
-                    y="34"
+                    x="70"
+                    y="32"
                     text-anchor="middle"
                     class="arena-lbl"
                     id="lbl-C"
@@ -326,14 +368,14 @@
                   </text>
 
                   <!-- AGV marker — start di BASE -->
-                  <g id="agv-marker" transform="translate(100,170)">
-                    <circle class="agv-pulse" r="16" />
+                  <g id="agv-marker" transform="translate(70,332)">
+                    <circle class="agv-pulse" r="13" />
                     <image
                       href="images/agv.png"
-                      x="-13"
-                      y="-13"
-                      width="26"
-                      height="26"
+                      x="-10"
+                      y="-10"
+                      width="20"
+                      height="20"
                       class="agv-img"
                       preserveAspectRatio="xMidYMid meet"
                     />
@@ -355,7 +397,7 @@
               </div>
               <div class="ctrl-body">
                 <!-- Mission Control — pilih tujuan -->
-                <div>
+                <section class="command-section mission-section">
                   <div class="dest-label">Mission Control</div>
                   <div class="dest-row">
                     <button class="btn-dest" id="btn-A" onclick="sendCmd('GOTO_A')">
@@ -371,9 +413,8 @@
                       <span class="ds">Titik C</span>
                     </button>
                   </div>
-                </div>
 
-                <div class="qa-row">
+                  <div class="qa-row mission-actions">
                   <button
                     class="btn-qa accent2"
                     onclick="sendCmd('RETURN')"
@@ -383,10 +424,10 @@
                   <button class="btn-qa" onclick="sendCmd('STOP')">
                     <i class="fa-solid fa-stop icon"></i>Stop
                   </button>
-                </div>
+                  </div>
 
                 <!-- Mission Status -->
-                <div class="scard" style="margin-top: 8px">
+                <div class="mission-status">
                   <div class="sname">Mission Status</div>
                   <div style="display: flex; justify-content: space-between; margin-top: 6px">
                     <span style="opacity: 0.6; font-size: 11px">Blackbox Count</span>
@@ -397,11 +438,12 @@
                     <span id="waiting-status" style="font-size: 11px">—</span>
                   </div>
                 </div>
+                </section>
 
                 <!-- Manual Control -->
-                <div style="margin-top: 8px">
+                <section class="command-section manual-section">
                   <div class="dest-label">Manual Control</div>
-                  <div class="qa-row" style="margin-bottom: 8px">
+                  <div class="qa-row">
                     <button class="btn-qa" id="btn-manual-toggle" onclick="toggleManual()">
                       <i class="fa-solid fa-gamepad icon"></i><span id="manual-toggle-txt">Show D-Pad</span>
                     </button>
@@ -433,9 +475,9 @@
                       <div class="dpad-empty"></div>
                     </div>
                   </div>
-                </div>
+                </section>
 
-                <button class="btn-estop" onclick="sendCmd('EMERGENCY_STOP')">
+                <button class="btn-estop" onclick="confirmEmergencyStop()">
                   <i class="fa-solid fa-ban icon"></i>EMERGENCY STOP
                 </button>
               </div>
@@ -443,6 +485,33 @@
 
             <!-- Sensors -->
             <div class="panel" id="panel-sensors">
+              <div class="command-section preflight-section" id="preflight-panel">
+                <div class="dest-label">Pre-Flight Checklist</div>
+                <div class="preflight-grid">
+                  <div class="preflight-item" data-check="esp">
+                    <i class="fa-solid fa-circle icon"></i><span>ESP Online</span>
+                  </div>
+                  <div class="preflight-item" data-check="mqtt">
+                    <i class="fa-solid fa-circle icon"></i><span>MQTT Connected</span>
+                  </div>
+                  <div class="preflight-item" data-check="tare">
+                    <i class="fa-solid fa-circle icon"></i><span>Loadcell Tared</span>
+                  </div>
+                  <div class="preflight-item" data-check="cargo">
+                    <i class="fa-solid fa-circle icon"></i><span>Cargo Detected</span>
+                  </div>
+                  <div class="preflight-item" data-check="ir">
+                    <i class="fa-solid fa-circle icon"></i><span>IR Sensor Valid</span>
+                  </div>
+                  <div class="preflight-item" data-check="ultrasonic">
+                    <i class="fa-solid fa-circle icon"></i><span>Ultrasonic Valid</span>
+                  </div>
+                  <div class="preflight-item" data-check="base">
+                    <i class="fa-solid fa-circle icon"></i><span>AGV at Base</span>
+                  </div>
+                </div>
+                <div class="preflight-summary" id="preflight-summary">Menunggu telemetry...</div>
+              </div>
               <div class="ptitle">
                 <i class="fa-solid fa-chart-line icon"></i>Sensor Monitor
               </div>
@@ -519,6 +588,10 @@
                   <div class="sbar-fill" id="lc-bar"></div>
                 </div>
                 <div class="load-tag" id="lc-tag">NO LOAD</div>
+                <div class="lc-tools">
+                  <button class="btn-sm" id="btn-lc-tare" type="button">Tare</button>
+                  <button class="btn-sm" id="btn-lc-reset" type="button">Reset</button>
+                </div>
               </div>
             </div>
 
@@ -526,6 +599,12 @@
             <div class="panel log-panel" id="panel-log">
               <div class="ptitle">
                 <i class="fa-solid fa-list icon"></i>Activity Log
+              </div>
+              <div class="timeline-box">
+                <div class="timeline-title">Mission Timeline</div>
+                <div class="mission-timeline" id="mission-timeline">
+                  <div class="timeline-empty">Menunggu misi dimulai...</div>
+                </div>
               </div>
               <div class="log-list" id="log-list"></div>
             </div>
@@ -552,186 +631,251 @@
             <span class="page-title">XORA</span>
             <span class="page-sep">/</span>
             <span class="page-active">SENSORS LIVE</span>
+            <div class="page-actions">
+              <span class="h-state IDLE" id="sensor-state-chip" style="font-size:10px;padding:2px 8px">IDLE</span>
+            </div>
           </div>
           <div class="sensor-page">
             <div class="sensor-big-grid">
-              <!-- Ultrasonic gauge -->
+
+              <!-- 1. Ultrasonic HC-SR04 -->
               <div class="sensor-big-card">
                 <div class="big-header">
                   <div class="big-label">
-                    <i class="fa-solid fa-water icon"></i>Ultrasonic
+                    <i class="fa-solid fa-water icon"></i>Ultrasonic HC-SR04
                   </div>
                   <div class="obs-warn" id="big-obs-warn">CLEAR</div>
                 </div>
                 <div class="gauge-wrap">
                   <svg width="160" height="100" viewBox="0 0 160 100">
-                    <path
-                      d="M 10 90 A 70 70 0 0 1 150 90"
-                      class="gauge-track"
-                      stroke-width="10"
-                      fill="none"
-                      stroke-linecap="round"
-                    />
-                    <path
-                      id="gauge-us-arc"
-                      d="M 10 90 A 70 70 0 0 1 150 90"
-                      class="gauge-arc-cyan"
-                      stroke-width="10"
-                      fill="none"
-                      stroke-linecap="round"
-                      stroke-dasharray="220"
-                      stroke-dashoffset="110"
-                    />
+                    <path d="M 10 90 A 70 70 0 0 1 150 90" class="gauge-track" stroke-width="10" fill="none" stroke-linecap="round"/>
+                    <path id="gauge-us-arc" d="M 10 90 A 70 70 0 0 1 150 90" class="gauge-arc-cyan" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="220" stroke-dashoffset="110"/>
                   </svg>
                   <div class="gauge-center">
                     <div class="gauge-val accent1" id="big-us">—</div>
                     <div class="gauge-unit">cm</div>
                   </div>
                 </div>
+                <div class="sensor-meta">
+                  <span>Threshold</span><span>25 cm</span>
+                </div>
                 <div class="sparkline-wrap">
                   <canvas id="spark-us"></canvas>
                 </div>
               </div>
 
-              <!-- IR big card — 3 channel -->
+              <!-- 2. IR Line Follower — 5 Channel -->
               <div class="sensor-big-card">
                 <div class="big-header">
                   <div class="big-label">
-                    <i class="fa-solid fa-minus icon"></i>IR Line Follower
+                    <i class="fa-solid fa-road icon"></i>IR Line Follower
                   </div>
-                  <div class="ir-pat" id="big-ir-pat-inline">□ □ □</div>
+                  <div class="ir-pat" id="big-ir-pat-inline">□ □ □ □ □</div>
                 </div>
-                <div
-                  class="ir-big-row"
-                  style="justify-content: center; gap: 32px; margin-top: 20px"
-                >
-                  <div class="ir-big-chip" id="big-ir-L">
-                    <i class="fa-solid fa-circle icon"></i>L
+                <div class="ir-big-row" style="margin-top:16px">
+                  <div class="ir-big-chip" id="big-ir-s1">
+                    <i class="fa-solid fa-circle icon"></i>IR-L
                   </div>
-                  <div class="ir-big-chip" id="big-ir-M">
-                    <i class="fa-solid fa-circle icon"></i>M
+                  <div class="ir-big-chip" id="big-ir-s2">
+                    <i class="fa-solid fa-circle icon"></i>LN-L
                   </div>
-                  <div class="ir-big-chip" id="big-ir-R">
-                    <i class="fa-solid fa-circle icon"></i>R
+                  <div class="ir-big-chip" id="big-ir-s3">
+                    <i class="fa-solid fa-circle icon"></i>LN-M
+                  </div>
+                  <div class="ir-big-chip" id="big-ir-s4">
+                    <i class="fa-solid fa-circle icon"></i>LN-R
+                  </div>
+                  <div class="ir-big-chip" id="big-ir-s5">
+                    <i class="fa-solid fa-circle icon"></i>IR-R
                   </div>
                 </div>
-                <div class="ir-pat" id="big-ir-pat" style="margin-top: 20px">
-                  □ □ □
-                </div>
-
-                <!-- Interpretasi pola -->
-                <div
-                  style="
-                    margin-top: 12px;
-                    font-size: 11px;
-                    opacity: 0.7;
-                    text-align: center;
-                  "
-                  id="ir-interpret"
-                >
-                  —
-                </div>
+                <div class="ir-interpret" id="ir-interpret">Menunggu data...</div>
               </div>
 
-              <!-- Obstacle status card -->
+              <!-- 3. Load Cell HX711 -->
               <div class="sensor-big-card">
                 <div class="big-header">
                   <div class="big-label">
-                    <i class="fa-solid fa-triangle-exclamation icon"></i
-                    >Obstacle
+                    <i class="fa-solid fa-weight-hanging icon"></i>Load Cell HX711
                   </div>
-                  <div class="obs-warn" id="big-obs-status">CLEAR</div>
+                  <div class="load-tag" id="big-lc-tag">NO LOAD</div>
                 </div>
                 <div class="gauge-wrap">
                   <svg width="160" height="100" viewBox="0 0 160 100">
-                    <path
-                      d="M 10 90 A 70 70 0 0 1 150 90"
-                      class="gauge-track"
-                      stroke-width="10"
-                      fill="none"
-                      stroke-linecap="round"
-                    />
-                    <path
-                      id="gauge-obs-arc"
-                      d="M 10 90 A 70 70 0 0 1 150 90"
-                      class="gauge-arc-cyan"
-                      stroke-width="10"
-                      fill="none"
-                      stroke-linecap="round"
-                      stroke-dasharray="220"
-                      stroke-dashoffset="220"
-                    />
+                    <path d="M 10 90 A 70 70 0 0 1 150 90" class="gauge-track" stroke-width="10" fill="none" stroke-linecap="round"/>
+                    <path id="gauge-lc-arc" d="M 10 90 A 70 70 0 0 1 150 90" class="gauge-arc-green" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="220" stroke-dashoffset="220"/>
                   </svg>
                   <div class="gauge-center">
-                    <div class="gauge-val accent1" id="big-obs-dist">—</div>
-                    <div class="gauge-unit">cm</div>
+                    <div class="gauge-val" id="big-lc" style="color:var(--clr-green)">—</div>
+                    <div class="gauge-unit">gram</div>
                   </div>
                 </div>
-                <div
-                  style="
-                    text-align: center;
-                    font-size: 11px;
-                    opacity: 0.6;
-                    margin-top: 8px;
-                  "
-                >
-                  Threshold: 10 cm
+                <div class="sensor-meta">
+                  <span>Threshold</span><span>5 g</span>
+                </div>
+                <div style="display:flex;gap:6px;margin-top:4px">
+                  <button class="btn-sm lc-tare-btn" type="button">Tare</button>
+                  <button class="btn-sm lc-reset-btn" type="button">Reset</button>
+                </div>
+                <div class="sparkline-wrap">
+                  <canvas id="spark-lc"></canvas>
+                </div>
+              </div>
+
+              <!-- 4. Motor PWM -->
+              <div class="sensor-big-card">
+                <div class="big-header">
+                  <div class="big-label">
+                    <i class="fa-solid fa-gears icon"></i>Motor PWM
+                  </div>
+                </div>
+                <div class="motor-row">
+                  <div class="motor-item">
+                    <span class="motor-label">LEFT</span>
+                    <div class="motor-bar-track">
+                      <div class="motor-bar-fill" id="motor-left-bar" style="width:0;background:var(--accent)"></div>
+                    </div>
+                    <span class="motor-val" id="motor-left-val">0</span>
+                  </div>
+                  <div class="motor-item">
+                    <span class="motor-label">RIGHT</span>
+                    <div class="motor-bar-track">
+                      <div class="motor-bar-fill" id="motor-right-bar" style="width:0;background:var(--accent)"></div>
+                    </div>
+                    <span class="motor-val" id="motor-right-val">0</span>
+                  </div>
+                </div>
+                <div class="sensor-meta" style="margin-top:12px">
+                  <span>Direction</span><span id="motor-direction">STOP</span>
+                </div>
+              </div>
+
+              <!-- 5. Battery -->
+              <div class="sensor-big-card">
+                <div class="big-header">
+                  <div class="big-label">
+                    <i class="fa-solid fa-battery-three-quarters icon"></i>Battery
+                  </div>
+                  <div id="big-bat-status" style="font-size:10px;font-family:var(--mono);font-weight:700;color:var(--clr-green)">—</div>
+                </div>
+                <div class="gauge-wrap">
+                  <svg width="160" height="100" viewBox="0 0 160 100">
+                    <path d="M 10 90 A 70 70 0 0 1 150 90" class="gauge-track" stroke-width="10" fill="none" stroke-linecap="round"/>
+                    <path id="gauge-bat-arc" d="M 10 90 A 70 70 0 0 1 150 90" class="gauge-arc-amber" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="220" stroke-dashoffset="220"/>
+                  </svg>
+                  <div class="gauge-center">
+                    <div class="gauge-val" id="big-bat" style="color:var(--clr-amber)">—</div>
+                    <div class="gauge-unit">%</div>
+                  </div>
+                </div>
+                <div class="sensor-meta">
+                  <span>Voltage</span><span id="bat-volt-big">—</span>
+                </div>
+                <div class="sparkline-wrap">
+                  <canvas id="spark-bat"></canvas>
+                </div>
+              </div>
+
+              <!-- 6. AGV Status -->
+              <div class="sensor-big-card">
+                <div class="big-header">
+                  <div class="big-label">
+                    <i class="fa-solid fa-microchip icon"></i>AGV Status
+                  </div>
+                </div>
+                <div class="status-grid">
+                  <div class="status-row">
+                    <span class="status-key">STATE</span>
+                    <span class="status-val" id="sensor-fsm">IDLE</span>
+                  </div>
+                  <div class="status-row">
+                    <span class="status-key">MISSION</span>
+                    <span class="status-val accent2" id="sensor-dest">BASE</span>
+                  </div>
+                  <div class="status-row">
+                    <span class="status-key">MODE</span>
+                    <span class="status-val" id="sensor-mode">AUTO</span>
+                  </div>
+                  <div class="status-row">
+                    <span class="status-key">BLACKBOX</span>
+                    <span class="status-val accent2" id="sensor-bb">0</span>
+                  </div>
+                  <div class="status-row">
+                    <span class="status-key">WAITING</span>
+                    <span class="status-val" id="sensor-waiting">Tidak</span>
+                  </div>
+                  <div class="status-row">
+                    <span class="status-key">OBSTACLE</span>
+                    <span class="status-val ok" id="sensor-obstacle">Clear</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- IR Pattern Reference — 5-bit -->
+            <div class="calibration-panel">
+              <div class="ptitle">
+                <i class="fa-solid fa-screwdriver-wrench icon"></i>Calibration Bench
+              </div>
+              <div class="calibration-grid">
+                <div class="cal-card">
+                  <div class="cal-label">Loadcell</div>
+                  <div class="cal-value" id="cal-loadcell">— g</div>
+                  <div class="cal-actions">
+                    <button class="btn-sm" type="button" onclick="tareLoadCellUI()">Tare</button>
+                    <button class="btn-sm" type="button" onclick="resetLoadCellUI()">Reset</button>
+                  </div>
+                </div>
+                <div class="cal-card">
+                  <div class="cal-label">IR Pattern</div>
+                  <div class="cal-value mono" id="cal-ir">-----</div>
+                  <div class="cal-hint" id="cal-ir-hint">Target: 00000 / 00100 / 11111</div>
+                </div>
+                <div class="cal-card">
+                  <div class="cal-label">Ultrasonic</div>
+                  <div class="cal-value" id="cal-ultrasonic">— cm</div>
+                  <div class="cal-hint" id="cal-ultra-hint">Dekatkan tangan untuk validasi.</div>
+                </div>
+                <div class="cal-card">
+                  <div class="cal-label">Motor Test</div>
+                  <div class="cal-actions cal-actions-grid">
+                    <button class="btn-sm" type="button" onclick="sendManual('LEFT')">Left</button>
+                    <button class="btn-sm" type="button" onclick="sendManual('RIGHT')">Right</button>
+                    <button class="btn-sm" type="button" onclick="sendManual('STOP')">Stop</button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <!-- IR pattern legend -->
-            <div class="ir-big-card" style="margin-top: 16px">
+            <div class="ir-big-card" style="margin-top:16px">
               <div class="ptitle">
-                <i class="fa-solid fa-table icon"></i>IR Pattern Reference
+                <i class="fa-solid fa-table icon"></i>IR Pattern Reference (5-bit)
               </div>
-              <div
-                style="
-                  display: grid;
-                  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-                  gap: 8px;
-                  margin-top: 8px;
-                "
-              >
-                <div class="scard" style="padding: 10px">
-                  <div style="font-size: 11px; font-weight: 600; opacity: 0.6">
-                    L=0 M=1 R=0
-                  </div>
-                  <div style="font-size: 12px; margin-top: 4px">
-                    Lurus — Follow line
-                  </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:8px">
+                <div class="scard" style="padding:10px">
+                  <div style="font-size:11px;font-weight:600;opacity:0.6;font-family:var(--mono)">0 1 1 1 0</div>
+                  <div style="font-size:12px;margin-top:4px">On Track — Lurus</div>
                 </div>
-                <div class="scard" style="padding: 10px">
-                  <div style="font-size: 11px; font-weight: 600; opacity: 0.6">
-                    L=0 M=1 R=1
-                  </div>
-                  <div style="font-size: 12px; margin-top: 4px">
-                    Pertigaan → Belok Kanan
-                  </div>
+                <div class="scard" style="padding:10px">
+                  <div style="font-size:11px;font-weight:600;opacity:0.6;font-family:var(--mono)">0 0 1 1 0</div>
+                  <div style="font-size:12px;margin-top:4px">Geser Kanan</div>
                 </div>
-                <div class="scard" style="padding: 10px">
-                  <div style="font-size: 11px; font-weight: 600; opacity: 0.6">
-                    L=1 M=1 R=0
-                  </div>
-                  <div style="font-size: 12px; margin-top: 4px">
-                    Pertigaan → Belok Kiri
-                  </div>
+                <div class="scard" style="padding:10px">
+                  <div style="font-size:11px;font-weight:600;opacity:0.6;font-family:var(--mono)">0 1 1 0 0</div>
+                  <div style="font-size:12px;margin-top:4px">Geser Kiri</div>
                 </div>
-                <div class="scard" style="padding: 10px">
-                  <div style="font-size: 11px; font-weight: 600; opacity: 0.6">
-                    L=1 M=1 R=1
-                  </div>
-                  <div style="font-size: 12px; margin-top: 4px">
-                    Kotak Hitam (Base / Titik A)
-                  </div>
+                <div class="scard" style="padding:10px">
+                  <div style="font-size:11px;font-weight:600;opacity:0.6;font-family:var(--mono)">1 1 1 1 1</div>
+                  <div style="font-size:12px;margin-top:4px">Blackbox — Hitung Intersection</div>
                 </div>
-                <div class="scard" style="padding: 10px">
-                  <div style="font-size: 11px; font-weight: 600; opacity: 0.6">
-                    L=0 M=0 R=0
-                  </div>
-                  <div style="font-size: 12px; margin-top: 4px">
-                    Garis Hilang — ERROR
-                  </div>
+                <div class="scard" style="padding:10px">
+                  <div style="font-size:11px;font-weight:600;opacity:0.6;font-family:var(--mono)">0 0 0 0 0</div>
+                  <div style="font-size:12px;margin-top:4px">Garis Hilang — ERROR</div>
+                </div>
+                <div class="scard" style="padding:10px">
+                  <div style="font-size:11px;font-weight:600;opacity:0.6;font-family:var(--mono)">1 0 0 0 1</div>
+                  <div style="font-size:12px;margin-top:4px">Sensor Luar Saja — Koreksi</div>
                 </div>
               </div>
             </div>
@@ -751,27 +895,30 @@
             </div>
           </div>
           <div class="analytics-page">
+            <!-- Range selector -->
             <div class="range-row">
               <span class="range-label">Range</span>
               <button class="range-btn" data-range="1h">1H</button>
               <button class="range-btn active" data-range="24h">24H</button>
               <button class="range-btn" data-range="7d">7D</button>
             </div>
+
+            <!-- Stat cards -->
             <div class="stats-row">
               <div class="stat-card stat-accent">
-                <div class="stat-label">Events (range)</div>
+                <div class="stat-label">Events</div>
                 <div class="stat-val" id="stat-events">—</div>
-                <div class="stat-sub">total in period</div>
+                <div class="stat-sub">in selected range</div>
               </div>
               <div class="stat-card stat-green">
-                <div class="stat-label">Trips to A</div>
+                <div class="stat-label">Deliveries</div>
                 <div class="stat-val" id="stat-deliveries">—</div>
-                <div class="stat-sub">successful arrived</div>
+                <div class="stat-sub">missions completed</div>
               </div>
               <div class="stat-card stat-red">
                 <div class="stat-label">Errors</div>
                 <div class="stat-val" id="stat-errors">—</div>
-                <div class="stat-sub">in period</div>
+                <div class="stat-sub">in selected range</div>
               </div>
               <div class="stat-card stat-dim">
                 <div class="stat-label">Total Events</div>
@@ -779,6 +926,8 @@
                 <div class="stat-sub">all time</div>
               </div>
             </div>
+
+            <!-- Charts row 1: Event Distribution + State Distribution -->
             <div class="chart-grid">
               <div class="chart-card">
                 <div class="chart-title">
@@ -790,18 +939,128 @@
               </div>
               <div class="chart-card">
                 <div class="chart-title">
-                  <i class="fa-solid fa-water icon"></i>Ultrasonic History (cm)
+                  <i class="fa-solid fa-chart-pie icon"></i>State Distribution
+                </div>
+                <div class="chart-wrap chart-wrap-doughnut">
+                  <canvas id="chart-states"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- Charts row 2: Sensor History (3 charts) -->
+            <div class="chart-grid chart-grid-3">
+              <div class="chart-card">
+                <div class="chart-title">
+                  <i class="fa-solid fa-water icon"></i>Ultrasonic (cm)
                 </div>
                 <div class="chart-wrap"><canvas id="chart-us"></canvas></div>
               </div>
+              <div class="chart-card">
+                <div class="chart-title">
+                  <i class="fa-solid fa-weight-hanging icon"></i>Load Cell (g)
+                </div>
+                <div class="chart-wrap"><canvas id="chart-lc"></canvas></div>
+              </div>
+              <div class="chart-card">
+                <div class="chart-title">
+                  <i class="fa-solid fa-battery-three-quarters icon"></i>Battery (%)
+                </div>
+                <div class="chart-wrap"><canvas id="chart-bat"></canvas></div>
+              </div>
             </div>
+
+            <!-- Error table -->
             <div class="err-list-card">
               <div class="ptitle">
-                <i class="fa-solid fa-circle-exclamation icon"></i>Recent Errors
-                & Warnings
+                <i class="fa-solid fa-circle-exclamation icon"></i>Recent Errors & Warnings
               </div>
               <div id="err-table-wrap">
                 <div class="loading">Loading...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAGE: Missions -->
+        <div class="page-view" id="page-missions">
+          <div class="page-header">
+            <span class="page-title">XORA</span>
+            <span class="page-sep">/</span>
+            <span class="page-active">MISSIONS</span>
+            <div class="page-actions">
+              <button class="btn-sm" onclick="exportMissionsCSV()">
+                <i class="fa-solid fa-download icon"></i>Export CSV
+              </button>
+            </div>
+          </div>
+          <div class="analytics-page">
+            <!-- Range selector -->
+            <div class="range-row" style="gap:12px;flex-wrap:wrap">
+              <span class="range-label">Range</span>
+              <button class="range-btn mission-range-btn" data-range="1h">1H</button>
+              <button class="range-btn mission-range-btn active" data-range="24h">24H</button>
+              <button class="range-btn mission-range-btn" data-range="7d">7D</button>
+              <div style="flex:1"></div>
+              <span class="range-label">Destination</span>
+              <select class="evlog-source" id="mission-dest-filter">
+                <option value="all">All</option>
+                <option value="A">Titik A</option>
+                <option value="B">Titik B</option>
+                <option value="C">Titik C</option>
+              </select>
+              <span class="range-label">Status</span>
+              <select class="evlog-source" id="mission-status-filter">
+                <option value="all">All</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="WAITING_CARGO">Waiting Cargo</option>
+                <option value="FAILED">Failed</option>
+              </select>
+            </div>
+
+            <!-- Stats cards -->
+            <div class="stats-row">
+              <div class="stat-card stat-accent">
+                <div class="stat-label">Total Missions</div>
+                <div class="stat-val" id="mission-total">—</div>
+                <div class="stat-sub">in selected range</div>
+              </div>
+              <div class="stat-card stat-green">
+                <div class="stat-label">Completed</div>
+                <div class="stat-val" id="mission-completed">—</div>
+                <div class="stat-sub">successful deliveries</div>
+              </div>
+              <div class="stat-card stat-red">
+                <div class="stat-label">Failed</div>
+                <div class="stat-val" id="mission-failed">—</div>
+                <div class="stat-sub">errors / stopped</div>
+              </div>
+              <div class="stat-card stat-dim">
+                <div class="stat-label">Avg Duration</div>
+                <div class="stat-val" id="mission-avg-duration">—</div>
+                <div class="stat-sub">per mission</div>
+              </div>
+              <div class="stat-card stat-green">
+                <div class="stat-label">Success Rate</div>
+                <div class="stat-val" id="mission-success-rate">-</div>
+                <div class="stat-sub">completed / total</div>
+              </div>
+            </div>
+            <!-- Mission table -->
+            <div class="evlog-card">
+              <div class="evlog-header">
+                <input class="evlog-filter" id="mission-filter" type="text" placeholder="Search destination, status..." />
+                <span class="pg-info" id="mission-info">—</span>
+              </div>
+              <div id="mission-wrap"><div class="loading">Loading...</div></div>
+              <div class="pg-row">
+                <button class="pg-btn" id="mission-pg-prev" onclick="changeMissionPage(-1)" disabled>
+                  <i class="fa-solid fa-chevron-left icon"></i>Prev
+                </button>
+                <span class="pg-info" id="mission-page-info" style="font-size:9px;color:var(--text-dim)">—</span>
+                <button class="pg-btn" id="mission-pg-next" onclick="changeMissionPage(1)">
+                  Next<i class="fa-solid fa-chevron-right icon"></i>
+                </button>
               </div>
             </div>
           </div>
@@ -817,16 +1076,34 @@
               <button class="btn-sm" onclick="exportCSV()">
                 <i class="fa-solid fa-download icon"></i>Export CSV
               </button>
+              <button class="btn-sm" onclick="exportLogPDF()">
+                <i class="fa-solid fa-file-pdf icon"></i>Export PDF
+              </button>
             </div>
           </div>
           <div class="analytics-page">
+            <!-- Filters row -->
+            <div class="range-row" style="gap:12px;flex-wrap:wrap">
+              <span class="range-label">Range</span>
+              <button class="range-btn evlog-range-btn" data-range="1h">1H</button>
+              <button class="range-btn evlog-range-btn active" data-range="24h">24H</button>
+              <button class="range-btn evlog-range-btn" data-range="7d">7D</button>
+              <div style="flex:1"></div>
+              <span class="range-label">Source</span>
+              <select class="evlog-source" id="evlog-source">
+                <option value="all">All Sources</option>
+                <option value="esp32">ESP32</option>
+                <option value="dashboard">Dashboard</option>
+              </select>
+            </div>
+
             <div class="evlog-card">
               <div class="evlog-header">
                 <input
                   class="evlog-filter"
                   id="evlog-filter"
                   type="text"
-                  placeholder="Filter by code or message..."
+                  placeholder="Search code, message, state, destination..."
                 />
                 <span class="pg-info" id="evlog-info">—</span>
               </div>
@@ -840,6 +1117,7 @@
                 >
                   <i class="fa-solid fa-chevron-left icon"></i>Prev
                 </button>
+                <span class="pg-info" id="evlog-page-info" style="font-size:9px;color:var(--text-dim)">—</span>
                 <button class="pg-btn" id="pg-next" onclick="changePage(1)">
                   Next<i class="fa-solid fa-chevron-right icon"></i>
                 </button>
@@ -854,9 +1132,16 @@
             <span class="page-title">XORA</span>
             <span class="page-sep">/</span>
             <span class="page-active">SYSTEM</span>
+            <div class="page-actions">
+              <button class="btn-sm" onclick="loadSystemInfo()">
+                <i class="fa-solid fa-arrows-rotate icon"></i>Refresh
+              </button>
+            </div>
           </div>
           <div class="system-page">
             <div class="system-grid">
+
+              <!-- 1. Connection Status -->
               <div class="system-card">
                 <div class="system-card-title">
                   <i class="fa-solid fa-wifi icon"></i>Connection Status
@@ -866,18 +1151,32 @@
                   <span class="sys-val" id="sys-ws">—</span>
                 </div>
                 <div class="sys-row">
+                  <span class="sys-key">WS Latency</span>
+                  <span class="sys-val" id="sys-latency">—</span>
+                </div>
+                <div class="sys-row">
                   <span class="sys-key">MQTT Broker</span>
                   <span class="sys-val" id="sys-mqtt">—</span>
                 </div>
                 <div class="sys-row">
-                  <span class="sys-key">Database</span>
-                  <span class="sys-val ok">NeonDB Connected</span>
+                  <span class="sys-key">MQTT Client</span>
+                  <span class="sys-val" id="sys-mqtt-client" style="font-size:8px">—</span>
                 </div>
                 <div class="sys-row">
-                  <span class="sys-key">WS Latency</span>
-                  <span class="sys-val" id="sys-latency">—</span>
+                  <span class="sys-key">Database</span>
+                  <span class="sys-val" id="sys-db">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">DB Version</span>
+                  <span class="sys-val" id="sys-db-version" style="font-size:9px">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">WS Clients</span>
+                  <span class="sys-val" id="sys-ws-clients">—</span>
                 </div>
               </div>
+
+              <!-- 2. AGV State -->
               <div class="system-card">
                 <div class="system-card-title">
                   <i class="fa-solid fa-robot icon"></i>AGV State
@@ -895,13 +1194,85 @@
                   <span class="sys-val" id="sys-mode">—</span>
                 </div>
                 <div class="sys-row">
+                  <span class="sys-key">Blackbox Count</span>
+                  <span class="sys-val" id="sys-bb">0</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Waiting</span>
+                  <span class="sys-val" id="sys-waiting">Tidak</span>
+                </div>
+                <div class="sys-row">
                   <span class="sys-key">Obstacle</span>
                   <span class="sys-val" id="sys-obstacle">—</span>
                 </div>
+                <div class="sys-row">
+                  <span class="sys-key">Battery</span>
+                  <span class="sys-val" id="sys-bat">—</span>
+                </div>
               </div>
+
+              <!-- 3. Sensors -->
               <div class="system-card">
                 <div class="system-card-title">
-                  <i class="fa-solid fa-shield-halved icon"></i>Security Info
+                  <i class="fa-solid fa-chart-line icon"></i>Sensors
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Ultrasonic</span>
+                  <span class="sys-val" id="sys-us">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Load Cell</span>
+                  <span class="sys-val" id="sys-lc">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">IR Pattern</span>
+                  <span class="sys-val" id="sys-ir" style="font-family:var(--mono)">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Motor Left</span>
+                  <span class="sys-val" id="sys-motor-l">0</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Motor Right</span>
+                  <span class="sys-val" id="sys-motor-r">0</span>
+                </div>
+              </div>
+
+              <!-- 4. Network & Device -->
+              <div class="system-card">
+                <div class="system-card-title">
+                  <i class="fa-solid fa-server icon"></i>Server & Device
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Device ID</span>
+                  <span class="sys-val" id="sys-device">agv-01</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Server Uptime</span>
+                  <span class="sys-val" id="sys-server-uptime">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Node.js</span>
+                  <span class="sys-val" id="sys-node">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Platform</span>
+                  <span class="sys-val" id="sys-platform">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Total Events</span>
+                  <span class="sys-val" id="sys-total-events">—</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Sensor Logs</span>
+                  <span class="sys-val" id="sys-total-logs">—</span>
+                </div>
+              </div>
+
+              <!-- 5. Security -->
+              <div class="system-card">
+                <div class="system-card-title">
+                  <i class="fa-solid fa-shield-halved icon"></i>Security
                 </div>
                 <div class="sys-row">
                   <span class="sys-key">Auth</span>
@@ -913,13 +1284,19 @@
                 </div>
                 <div class="sys-row">
                   <span class="sys-key">Rate Limit</span>
-                  <span class="sys-val ok">Active</span>
+                  <span class="sys-val ok">Active (300/15m)</span>
                 </div>
                 <div class="sys-row">
                   <span class="sys-key">WS Auth</span>
-                  <span class="sys-val ok">Token-based</span>
+                  <span class="sys-val ok">One-time Token</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Helmet</span>
+                  <span class="sys-val ok">CSP + Headers</span>
                 </div>
               </div>
+
+              <!-- 6. Session -->
               <div class="system-card">
                 <div class="system-card-title">
                   <i class="fa-solid fa-user icon"></i>Session
@@ -941,6 +1318,7 @@
                   <span class="sys-val ok">httpOnly + SameSite</span>
                 </div>
               </div>
+
             </div>
           </div>
         </div>
@@ -966,6 +1344,12 @@
                         <span></span><span></span><span></span>
                       </div>
                       <div class="theme-opt-label">Cyberpunk</div>
+                    </div>
+                    <div class="theme-opt" data-theme="xora">
+                      <div class="theme-preview xora-prev">
+                        <span></span><span></span><span></span>
+                      </div>
+                      <div class="theme-opt-label">XORA</div>
                     </div>
                     <div class="theme-opt" data-theme="tableau">
                       <div class="theme-preview tableau-prev">
@@ -1137,6 +1521,23 @@
                   <i class="fa-solid fa-right-from-bracket icon"></i>Logout Now
                 </button>
               </div>
+
+              <div class="settings-card">
+                <div class="settings-card-title">
+                  <i class="fa-solid fa-rotate-left icon"></i>Reset Settings
+                </div>
+                <p class="settings-desc">
+                  Reset semua pengaturan tampilan ke default. Theme, accent color, font size, dan toggle akan di-reset.
+                </p>
+                <button class="btn-sm" onclick="resetSettings()" style="margin-top:8px">
+                  <i class="fa-solid fa-rotate-left icon"></i>Reset to Default
+                </button>
+              </div>
+            </div>
+
+            <!-- Version info -->
+            <div style="text-align:center;margin-top:20px;padding:12px;opacity:0.5;font-family:var(--mono);font-size:10px;color:var(--text-dim)">
+              XORA AGV Dashboard v4.0.0 &middot; Built with Express + WebSocket + MQTT
             </div>
           </div>
         </div>
@@ -1270,6 +1671,8 @@
     <script src="js/websocket.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/analytics.js"></script>
+    <script src="js/missions.js"></script>
     <script src="js/controls.js"></script>
+    <script src="js/ops.js"></script>
   </body>
 </html>

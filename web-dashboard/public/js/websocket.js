@@ -157,7 +157,7 @@ function handlePong(ts) {
 /* ══════════════════════════════════════════════════════════════════════════════
    MESSAGE ROUTER
 ══════════════════════════════════════════════════════════════════════════════ */
-function handleMessage({ topic, data, pong }) {
+function handleMessage({ topic, data, api, pong }) {
   // Pong response
   if (pong !== undefined) {
     handlePong(pong);
@@ -167,9 +167,22 @@ function handleMessage({ topic, data, pong }) {
   switch (topic) {
     case "xora/snapshot":
       applySnapshot(data);
+      if (typeof window.opsHandleTelemetry === "function") {
+        window.opsHandleTelemetry({
+          state: data?.state,
+          mission: data?.destination === "A" ? 1 : data?.destination === "B" ? 2 : data?.destination === "C" ? 3 : 0,
+          blackbox_count: data?.blackboxCount,
+          waiting: data?.waiting,
+          distance_cm: data?.sensors?.ultrasonic,
+          loadcell_g: data?.sensors?.loadcell,
+          ...(data?.sensors?.ir || {}),
+          mqtt_connected: true,
+        });
+      }
       break;
     case "xora/state":
       applyState(data);
+      if (typeof window.opsHandleTelemetry === "function") window.opsHandleTelemetry({ state: data });
       break;
     case "xora/destination":
       applyDest(data);
@@ -182,18 +195,22 @@ function handleMessage({ topic, data, pong }) {
       break;
     case "xora/sensor/ir":
       applyIR(data);
+      if (typeof window.opsHandleTelemetry === "function") window.opsHandleTelemetry(data || {});
       break;
     case "xora/sensor/ultrasonic":
       applyUS(data);
+      if (typeof window.opsHandleTelemetry === "function") window.opsHandleTelemetry({ distance_cm: data });
       break;
     case "xora/sensor/loadcell":
       applyLC(data);
+      if (typeof window.opsHandleTelemetry === "function") window.opsHandleTelemetry({ loadcell_g: data });
       break;
     case "xora/event":
       applyEvent(data);
+      if (typeof window.opsHandleEvent === "function") window.opsHandleEvent(data);
       break;
     case "xora/api":
-      handleAPIResponse(data?.api || "", data?.data);
+      handleAPIResponse(api || "", data);
       break;
 
     // ── AGV Firmware direct topics ────────────────────────────────────────
@@ -218,12 +235,17 @@ function handleMessage({ topic, data, pong }) {
             s5: data.ir_right || 0,
           });
         }
+        if (data.motor_left != null || data.motor_right != null) {
+          applyMotor(data.motor_left || 0, data.motor_right || 0);
+        }
+        if (typeof window.opsHandleTelemetry === "function") window.opsHandleTelemetry(data);
       }
       setMQTTStatus(true);
       break;
     case "agv/agv-01/status":
       if (typeof data === "object" && data.online != null) {
         setMQTTStatus(data.online);
+        if (typeof window.opsHandleStatus === "function") window.opsHandleStatus(data);
       }
       break;
 

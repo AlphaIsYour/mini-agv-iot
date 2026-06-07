@@ -5,55 +5,91 @@
 
 /* ══════════════════════════════════════════════════════════════════════════════
    ARENA — Node positions & track routes
-   Koordinat sesuai SVG viewBox="0 0 200 200":
-   BASE : (100, 170)
-   A    : (100, 130)
-   B    : (100, 80)
-   C    : (100, 30)
+   Koordinat sesuai SVG viewBox="0 0 120 360":
+   BASE : (70, 332)
+   A    : (70, 248)
+   B    : (70, 150)
+   C    : (70, 28)
 ══════════════════════════════════════════════════════════════════════════════ */
 const NODE_POS = {
-  BASE: { x: 100, y: 170 },
-  A: { x: 100, y: 130 },
-  B: { x: 100, y: 80 },
-  C: { x: 100, y: 30 },
+  BASE: { x: 70, y: 332 },
+  A: { x: 70, y: 248 },
+  B: { x: 70, y: 150 },
+  C: { x: 70, y: 28 },
+};
+
+const RETURN_LEFT = {
+  TOP: { x: 24, y: 62 },
+  A_JOIN: { x: 24, y: 286 },
+  BASE_LEFT: { x: 34, y: 332 },
 };
 
 // Rute pergi: BASE → tujuan
 const ROUTE_TO_A = [
-  { x: 100, y: 170 },
-  { x: 100, y: 130 },
+  NODE_POS.BASE,
+  NODE_POS.A,
 ];
 const ROUTE_TO_B = [
-  { x: 100, y: 170 },
-  { x: 100, y: 80 },
+  NODE_POS.BASE,
+  NODE_POS.A,
+  NODE_POS.B,
 ];
 const ROUTE_TO_C = [
-  { x: 100, y: 170 },
-  { x: 100, y: 30 },
+  NODE_POS.BASE,
+  NODE_POS.A,
+  NODE_POS.B,
+  NODE_POS.C,
 ];
 
 // Rute pulang: tujuan → BASE
 const ROUTE_FROM_A = [
-  { x: 100, y: 130 },
-  { x: 100, y: 170 },
+  NODE_POS.A,
+  { x: 52, y: 250 },
+  { x: 34, y: 262 },
+  RETURN_LEFT.A_JOIN,
+  RETURN_LEFT.BASE_LEFT,
+  NODE_POS.BASE,
 ];
 const ROUTE_FROM_B = [
-  { x: 100, y: 80 },
-  { x: 100, y: 170 },
+  NODE_POS.B,
+  NODE_POS.A,
+  { x: 52, y: 250 },
+  { x: 34, y: 262 },
+  RETURN_LEFT.A_JOIN,
+  RETURN_LEFT.BASE_LEFT,
+  NODE_POS.BASE,
 ];
 const ROUTE_FROM_C = [
-  { x: 100, y: 30 },
-  { x: 100, y: 170 },
+  NODE_POS.C,
+  RETURN_LEFT.TOP,
+  RETURN_LEFT.A_JOIN,
+  RETURN_LEFT.BASE_LEFT,
+  NODE_POS.BASE,
 ];
 
 /* ── Animation state ─────────────────────────────────────────────────────── */
-let agvPos = { x: 100, y: 170 };
+let agvPos = { ...NODE_POS.BASE };
 let animFrame = null;
 let currentWaypoints = null;
 let animStartTime = null;
 let animDuration = 1000;
+let currentRouteKey = "";
+let currentVisualState = "";
 
 window.currentMode = "AUTO";
+
+window.setControlMode = function (mode) {
+  const normalized = mode === "MAN" ? "MANUAL" : mode || "AUTO";
+  window.currentMode = normalized;
+  document
+    .querySelectorAll(".mchip")
+    .forEach((chip) => chip.classList.toggle("active", chip.dataset.mode === normalized));
+
+  const sfMode = document.getElementById("sf-mode");
+  const sysMode = document.getElementById("sys-mode");
+  if (sfMode) sfMode.textContent = normalized;
+  if (sysMode) sysMode.textContent = normalized;
+};
 
 /* ══════════════════════════════════════════════════════════════════════════════
    AGV VISUAL STATE
@@ -64,27 +100,34 @@ window.updateAGVVisual = function (state, mission) {
   const trail = document.getElementById("agv-trail");
   if (!marker) return;
 
-  marker.className = "";
+  marker.setAttribute("class", "");
+  const visualKey = `${state}:${mission || 0}`;
 
   // Moving states
   if (state === "KEBERANGKATAN" || state === "PULANG") {
     marker.classList.add("agv-moving");
     if (trail) trail.classList.add("visible");
 
+    let route = null;
+    let routeKey = "";
     if (state === "KEBERANGKATAN") {
-      // Pergi ke tujuan
-      if (mission === 1) animateAGVAlongTrack(ROUTE_TO_A);
-      else if (mission === 2) animateAGVAlongTrack(ROUTE_TO_B);
-      else if (mission === 3) animateAGVAlongTrack(ROUTE_TO_C);
+      if (mission === 1) route = ROUTE_TO_A;
+      else if (mission === 2) route = ROUTE_TO_B;
+      else if (mission === 3) route = ROUTE_TO_C;
     } else if (state === "PULANG") {
-      // Pulang ke base
-      if (mission === 1) animateAGVAlongTrack(ROUTE_FROM_A);
-      else if (mission === 2) animateAGVAlongTrack(ROUTE_FROM_B);
-      else if (mission === 3) animateAGVAlongTrack(ROUTE_FROM_C);
+      if (mission === 1) route = ROUTE_FROM_A;
+      else if (mission === 2) route = ROUTE_FROM_B;
+      else if (mission === 3) route = ROUTE_FROM_C;
+    }
+
+    routeKey = route ? `${visualKey}:${pointsToPath(route)}` : "";
+    if (route && currentRouteKey !== routeKey) {
+      animateAGVAlongTrack(route, routeKey);
     }
   } else if (state === "SAMPAI") {
     marker.classList.add("agv-arrived");
     stopAnimation();
+    currentRouteKey = "";
     // Snap ke posisi tujuan
     if (mission === 1) snapAGV(NODE_POS.A);
     else if (mission === 2) snapAGV(NODE_POS.B);
@@ -92,13 +135,17 @@ window.updateAGVVisual = function (state, mission) {
   } else if (state === "SELESAI") {
     marker.classList.add("agv-arrived");
     stopAnimation();
+    currentRouteKey = "";
     snapAGV(NODE_POS.BASE);
   } else {
     // IDLE
     stopAnimation();
+    currentRouteKey = "";
     if (trail) trail.classList.remove("visible");
     snapAGV(NODE_POS.BASE);
   }
+
+  currentVisualState = visualKey;
 };
 
 /* ── Snap AGV ke posisi tanpa animasi ────────────────────────────────────── */
@@ -109,10 +156,19 @@ function snapAGV(pos) {
     ?.setAttribute("transform", `translate(${pos.x},${pos.y})`);
 }
 
+window.snapAGVToNode = function (name) {
+  const pos = NODE_POS[name];
+  if (!pos) return;
+  stopAnimation();
+  currentRouteKey = "";
+  currentWaypoints = null;
+  snapAGV(pos);
+};
+
 /* ══════════════════════════════════════════════════════════════════════════════
    AGV ANIMATION — bergerak sepanjang waypoints
 ══════════════════════════════════════════════════════════════════════════════ */
-window.animateAGVAlongTrack = function (waypoints) {
+window.animateAGVAlongTrack = function (waypoints, routeKey = "") {
   if (!waypoints || waypoints.length < 2) return;
 
   const dx0 = agvPos.x - waypoints[0].x;
@@ -125,8 +181,9 @@ window.animateAGVAlongTrack = function (waypoints) {
   const trail = document.getElementById("agv-trail");
   if (trail) trail.setAttribute("d", pointsToPath(waypoints));
 
-  animDuration = Math.max(800, (routeLength(fullPath) / 80) * 1000);
+  animDuration = Math.max(1100, (routeLength(fullPath) / 70) * 1000);
   currentWaypoints = fullPath;
+  currentRouteKey = routeKey || pointsToPath(fullPath);
   animStartTime = null;
 
   stopAnimation();
@@ -134,14 +191,17 @@ window.animateAGVAlongTrack = function (waypoints) {
   function step(now) {
     if (!animStartTime) animStartTime = now;
     const t = Math.min(1, (now - animStartTime) / animDuration);
-    const pos = posAlongRoute(currentWaypoints, easeInOut(t));
+    const eased = easeInOut(t);
+    const pos = posAlongRoute(currentWaypoints, eased);
+    const ahead = posAlongRoute(currentWaypoints, Math.min(1, eased + 0.015));
+    const angle = Math.atan2(ahead.y - pos.y, ahead.x - pos.x) * (180 / Math.PI) + 90;
 
     agvPos = { ...pos };
     document
       .getElementById("agv-marker")
       ?.setAttribute(
         "transform",
-        `translate(${pos.x.toFixed(2)},${pos.y.toFixed(2)})`,
+        `translate(${pos.x.toFixed(2)},${pos.y.toFixed(2)}) rotate(${angle.toFixed(1)})`,
       );
 
     if (t < 1) {
@@ -160,6 +220,7 @@ function stopAnimation() {
     cancelAnimationFrame(animFrame);
     animFrame = null;
   }
+  animStartTime = null;
 }
 
 /* ── Path helpers ─────────────────────────────────────────────────────────── */
@@ -212,6 +273,7 @@ function easeInOut(t) {
 ══════════════════════════════════════════════════════════════════════════════ */
 window.sendCmd = function (cmd) {
   if (typeof window.wsSend === "function") {
+    if (/^(GOTO_|RETURN)/.test(cmd)) window.setControlMode("AUTO");
     window.wsSend({
       type: "command",
       command: cmd,
@@ -226,6 +288,7 @@ window.sendCmd = function (cmd) {
    sendManual — kirim command manual drive
 ══════════════════════════════════════════════════════════════════════════════ */
 window.sendManual = function (cmd) {
+  window.setControlMode("MANUAL");
   if (typeof window.wsSend === "function") {
     window.wsSend({
       type: "manual",
@@ -245,6 +308,7 @@ window.toggleManual = function () {
   const visible = dpad.style.display !== "none";
   dpad.style.display = visible ? "none" : "flex";
   if (txt) txt.textContent = visible ? "Show D-Pad" : "Hide D-Pad";
+  if (!visible) window.setControlMode("MANUAL");
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════

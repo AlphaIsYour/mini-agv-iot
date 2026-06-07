@@ -41,6 +41,7 @@ for (const k of REQUIRED_ENV) {
 const IS_PROD = process.env.NODE_ENV === "production";
 const HTTP_PORT = parseInt(process.env.PORT) || 3000;
 const WS_PORT = parseInt(process.env.WS_PORT) || 3001;
+const SERVER_START = new Date().toISOString();
 
 // ─── Database ─────────────────────────────────────────────────────────────────
 const useSSL = process.env.DB_SSL !== "false";
@@ -74,7 +75,23 @@ async function initDB() {
       ts          TIMESTAMPTZ DEFAULT NOW()
     );
   `);
-  console.log("[DB] Tables ready");
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS agv_missions (
+      id                SERIAL PRIMARY KEY,
+      destination       TEXT NOT NULL,
+      status            TEXT DEFAULT 'IN_PROGRESS',
+      cargo_weight      FLOAT,
+      created_at        TIMESTAMPTZ DEFAULT NOW(),
+      cargo_detected_at TIMESTAMPTZ,
+      departed_at       TIMESTAMPTZ,
+      arrived_at        TIMESTAMPTZ,
+      cargo_removed_at  TIMESTAMPTZ,
+      return_departed_at TIMESTAMPTZ,
+      returned_at       TIMESTAMPTZ,
+      duration_seconds  FLOAT
+    );
+  `);
+  console.log("[DB] Tables ready (events, sensor_logs, missions)");
 }
 
 async function insertEvent(ev) {
@@ -119,6 +136,12 @@ async function insertSensorLog() {
 }
 
 // ─── AGV State ────────────────────────────────────────────────────────────────
+function missionToDestination(mission) {
+  const n = Number(mission);
+  if (!Number.isFinite(n) || n <= 0) return "BASE";
+  return String.fromCharCode(64 + n);
+}
+
 const agvState = {
   state: "IDLE",
   destination: "BASE",
@@ -136,6 +159,148 @@ const agvState = {
   events: [],
   connectedAt: new Date().toISOString(),
 };
+
+// ─── Mission Tracking ─────────────────────────────────────────────────────────
+let currentMission = null; // Active mission being tracked
+let prevStateForMission = "IDLE";
+let stateChangeQueue = Promise.resolve();
+
+function queueStateChange(newState) {
+  if (!newState) return;
+  stateChangeQueue = stateChangeQueue
+    .then(() => handleStateChange(newState))
+    .catch((e) => console.error("[MISSION] handleStateChange:", e.message));
+}
+
+async function startMission(destination) {
+  if (!["A", "B", "C"].includes(destination)) {
+    console.log(`[MISSION] Ignoring mission start with destination=${destination}`);
+    return;
+  }
+
+  try {
+    const { rows } = await db.query(
+      `INSERT INTO agv_missions (destination, status) VALUES ($1, 'WAITING_CARGO') RETURNING id`,
+      [destination],
+    );
+    currentMission = {
+      id: rows[0]?.id,
+      destination,
+      status: "WAITING_CARGO",
+      cargoWeight: null,
+    };
+    console.log(`[MISSION] #${currentMission.id} started → ${destination}`);
+  } catch (e) {
+    console.error("[MISSION] startMission:", e.message);
+  }
+}
+
+async function updateMission(field, value) {
+  if (!currentMission?.id) return;
+  try {
+    await db.query(
+      `UPDATE agv_missions SET ${field} = $1 WHERE id = $2`,
+      [value, currentMission.id],
+    );
+  } catch (e) {
+    console.error(`[MISSION] updateMission ${field}:`, e.message);
+  }
+}
+
+async function completeMission(status) {
+  if (!currentMission?.id) return;
+  try {
+    const durationRes = await db.query(
+      `SELECT EXTRACT(EPOCH FROM (NOW() - created_at)) as dur FROM agv_missions WHERE id = $1`,
+      [currentMission.id],
+    );
+    const duration = durationRes.rows[0]?.dur || null;
+    await db.query(
+      `UPDATE agv_missions SET status = $1, duration_seconds = $2, returned_at = NOW() WHERE id = $3`,
+      [status, duration, currentMission.id],
+    );
+    console.log(`[MISSION] #${currentMission.id} completed → ${status} (${duration?.toFixed(0)}s)`);
+    currentMission = null;
+  } catch (e) {
+    console.error("[MISSION] completeMission:", e.message);
+  }
+}
+
+async function handleStateChange(newState) {
+  const prev = prevStateForMission;
+  if (newState === prev) return;
+  prevStateForMission = newState;
+  console.log(`[MISSION] State change: ${prev} → ${newState} (dest=${agvState.destination}, mission=${currentMission?.id || 'none'})`);
+
+  // Skip spurious transition: IDLE → SELESAI on server restart
+  // (firmware sends its last state which is already SELESAI)
+  if (prev === "IDLE" && newState === "SELESAI") {
+    console.log("[MISSION] Skipping IDLE→SELESAI (restart recovery)");
+    currentMission = null;
+    return;
+  }
+
+  const stateEventCode = {
+    MENUNGGU_BARANG: "WAITING_CARGO",
+    KEBERANGKATAN: "MISSION_STARTED",
+    SAMPAI: "ARRIVED",
+    PULANG: "RETURNING",
+    SELESAI: "MISSION_COMPLETED",
+    ERROR_STATE: "ERROR_STATE",
+    IDLE: "IDLE",
+  }[newState] || "STATE_CHANGE";
+
+  await insertEvent({
+    code: stateEventCode,
+    message: `${prev} -> ${newState}`,
+    source: "esp32",
+  });
+
+  // New mission starts when AGV waits for cargo, or when it departs
+  // immediately because cargo was already detected.
+  if ((newState === "MENUNGGU_BARANG" || newState === "KEBERANGKATAN") && !currentMission) {
+    await startMission(agvState.destination);
+  }
+
+  // Cargo detected, AGV departing
+  if (newState === "KEBERANGKATAN" && currentMission) {
+    await updateMission("cargo_detected_at", new Date().toISOString());
+    await updateMission("departed_at", new Date().toISOString());
+    await updateMission("cargo_weight", agvState.sensors.loadcell);
+    await updateMission("status", "IN_PROGRESS");
+    currentMission.status = "IN_PROGRESS";
+    currentMission.cargoWeight = agvState.sensors.loadcell;
+  }
+
+  // Arrived at destination
+  if (newState === "SAMPAI" && currentMission) {
+    await updateMission("arrived_at", new Date().toISOString());
+  }
+
+  // Cargo removed, returning to base
+  if (newState === "PULANG" && currentMission) {
+    await updateMission("cargo_removed_at", new Date().toISOString());
+    await updateMission("return_departed_at", new Date().toISOString());
+  }
+
+  // Mission completed successfully
+  if (newState === "SELESAI") {
+    if (currentMission) await completeMission("COMPLETED");
+    currentMission = null;
+  }
+
+  // Mission failed due to error
+  if (newState === "ERROR_STATE") {
+    if (currentMission) await completeMission("FAILED");
+    currentMission = null;
+  }
+
+  // Back to idle — clean up any stale mission
+  if (newState === "IDLE") {
+    if (currentMission) await completeMission("FAILED");
+    currentMission = null;
+  }
+}
 
 // ─── MQTT ─────────────────────────────────────────────────────────────────────
 const MQTT_BROKER = process.env.MQTT_BROKER || "mqtt://broker.hivemq.com:1883";
@@ -196,9 +361,12 @@ mqttClient.on("message", (topic, payload) => {
   }
 
   switch (topic) {
-    case "xora/state":
-      agvState.state = typeof data === "string" ? data : data.state || data;
+    case "xora/state": {
+      const s = typeof data === "string" ? data : data.state || data;
+      agvState.state = s;
+      queueStateChange(s);
       break;
+    }
     case "xora/destination":
       agvState.destination =
         typeof data === "string" ? data : data.destination || data;
@@ -240,18 +408,22 @@ mqttClient.on("message", (topic, payload) => {
     // ── AGV Firmware State ─────────────────────────────────────────────────
     case `agv/${DEVICE_ID}/state`: {
       if (typeof data === "object") {
-        if (data.state) agvState.state = data.state;
-        if (data.mission != null) agvState.destination = data.mission === 0 ? "BASE" : String.fromCharCode(64 + data.mission);
+        const nextState = data.state;
+        if (data.mission != null) agvState.destination = missionToDestination(data.mission);
         if (data.blackbox_count != null) agvState.blackboxCount = data.blackbox_count;
         if (data.distance_cm != null) agvState.sensors.ultrasonic = data.distance_cm;
         if (data.waiting != null) agvState.waiting = data.waiting;
+        if (nextState) {
+          agvState.state = nextState;
+          queueStateChange(nextState);
+        }
       }
       break;
     }
     case `agv/${DEVICE_ID}/telemetry`: {
       if (typeof data === "object") {
-        if (data.state) agvState.state = data.state;
-        if (data.mission != null) agvState.destination = data.mission === 0 ? "BASE" : String.fromCharCode(64 + data.mission);
+        const nextState = data.state;
+        if (data.mission != null) agvState.destination = missionToDestination(data.mission);
         if (data.blackbox_count != null) agvState.blackboxCount = data.blackbox_count;
         if (data.distance_cm != null) agvState.sensors.ultrasonic = data.distance_cm;
         if (data.line_left != null) agvState.sensors.ir = {
@@ -265,6 +437,10 @@ mqttClient.on("message", (topic, payload) => {
         if (data.motor_right != null) agvState.motorRight = data.motor_right;
         if (data.waiting != null) agvState.waiting = data.waiting;
         if (data.loadcell_g != null) agvState.sensors.loadcell = data.loadcell_g;
+        if (nextState) {
+          agvState.state = nextState;
+          queueStateChange(nextState);
+        }
       }
       break;
     }
@@ -280,7 +456,15 @@ mqttClient.on("message", (topic, payload) => {
   wss.clients.forEach((c) => {
     if (c.readyState === 1 && c.authenticated) c.send(wsMsg);
   });
-  console.log(`[MQTT→WS] ${topic}: ${raw.slice(0, 80)}`);
+  if (topic === `agv/${DEVICE_ID}/telemetry` && typeof data === "object") {
+    console.log(
+      `[MQTT→WS] ${topic}: distance=${data.distance_cm}cm loadcell=${data.loadcell_g}g ` +
+        `ir=${data.ir_left}${data.line_left}${data.line_middle}${data.line_right}${data.ir_right} ` +
+        `mqtt=${data.mqtt_connected}`,
+    );
+  } else {
+    console.log(`[MQTT→WS] ${topic}: ${raw.slice(0, 120)}`);
+  }
 });
 
 // ─── Express App ──────────────────────────────────────────────────────────────
@@ -607,6 +791,7 @@ wss.on("connection", (ws, req) => {
           "LEFT": "left",
           "RIGHT": "right",
           "STOP": "stop",
+          "TARE": "tare",
         };
 
         if (GOTO_MAP[cmd]) {
@@ -681,6 +866,7 @@ const ALLOWED_COMMANDS = new Set([
   "GOTO_B",
   "GOTO_C",
   "RETURN",
+  "TARE",
 ]);
 
 function sanitizeCmd(cmd) {
@@ -745,25 +931,164 @@ async function handleAPI(api, params) {
     case "event_log": {
       const page = Math.max(0, parseInt(params.page) || 0);
       const limit = 40;
+      const source = params.source;
+      const validSources = ["esp32", "dashboard"];
+      const sourceFilter = validSources.includes(source)
+        ? `AND source = '${source}'`
+        : "";
+
+      const countResult = await db.query(
+        `SELECT COUNT(*) as total FROM agv_events
+         WHERE ts > NOW() - INTERVAL $1 ${sourceFilter}`,
+        [since],
+      );
+      const total = parseInt(countResult.rows[0]?.total) || 0;
+
       const { rows } = await db.query(
         `SELECT id, code, message, state, destination, mode, source, ts
-         FROM agv_events ORDER BY ts DESC LIMIT $1 OFFSET $2`,
-        [limit, page * limit],
+         FROM agv_events
+         WHERE ts > NOW() - INTERVAL $1 ${sourceFilter}
+         ORDER BY ts DESC LIMIT $2 OFFSET $3`,
+        [since, limit, page * limit],
       );
-      return rows;
+      return { rows, total };
     }
     case "stats_summary": {
       const {
         rows: [ss],
-      } = await db.query(`
-        SELECT
-          COUNT(*) FILTER (WHERE ts > NOW() - INTERVAL '24 hours') as events_24h,
-          COUNT(*) FILTER (WHERE code='ARRIVED' AND ts > NOW() - INTERVAL '24 hours') as deliveries_24h,
-          COUNT(*) FILTER (WHERE (code='ERROR_STATE' OR code='ESTOP' OR code='OBSTACLE_DETECTED') AND ts > NOW() - INTERVAL '24 hours') as errors_24h,
-          COUNT(*) as total_events
-        FROM agv_events
-      `);
+      } = await db.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE ts > NOW() - INTERVAL $1) as events_range,
+           COUNT(*) FILTER (WHERE (code IN ('ARRIVED','SAMPAI','CMD_SENT')) AND ts > NOW() - INTERVAL $1) as deliveries_range,
+           COUNT(*) FILTER (WHERE (code LIKE '%ERROR%' OR code LIKE '%FAIL%' OR code LIKE '%LOST%' OR code = 'ESTOP' OR code = 'OBSTACLE_DETECTED') AND ts > NOW() - INTERVAL $1) as errors_range,
+           COUNT(*) as total_events,
+           (SELECT COUNT(DISTINCT ts::date) FROM agv_events) as active_days
+         FROM agv_events`,
+        [since],
+      );
       return ss;
+    }
+    case "state_distribution": {
+      const { rows } = await db.query(
+        `SELECT state, COUNT(*) as count
+         FROM agv_events
+         WHERE ts > NOW() - INTERVAL $1 AND state IS NOT NULL
+         GROUP BY state ORDER BY count DESC`,
+        [since],
+      );
+      return rows;
+    }
+    case "system_info": {
+      // Test DB connection
+      let dbOk = false;
+      let dbVersion = "";
+      try {
+        const dbTest = await db.query("SELECT version() as v, NOW() as now");
+        dbOk = true;
+        dbVersion = dbTest.rows[0]?.v?.split(" ").slice(0, 2).join(" ") || "";
+      } catch {}
+
+      // Count total events
+      let totalEvents = 0;
+      try {
+        const ec = await db.query("SELECT COUNT(*) as c FROM agv_events");
+        totalEvents = parseInt(ec.rows[0]?.c) || 0;
+      } catch {}
+
+      // Count total sensor logs
+      let totalLogs = 0;
+      try {
+        const lc = await db.query("SELECT COUNT(*) as c FROM agv_sensor_logs");
+        totalLogs = parseInt(lc.rows[0]?.c) || 0;
+      } catch {}
+
+      return {
+        server: {
+          uptime: SERVER_START,
+          httpPort: HTTP_PORT,
+          wsPort: WS_PORT,
+          nodeVersion: process.version,
+          platform: process.platform,
+          pid: process.pid,
+        },
+        database: {
+          connected: dbOk,
+          version: dbVersion,
+          totalEvents,
+          totalSensorLogs: totalLogs,
+        },
+        mqtt: {
+          connected: mqttClient.connected,
+          broker: MQTT_BROKER,
+          clientId: MQTT_CLIENT_ID,
+          deviceId: DEVICE_ID,
+        },
+        websocket: {
+          clients: wss.clients.size,
+          authenticated: [...wss.clients].filter((c) => c.authenticated).length,
+        },
+        agv: {
+          state: agvState.state,
+          destination: agvState.destination,
+          mode: agvState.mode,
+          battery: agvState.battery,
+          connectedAt: agvState.connectedAt,
+        },
+      };
+    }
+    case "mission_log": {
+      try {
+        const page = Math.max(0, parseInt(params.page) || 0);
+        const limit = 20;
+        const destFilter = ["A", "B", "C"].includes(params.dest)
+          ? `AND destination = '${params.dest}'`
+          : "";
+        const statusFilter = ["COMPLETED", "FAILED", "IN_PROGRESS", "WAITING_CARGO"].includes(params.status)
+          ? `AND status = '${params.status}'`
+          : "";
+
+        const countResult = await db.query(
+          `SELECT COUNT(*) as total FROM agv_missions
+           WHERE created_at > NOW() - INTERVAL $1 ${destFilter} ${statusFilter}`,
+          [since],
+        );
+        const total = parseInt(countResult.rows[0]?.total) || 0;
+
+        const { rows } = await db.query(
+          `SELECT id, destination, status, cargo_weight,
+                  created_at, cargo_detected_at, departed_at,
+                  arrived_at, cargo_removed_at, return_departed_at,
+                  returned_at, duration_seconds
+           FROM agv_missions
+           WHERE created_at > NOW() - INTERVAL $1 ${destFilter} ${statusFilter}
+           ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+          [since, limit, page * limit],
+        );
+
+        // Summary stats
+        const statsResult = await db.query(
+          `SELECT
+             COUNT(*) as total_missions,
+             COUNT(*) FILTER (WHERE status = 'COMPLETED') as completed,
+             COUNT(*) FILTER (WHERE status = 'FAILED') as failed,
+             COUNT(*) FILTER (WHERE status = 'IN_PROGRESS' OR status = 'WAITING_CARGO') as active,
+             AVG(duration_seconds) FILTER (WHERE status = 'COMPLETED') as avg_duration,
+             AVG(cargo_weight) FILTER (WHERE cargo_weight IS NOT NULL) as avg_weight
+           FROM agv_missions
+           WHERE created_at > NOW() - INTERVAL $1`,
+          [since],
+        );
+
+        console.log(`[API] mission_log: ${total} rows, range=${since}, stats=${JSON.stringify(statsResult.rows[0])}`);
+        return {
+          rows,
+          total,
+          stats: statsResult.rows[0] || {},
+        };
+      } catch (e) {
+        console.error("[API] mission_log error:", e.message);
+        return { rows: [], total: 0, stats: {} };
+      }
     }
     default:
       return { error: "Unknown API" };
