@@ -252,6 +252,11 @@ function handleMessage({ topic, data, api, pong }) {
     default:
       break;
   }
+
+  // Forward all messages to 3D simulation (if active)
+  if (typeof window.onAGVMessage === "function") {
+    window.onAGVMessage({ topic, data });
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════

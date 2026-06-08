@@ -491,6 +491,7 @@ app.use(
           "https://cdnjs.cloudflare.com",
           "https://fonts.googleapis.com",
           "https://unpkg.com",
+          "https://cdn.jsdelivr.net",
         ],
         styleSrc: [
           "'self'",

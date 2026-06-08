@@ -1,0 +1,406 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   SIMULATION3D.CSS — Game-style floating UI for 3D AGV Simulator
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Page ── */
+#page-simulation3d {
+  height: calc(100vh - var(--header-h));
+  overflow: visible;
+}
+
+.sim3d-page {
+  height: 100%;
+}
+
+/* ── Canvas Wrapper ── */
+.sim3d-canvas-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: #87ceeb;
+}
+
+.sim3d-canvas-wrap canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ── Mobile/Desktop visibility ── */
+.sim3d-mobile-only { display: none; }
+.sim3d-desktop-only { display: flex; }
+@media (max-width: 768px) {
+  .sim3d-mobile-only { display: flex; }
+  .sim3d-desktop-only { display: none; }
+}
+
+/* ── Floating Panels (Game HUD) ── */
+.sim3d-float {
+  position: absolute;
+  z-index: 10;
+  pointer-events: none;
+}
+.sim3d-float > * {
+  pointer-events: auto;
+}
+
+.sim3d-float-tl { top: 12px; left: 12px; }
+.sim3d-float-tr { top: 12px; right: 12px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.sim3d-float-bl { bottom: 12px; left: 12px; }
+.sim3d-float-br { bottom: 12px; right: 12px; }
+.sim3d-float-bc { bottom: 12px; left: 50%; transform: translateX(-50%); }
+
+/* ── Float Panel (semi-transparent game box) ── */
+.sim3d-float-panel {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #fff;
+  font-family: var(--mono, monospace);
+}
+
+.sim3d-float-header {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sim3d-float-header i { color: var(--accent, #4488ff); }
+
+/* ── Telemetry Strip ── */
+.sim3d-telem-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.8);
+}
+.sim3d-telem-strip i {
+  color: var(--accent, #4488ff);
+  font-size: 9px;
+  margin-right: 3px;
+}
+.sim3d-telem-strip span span {
+  font-weight: 700;
+  color: #fff;
+}
+
+/* ── Game Toolbar (top-right buttons) ── */
+.sim3d-float-toolbar {
+  display: flex;
+  gap: 6px;
+}
+
+.sim3d-gbtn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(8px);
+  color: #ccc;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.sim3d-gbtn:hover {
+  background: rgba(0,0,0,0.7);
+  border-color: var(--accent, #4488ff);
+  color: var(--accent, #4488ff);
+}
+.sim3d-gbtn.active {
+  background: rgba(68,136,255,0.2);
+  border-color: var(--accent, #4488ff);
+  color: var(--accent, #4488ff);
+}
+
+/* ── Status Pill ── */
+.sim3d-pill {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #aaa;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.sim3d-pill .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #666;
+}
+.sim3d-pill.online .dot { background: #00ff88; box-shadow: 0 0 6px #00ff88; }
+.sim3d-pill.online { color: #00ff88; border-color: rgba(0,255,136,0.2); }
+.sim3d-pill.driving .dot { background: var(--accent, #4488ff); box-shadow: 0 0 6px var(--accent, #4488ff); }
+.sim3d-pill.driving { color: var(--accent, #4488ff); border-color: rgba(68,136,255,0.3); }
+
+/* ── Mission Buttons ── */
+.sim3d-mission-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.sim3d-mbtn {
+  padding: 8px 12px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.4);
+  color: #ccc;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--mono, monospace);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sim3d-mbtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.sim3d-mbtn.m-a { border-color: rgba(0,204,102,0.4); }
+.sim3d-mbtn.m-a:hover { background: rgba(0,204,102,0.2); color: #00cc66; border-color: #00cc66; }
+.sim3d-mbtn.m-b { border-color: rgba(255,170,0,0.4); }
+.sim3d-mbtn.m-b:hover { background: rgba(255,170,0,0.2); color: #ffaa00; border-color: #ffaa00; }
+.sim3d-mbtn.m-c { border-color: rgba(255,68,102,0.4); }
+.sim3d-mbtn.m-c:hover { background: rgba(255,68,102,0.2); color: #ff4466; border-color: #ff4466; }
+.sim3d-mbtn.m-base { border-color: rgba(68,136,255,0.4); }
+.sim3d-mbtn.m-base:hover { background: rgba(68,136,255,0.2); color: #4488ff; border-color: #4488ff; }
+
+/* ── Mode Chips ── */
+.sim3d-mode-row {
+  display: flex;
+  gap: 6px;
+}
+.sim3d-mode-chip {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  background: rgba(0,0,0,0.3);
+  color: #888;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.sim3d-mode-chip:hover { border-color: rgba(255,255,255,0.3); color: #ccc; }
+.sim3d-mode-chip.active {
+  background: rgba(68,136,255,0.2);
+  border-color: var(--accent, #4488ff);
+  color: var(--accent, #4488ff);
+}
+
+/* ── Joystick (mobile) ── */
+.sim3d-joystick {
+  position: relative;
+  width: 120px;
+  height: 120px;
+}
+.sim3d-joystick-base {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(40,40,40,0.8) 0%, rgba(20,20,20,0.9) 100%);
+  border: 2px solid rgba(255,255,255,0.12);
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.sim3d-joystick-stick {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--accent, #4488ff) 0%, #224 100%);
+  border: 2px solid var(--accent, #4488ff);
+  box-shadow: 0 0 12px rgba(68,136,255,0.4);
+  position: absolute;
+  cursor: grab;
+  touch-action: none;
+}
+.sim3d-joystick-stick:active { cursor: grabbing; }
+
+/* ── Keyboard Hint Bar ── */
+.sim3d-kbd-bar {
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  white-space: nowrap;
+}
+.sim3d-kbd-bar kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  font-family: var(--mono, monospace);
+  font-size: 10px;
+  color: rgba(255,255,255,0.7);
+  margin: 0 1px;
+}
+
+/* ── Door Popup ── */
+.sim3d-door-popup {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  z-index: 30;
+  animation: doorFadeIn 0.3s ease;
+}
+.sim3d-door-popup.hidden { display: none; }
+
+@keyframes doorFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.sim3d-door-popup-box {
+  background: rgba(20,20,30,0.95);
+  border: 2px solid var(--accent, #4488ff);
+  border-radius: 16px;
+  padding: 28px 36px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  animation: doorPopIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes doorPopIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.sim3d-door-popup-icon { font-size: 48px; margin-bottom: 8px; }
+.sim3d-door-popup-title { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.sim3d-door-popup-sub { font-size: 12px; color: #888; margin-bottom: 20px; }
+.sim3d-door-popup-actions { display: flex; gap: 12px; justify-content: center; }
+
+.sim3d-door-btn {
+  padding: 10px 28px;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+.sim3d-door-yes { background: rgba(68,136,255,0.2); border-color: var(--accent, #4488ff); color: var(--accent, #4488ff); }
+.sim3d-door-yes:hover { background: var(--accent, #4488ff); color: #fff; }
+.sim3d-door-no { background: rgba(40,40,40,0.8); border-color: rgba(255,255,255,0.15); color: #888; }
+.sim3d-door-no:hover { border-color: #ff4466; color: #ff4466; }
+
+/* ── Loading ── */
+.sim3d-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.8);
+  z-index: 20;
+  gap: 16px;
+  transition: opacity 0.5s;
+}
+.sim3d-loading.hidden { opacity: 0; pointer-events: none; }
+
+.sim3d-loading-spinner {
+  width: 40px; height: 40px;
+  border: 3px solid rgba(255,255,255,0.2);
+  border-top-color: var(--accent, #4488ff);
+  border-radius: 50%;
+  animation: sim3d-spin 0.8s linear infinite;
+}
+@keyframes sim3d-spin { to { transform: rotate(360deg); } }
+
+.sim3d-loading-text { font-size: 11px; color: #888; letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* ── Fullscreen ── */
+.sim3d-canvas-wrap:fullscreen { background: #87ceeb; }
+.sim3d-canvas-wrap:fullscreen canvas { width: 100% !important; height: 100% !important; }
+.sim3d-canvas-wrap:-webkit-full-screen { background: #87ceeb; }
+.sim3d-canvas-wrap:-webkit-full-screen canvas { width: 100% !important; height: 100% !important; }
+
+/* ── Responsive: lift panels on smaller screens ── */
+@media (max-height: 800px) {
+  .sim3d-float-bl { bottom: 60px; }
+  .sim3d-float-br { bottom: 60px; }
+  .sim3d-float-bc { bottom: 60px; }
+  .sim3d-float-panel { padding: 8px 12px; }
+  .sim3d-mbtn { padding: 6px 10px; font-size: 11px; }
+}
+
+@media (max-height: 700px) {
+  .sim3d-float-bl { bottom: 50px; }
+  .sim3d-float-br { bottom: 50px; }
+  .sim3d-float-bc { bottom: 50px; }
+  .sim3d-float-tl { top: 8px; left: 8px; }
+  .sim3d-float-tr { top: 8px; right: 8px; }
+  .sim3d-float-panel { padding: 6px 10px; border-radius: 8px; }
+  .sim3d-float-header { font-size: 13px; margin-bottom: 4px; }
+  .sim3d-telem-strip { font-size: 10px; gap: 6px 10px; }
+  .sim3d-mbtn { padding: 5px 8px; font-size: 10px; }
+  .sim3d-gbtn { width: 32px; height: 32px; font-size: 12px; }
+  .sim3d-joystick { width: 100px; height: 100px; }
+  .sim3d-joystick-base { width: 90px; height: 90px; }
+  .sim3d-joystick-stick { width: 36px; height: 36px; }
+}
+
+@media (max-height: 600px) {
+  .sim3d-float-bl { bottom: 40px; }
+  .sim3d-float-br { bottom: 40px; }
+  .sim3d-float-bc { bottom: 40px; }
+  .sim3d-float-panel { padding: 5px 8px; }
+  .sim3d-telem-strip { font-size: 9px; gap: 4px 8px; }
+  .sim3d-mission-row { gap: 4px; }
+  .sim3d-mbtn { padding: 4px 6px; font-size: 9px; }
+}
+
+/* ── Responsive: width ── */
+@media (max-width: 768px) {
+  .sim3d-float-tl { left: 8px; top: 8px; }
+  .sim3d-float-tr { right: 8px; top: 8px; }
+  .sim3d-float-bl { left: 8px; bottom: 8px; }
+  .sim3d-float-br { right: 8px; bottom: 8px; }
+  .sim3d-telem-strip { gap: 4px 8px; font-size: 9px; }
+  .sim3d-gbtn { width: 32px; height: 32px; }
+  .sim3d-mbtn { padding: 5px 8px; font-size: 10px; }
+  .sim3d-kbd-bar { font-size: 9px; padding: 4px 10px; }
+}
+
+/* ── Very small screens ── */
+@media (max-width: 480px) {
+  .sim3d-float-panel { padding: 4px 6px; border-radius: 6px; }
+  .sim3d-float-header { font-size: 12px; }
+  .sim3d-telem-strip { font-size: 8px; gap: 3px 6px; }
+  .sim3d-mission-row { gap: 3px; }
+  .sim3d-mbtn { padding: 4px 6px; font-size: 9px; }
+  .sim3d-mode-chip { font-size: 8px; padding: 3px 6px; }
+}

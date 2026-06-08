@@ -225,6 +225,11 @@ window.navTo = function (page) {
   if (page === "system") loadSystemInfo();
 
   // When entering Robo Eyes page, ensure videos are playing and state is current
+  if (page === "simulation3d") {
+    if (typeof window.initSimulation3D === "function") window.initSimulation3D();
+  } else if (typeof window.pauseSimulation3D === "function") {
+    window.pauseSimulation3D();
+  }
   if (page === "roboeyes") {
     ["eyes-video-ready","eyes-video-moving","eyes-video-error"].forEach(id => {
       document.getElementById(id)?.play().catch(() => {});
