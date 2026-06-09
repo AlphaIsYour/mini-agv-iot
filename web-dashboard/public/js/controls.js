@@ -77,6 +77,7 @@ let currentRouteKey = "";
 let currentVisualState = "";
 
 window.currentMode = "AUTO";
+window.aliveModeActive = false;
 
 window.setControlMode = function (mode) {
   const normalized = mode === "MAN" ? "MANUAL" : mode || "AUTO";
@@ -272,6 +273,11 @@ function easeInOut(t) {
    sendCmd — kirim command ke server via WebSocket
 ══════════════════════════════════════════════════════════════════════════════ */
 window.sendCmd = function (cmd) {
+  // Block guest from sending commands
+  if (window.sessionUser?.role === "guest") {
+    if (typeof toast === "function") toast("Access Denied", "Guest mode — cannot control AGV", "warning", 2000);
+    return;
+  }
   if (typeof window.wsSend === "function") {
     if (/^(GOTO_|RETURN)/.test(cmd)) window.setControlMode("AUTO");
     window.wsSend({
@@ -288,6 +294,8 @@ window.sendCmd = function (cmd) {
    sendManual — kirim command manual drive
 ══════════════════════════════════════════════════════════════════════════════ */
 window.sendManual = function (cmd) {
+  // Block guest from sending commands
+  if (window.sessionUser?.role === "guest") return;
   window.setControlMode("MANUAL");
   if (typeof window.wsSend === "function") {
     window.wsSend({
@@ -309,6 +317,27 @@ window.toggleManual = function () {
   dpad.style.display = visible ? "none" : "flex";
   if (txt) txt.textContent = visible ? "Show D-Pad" : "Hide D-Pad";
   if (!visible) window.setControlMode("MANUAL");
+};
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   TOGGLE ALIVE MODE — AGV bergerak natural saat idle
+   Kirim command ke firmware: alive:on / alive:off
+══════════════════════════════════════════════════════════════════════════════ */
+window.toggleAliveMode = function () {
+  const cmd = window.aliveModeActive ? "ALIVE_OFF" : "ALIVE_ON";
+  sendCmd(cmd);
+};
+
+window.updateAliveModeUI = function (active) {
+  window.aliveModeActive = active;
+  const btn = document.getElementById("btn-alive-mode");
+  const txt = document.getElementById("alive-mode-txt");
+  if (btn) {
+    btn.classList.toggle("active", active);
+  }
+  if (txt) {
+    txt.textContent = active ? "Alive: ON" : "Alive Mode";
+  }
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -370,6 +399,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.addEventListener("keydown", (e) => {
     if (["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
+    // Skip jika tab 3D Sim aktif — keyboard masuk ke iframe folio
+    const sim3dPage = document.getElementById("page-simulation3d");
+    if (sim3dPage && sim3dPage.classList.contains("active")) return;
     const cmd = KEY_MAP[e.key];
     if (!cmd) return;
     e.preventDefault();
@@ -381,6 +413,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.addEventListener("keyup", (e) => {
+    // Skip jika tab 3D Sim aktif
+    const sim3dPage = document.getElementById("page-simulation3d");
+    if (sim3dPage && sim3dPage.classList.contains("active")) return;
     const cmd = KEY_MAP[e.key];
     if (!cmd) return;
     activeKeys.delete(e.key);

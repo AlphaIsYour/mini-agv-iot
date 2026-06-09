@@ -656,9 +656,15 @@ app.get("/api/me", auth.requireAuth, (req, res) => {
   });
 });
 
-// ── GET / (dashboard) ─────────────────────────────────────────────────────────
-app.get("/", auth.requireAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+// ── GET / (landing page OR dashboard) ─────────────────────────────────────────
+app.get("/", (req, res) => {
+  if (req.session?.user) {
+    // Authenticated → serve dashboard
+    res.sendFile(path.join(__dirname, "public", "index.html"));
+  } else {
+    // Not authenticated → serve landing page
+    res.sendFile(path.join(__dirname, "public", "landing.html"));
+  }
 });
 
 // ── POST /api/change-password ─────────────────────────────────────────────────
@@ -746,7 +752,8 @@ wss.on("connection", (ws, req) => {
           clearTimeout(authTimeout);
           ws.authenticated = true;
           ws.username = "dev";
-          console.log("[WS] DEV bypass auth");
+          ws.role = "admin";
+          console.log("[WS] DEV bypass auth (admin)");
           ws.send(
             JSON.stringify({
               topic: "xora/snapshot",
@@ -761,15 +768,16 @@ wss.on("connection", (ws, req) => {
           ws.close(4003, "Token required");
           return;
         }
-        const username = auth.validateWSToken(msg.wsToken);
-        if (!username) {
+        const tokenData = auth.validateWSToken(msg.wsToken);
+        if (!tokenData) {
           ws.close(4003, "Invalid token");
           return;
         }
         clearTimeout(authTimeout);
         ws.authenticated = true;
-        ws.username = username;
-        console.log(`[WS] Authenticated: ${username}`);
+        ws.username = tokenData.username;
+        ws.role = tokenData.role;
+        console.log(`[WS] Authenticated: ${tokenData.username} (${tokenData.role})`);
 
         // Kirim snapshot state
         ws.send(
@@ -784,6 +792,11 @@ wss.on("connection", (ws, req) => {
 
       // ── Step 2: Authenticated messages ────────────────────────────────────
       if (msg.manualCmd) {
+        // Guest cannot send commands
+        if (ws.role === "guest") {
+          ws.send(JSON.stringify({ topic: "xora/error", data: { error: "Guest mode — access denied" } }));
+          return;
+        }
         const cmd = sanitizeCmd(msg.manualCmd);
         if (!cmd) return;
         const manualMap = {
@@ -797,6 +810,11 @@ wss.on("connection", (ws, req) => {
       }
 
       if (msg.command) {
+        // Guest cannot send commands
+        if (ws.role === "guest") {
+          ws.send(JSON.stringify({ topic: "xora/error", data: { error: "Guest mode — access denied" } }));
+          return;
+        }
         const cmd = sanitizeCmd(msg.command);
         if (!cmd) return;
         console.log(`[WS→MQTT] Command: ${cmd} (by ${ws.username})`);

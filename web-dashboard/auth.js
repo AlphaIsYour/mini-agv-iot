@@ -1,6 +1,6 @@
 /**
  * auth.js — Xora AGV Auth Module
- * bcrypt password hashing + session validation
+ * Multi-user bcrypt + role-based session validation
  */
 
 "use strict";
@@ -9,21 +9,25 @@ const bcrypt = require("bcrypt");
 const SALT_ROUNDS = 12;
 
 // ─── In-memory user store ─────────────────────────────────────────────────────
-// Di produksi, simpan ke DB. Untuk AGV single-user ini cukup.
+// Multi-user: 4 admin + 1 guest
+const USER_DEFS = [
+  { username: "alphareno", password: process.env.ADMIN_PASSWORD_PLAIN || "alphareno77", role: "admin" },
+  { username: "dzaki",     password: "xoraagv2026", role: "admin" },
+  { username: "derby",     password: "xoraagv2026", role: "admin" },
+  { username: "ilyas",     password: "xoraagv2026", role: "admin" },
+  { username: "guest",     password: "guest",       role: "guest" },
+];
+
 let USERS = null;
 
 async function initUsers() {
-  const user = process.env.ADMIN_USERNAME || "admin";
-  const plain = process.env.ADMIN_PASSWORD_PLAIN;
-
-  if (!plain) {
-    console.error("[AUTH] ADMIN_PASSWORD_PLAIN not set in .env — exiting");
-    process.exit(1);
+  USERS = {};
+  for (const u of USER_DEFS) {
+    if (!u.password) continue;
+    const hash = await bcrypt.hash(u.password, SALT_ROUNDS);
+    USERS[u.username] = { username: u.username, hash, role: u.role };
+    console.log(`[AUTH] User '${u.username}' (${u.role}) initialized`);
   }
-
-  const hash = await bcrypt.hash(plain, SALT_ROUNDS);
-  USERS = { [user]: { username: user, hash, role: "admin" } };
-  console.log(`[AUTH] User '${user}' initialized (bcrypt hash ready)`);
 }
 
 async function verifyCredentials(username, password) {
@@ -45,15 +49,17 @@ function requireAuth(req, res, next) {
 }
 
 // ─── WebSocket token store (simple in-memory) ────────────────────────────────
-// Maps ws_token → { username, expires }
+// Maps ws_token → { username, role, expires }
 const WS_TOKENS = new Map();
 const WS_TOKEN_TTL = 30 * 1000; // 30 detik untuk handshake
 
 function issueWSToken(username) {
   const { v4: uuidv4 } = require("uuid");
   const token = uuidv4();
+  const user = USERS ? USERS[username] : null;
   WS_TOKENS.set(token, {
     username,
+    role: user ? user.role : "guest",
     expires: Date.now() + WS_TOKEN_TTL,
   });
   // Cleanup expired tokens setiap kali issue
@@ -72,7 +78,7 @@ function validateWSToken(token) {
   }
   // One-time use after connection established
   WS_TOKENS.delete(token);
-  return entry.username;
+  return { username: entry.username, role: entry.role };
 }
 
 module.exports = {
@@ -85,6 +91,8 @@ module.exports = {
 
 async function changePassword(username, newPlain) {
   if (!USERS || !USERS[username]) throw new Error("User not found");
+  // Only admins can change password
+  if (USERS[username].role !== "admin") throw new Error("Guest cannot change password");
   const hash = await bcrypt.hash(newPlain, SALT_ROUNDS);
   USERS[username].hash = hash;
   console.log(`[AUTH] Password changed for '${username}'`);

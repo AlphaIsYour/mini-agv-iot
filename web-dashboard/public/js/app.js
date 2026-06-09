@@ -80,6 +80,13 @@ async function fetchMe() {
     const sUser = document.getElementById("sys-user");
     const sLogin = document.getElementById("sys-login-at");
     if (hUser) hUser.textContent = u.username || "—";
+
+    // ── Role-based UI ──────────────────────────────────────────────────────
+    if (u.role === "guest") {
+      applyGuestMode();
+    } else {
+      applyAdminMode();
+    }
     if (sUser) sUser.textContent = u.username || "—";
     if (sLogin)
       sLogin.textContent = u.loginAt
@@ -88,6 +95,70 @@ async function fetchMe() {
   } catch {
     window.location.href = "/login";
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   ROLE-BASED UI
+   Guest: only 3D Sim visible, no MQTT commands
+   Admin: full access
+══════════════════════════════════════════════════════════════════════════════ */
+function applyGuestMode() {
+  // Hide all nav items except 3D Sim
+  document.querySelectorAll(".nav-item").forEach(item => {
+    if (item.dataset.page !== "simulation3d") {
+      item.style.display = "none";
+    }
+  });
+
+  // Hide all page views except 3D Sim
+  document.querySelectorAll(".page-view").forEach(page => {
+    if (page.id !== "page-simulation3d") {
+      page.style.display = "none";
+    }
+  });
+
+  // Hide control-related panels
+  ["panel-commands", "panel-sensors", "panel-log", "panel-lastevent"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = "none";
+  });
+
+  // Hide sidebar footer (state, mission, bb)
+  const sf = document.querySelector(".sidebar-footer");
+  if (sf) sf.style.display = "none";
+
+  // Update header to show guest badge
+  const hUser = document.getElementById("h-username");
+  if (hUser) hUser.textContent = "guest (read-only)";
+
+  // Auto-navigate to 3D Sim
+  navTo("simulation3d");
+
+  console.log("[AUTH] Guest mode — 3D Sim only");
+}
+
+function applyAdminMode() {
+  // Show all nav items
+  document.querySelectorAll(".nav-item").forEach(item => {
+    item.style.display = "";
+  });
+
+  // Show all page views
+  document.querySelectorAll(".page-view").forEach(page => {
+    page.style.display = "";
+  });
+
+  // Show control panels
+  ["panel-commands", "panel-sensors", "panel-log", "panel-lastevent"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = "";
+  });
+
+  // Show sidebar footer
+  const sf = document.querySelector(".sidebar-footer");
+  if (sf) sf.style.display = "";
+
+  console.log("[AUTH] Admin mode — full access");
 }
 
 window.fetchCSRF = async function () {
@@ -224,11 +295,19 @@ window.navTo = function (page) {
   if (page === "missions") loadMissions();
   if (page === "system") loadSystemInfo();
 
-  // When entering Robo Eyes page, ensure videos are playing and state is current
+  // When entering 3D Sim page — iframe auto-loads, no custom init needed
+  // (XORA world runs independently on port 5173)
   if (page === "simulation3d") {
-    if (typeof window.initSimulation3D === "function") window.initSimulation3D();
-  } else if (typeof window.pauseSimulation3D === "function") {
-    window.pauseSimulation3D();
+    // Trigger health check to show/hide fallback
+    const fallback = document.getElementById('sim3d-fallback');
+    if (fallback) {
+      fetch('http://localhost:5173', { mode: 'no-cors', cache: 'no-store' })
+        .then(() => { fallback.style.display = 'none'; })
+        .catch(() => { fallback.style.display = 'flex'; });
+    }
+    // Focus iframe agar keyboard WASD masuk ke 3D world
+    const iframe = document.getElementById('sim3d-iframe');
+    if (iframe) setTimeout(() => iframe.focus(), 300);
   }
   if (page === "roboeyes") {
     ["eyes-video-ready","eyes-video-moving","eyes-video-error"].forEach(id => {
