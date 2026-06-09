@@ -506,9 +506,9 @@ app.use(
         ],
         connectSrc: [
           "'self'",
-          "ws://localhost:3001",
-          "ws://127.0.0.1:3001",
-          "ws://156.230.188.87:3001",
+          "ws://localhost:3000",
+          "ws://127.0.0.1:3000",
+          "ws://156.230.188.87:3000",
           "http://156.230.188.87:3000",
           "wss:",
           "http://localhost:5173",  // folio dev server (3D world)

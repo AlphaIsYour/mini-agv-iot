@@ -3,7 +3,7 @@
 ══════════════════════════════════════════════════════════════════════════════ */
 
 const WS_HOST = window.location.hostname;
-const WS_PORT = window.location.port === '3000' ? '3001' : window.location.port; // WS server di port 3001
+const WS_PORT = window.location.port; // WS server sharing port dengan HTTP
 const WS_URL = `ws://${WS_HOST}:${WS_PORT}/ws`;
 
 let ws = null;
