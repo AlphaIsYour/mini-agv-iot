@@ -508,16 +508,21 @@ app.use(
           "'self'",
           "ws://localhost:3001",
           "ws://127.0.0.1:3001",
+          "ws://156.230.188.87:3001",
+          "http://156.230.188.87:3000",
           "wss:",
+          "http://localhost:5173",  // folio dev server (3D world)
         ],
         scriptSrcAttr: ["'unsafe-inline'"],
         imgSrc: ["'self'", "data:"],
-        frameSrc: ["'none'"],
+        frameSrc: ["'self'", "http://localhost:5173"],  // folio 3D world iframe
         objectSrc: ["'none'"],
-        upgradeInsecureRequests: IS_PROD ? [] : null,
+        upgradeInsecureRequests: null,  // Jangan paksa HTTPS (belum ada SSL)
       },
     },
-    crossOriginEmbedderPolicy: false, // allow Chart.js CDN
+    crossOriginEmbedderPolicy: false,   // allow Chart.js CDN
+    crossOriginOpenerPolicy: false,     // disable COOP (butuh HTTPS)
+    crossOriginResourcePolicy: false,   // disable CORP (butuh HTTPS)
   }),
 );
 
@@ -736,6 +741,22 @@ wss.on("connection", (ws, req) => {
 
       // ── Step 1: WS Auth Handshake ──────────────────────────────────────────
       if (!ws.authenticated) {
+        // DEV BYPASS — hapus di production!
+        if (msg.wsToken === "__DEV__" && process.env.NODE_ENV !== "production") {
+          clearTimeout(authTimeout);
+          ws.authenticated = true;
+          ws.username = "dev";
+          console.log("[WS] DEV bypass auth");
+          ws.send(
+            JSON.stringify({
+              topic: "xora/snapshot",
+              data: agvState,
+              ts: new Date().toISOString(),
+            }),
+          );
+          return;
+        }
+
         if (!msg.wsToken) {
           ws.close(4003, "Token required");
           return;
@@ -793,6 +814,8 @@ wss.on("connection", (ws, req) => {
           "RIGHT": "right",
           "STOP": "stop",
           "TARE": "tare",
+          "ALIVE_ON": "alive:on",
+          "ALIVE_OFF": "alive:off",
         };
 
         if (GOTO_MAP[cmd]) {
@@ -868,6 +891,8 @@ const ALLOWED_COMMANDS = new Set([
   "GOTO_C",
   "RETURN",
   "TARE",
+  "ALIVE_ON",
+  "ALIVE_OFF",
 ]);
 
 function sanitizeCmd(cmd) {

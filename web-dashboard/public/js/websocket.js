@@ -3,7 +3,7 @@
 ══════════════════════════════════════════════════════════════════════════════ */
 
 const WS_HOST = window.location.hostname;
-const WS_PORT = window.location.port; // ikut port HTTP
+const WS_PORT = window.location.port === '3000' ? '3001' : window.location.port; // WS server di port 3001
 const WS_URL = `ws://${WS_HOST}:${WS_PORT}/ws`;
 
 let ws = null;
@@ -237,6 +237,9 @@ function handleMessage({ topic, data, api, pong }) {
         }
         if (data.motor_left != null || data.motor_right != null) {
           applyMotor(data.motor_left || 0, data.motor_right || 0);
+        }
+        if (data.alive_mode != null && typeof updateAliveModeUI === "function") {
+          updateAliveModeUI(!!data.alive_mode);
         }
         if (typeof window.opsHandleTelemetry === "function") window.opsHandleTelemetry(data);
       }
