@@ -25,16 +25,6 @@
     <link rel="stylesheet" href="/fontawesome/css/all.min.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 
-    <!-- Three.js importmap for 3D Simulation -->
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-        }
-      }
-    </script>
-
     <link rel="stylesheet" href="css/base.css" />
     <link rel="stylesheet" href="css/layout.css" />
     <link rel="stylesheet" href="css/components.css" />
@@ -168,7 +158,7 @@
             ●
           </div>
         </div>
-        <div class="nav-item" data-page="simulation3d">
+        <div class="nav-item" data-page="simulation3d" id="nav-3dsim">
           <div class="nav-icon"><i class="fa-solid fa-cube icon"></i></div>
           <div class="nav-label">3D Sim</div>
         </div>
@@ -192,6 +182,9 @@
             <span class="page-sep">/</span>
             <span class="page-active">CONTROL</span>
             <div class="page-actions">
+              <button class="btn-sm btn-alive" id="btn-alive-mode" type="button" onclick="toggleAliveMode()">
+                <i class="fa-solid fa-wand-magic-sparkles icon"></i><span id="alive-mode-txt">Alive Mode</span>
+              </button>
               <button class="btn-sm" id="btn-demo-mode" type="button" onclick="toggleDemoMode()">
                 <i class="fa-solid fa-vial-circle-check icon"></i>Demo Mode
               </button>
@@ -1679,97 +1672,52 @@
         </div>
         <!-- /page-roboeyes -->
 
-        <!-- PAGE: 3D Simulation -->
+        <!-- PAGE: 3D Simulation (XORA World — folio) -->
         <div class="page-view" id="page-simulation3d">
           <div class="page-header">
             <span class="page-title">XORA</span>
             <span class="page-sep">/</span>
             <span class="page-active">3D SIMULATION</span>
             <div class="page-actions">
-              <span class="page-sub" style="color: var(--text-dim); font-size: 11px">Digital Twin</span>
+              <button class="btn-sm" id="sim3d-fullscreen" title="Fullscreen 3D World">
+                <i class="fa-solid fa-expand icon"></i>Fullscreen
+              </button>
+              <button class="btn-sm" id="sim3d-open-tab" title="Open in new tab">
+                <i class="fa-solid fa-external-link-alt icon"></i>Open in Tab
+              </button>
+              <button class="btn-sm" id="sim3d-reload-frame" title="Reload 3D world">
+                <i class="fa-solid fa-arrows-rotate icon"></i>Reload
+              </button>
+              <span class="page-sub" style="color: var(--text-dim); font-size: 11px">XORA World</span>
             </div>
           </div>
 
-            <div class="sim3d-page">
-              <div class="sim3d-canvas-wrap" id="sim3d-canvas-wrap">
-                <!-- Three.js canvas mounts here -->
+          <div class="sim3d-page" style="height:100%;position:relative">
+            <!-- iframe folio world -->
+            <iframe
+              id="sim3d-iframe"
+              src="http://localhost:5173"
+              style="width:100%;height:100%;border:none;display:block"
+              allowfullscreen
+            ></iframe>
 
-                <!-- Loading overlay -->
-                <div class="sim3d-loading" id="sim3d-loading">
-                  <div class="sim3d-loading-spinner"></div>
-                  <div class="sim3d-loading-text">Loading 3D Engine...</div>
-                </div>
-
-                <!-- TOP-LEFT: State + Telemetry -->
-                <div class="sim3d-float sim3d-float-tl">
-                  <div class="sim3d-float-panel">
-                    <div class="sim3d-float-header"><i class="fa-solid fa-robot"></i> <span id="sim3d-state-value">IDLE</span></div>
-                    <div class="sim3d-telem-strip">
-                      <span><i class="fa-solid fa-gauge"></i> <span id="sim3d-speed">0</span></span>
-                      <span><i class="fa-solid fa-ruler"></i> <span id="sim3d-dist">0</span>cm</span>
-                      <span><i class="fa-solid fa-weight-hanging"></i> <span id="sim3d-load">0</span>g</span>
-                      <span><i class="fa-solid fa-wifi"></i> <span id="sim3d-rssi">0</span></span>
-                      <span>ML:<span id="sim3d-ml">0</span> MR:<span id="sim3d-mr">0</span></span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- TOP-RIGHT: Toolbar + Status -->
-                <div class="sim3d-float sim3d-float-tr">
-                  <div class="sim3d-float-toolbar">
-                    <button class="sim3d-gbtn active" id="sim3d-cam-toggle" title="Camera"><i class="fa-solid fa-video"></i></button>
-                    <button class="sim3d-gbtn" id="sim3d-cam-reset" title="Reset"><i class="fa-solid fa-crosshairs"></i></button>
-                    <button class="sim3d-gbtn" id="sim3d-fullscreen" title="Fullscreen"><i class="fa-solid fa-expand"></i></button>
-                    <button class="sim3d-gbtn" id="sim3d-demo-toggle" title="Demo"><i class="fa-solid fa-play"></i></button>
-                  </div>
-                  <div class="sim3d-pill online" id="sim3d-conn-pill"><span class="dot"></span><span id="sim3d-state-pill">IDLE</span></div>
-                </div>
-
-                <!-- BOTTOM-LEFT: Missions + Mode -->
-                <div class="sim3d-float sim3d-float-bl">
-                  <div class="sim3d-float-panel">
-                    <div class="sim3d-mission-row">
-                      <button class="sim3d-mbtn m-a" id="sim3d-mission-a"><i class="fa-solid fa-location-dot"></i> A</button>
-                      <button class="sim3d-mbtn m-b" id="sim3d-mission-b"><i class="fa-solid fa-location-dot"></i> B</button>
-                      <button class="sim3d-mbtn m-c" id="sim3d-mission-c"><i class="fa-solid fa-location-dot"></i> C</button>
-                      <button class="sim3d-mbtn m-base" id="sim3d-return"><i class="fa-solid fa-house"></i></button>
-                    </div>
-                    <div class="sim3d-mode-row">
-                      <button class="sim3d-mode-chip active" data-mode="AUTO">AUTO</button>
-                      <button class="sim3d-mode-chip" data-mode="MANUAL">MANUAL</button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- BOTTOM-RIGHT: Joystick (mobile only) -->
-                <div class="sim3d-float sim3d-float-br sim3d-mobile-only">
-                  <div class="sim3d-joystick" id="sim3d-joystick">
-                    <div class="sim3d-joystick-base">
-                      <div class="sim3d-joystick-stick" id="sim3d-joystick-stick"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- BOTTOM-CENTER: Keyboard hint (desktop only) -->
-                <div class="sim3d-float sim3d-float-bc sim3d-desktop-only">
-                  <div class="sim3d-kbd-bar"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive · <kbd>Space</kbd> stop</div>
-                </div>
-
-                <!-- Door popup -->
-                <div class="sim3d-door-popup hidden" id="sim3d-door-popup">
-                  <div class="sim3d-door-popup-box">
-                    <div class="sim3d-door-popup-icon">🚪</div>
-                    <div class="sim3d-door-popup-title" id="sim3d-door-popup-title">Keluar dari arena?</div>
-                    <div class="sim3d-door-popup-sub">AGV akan masuk ke area gudang utama</div>
-                    <div class="sim3d-door-popup-actions">
-                      <button class="sim3d-door-btn sim3d-door-yes" id="sim3d-door-yes">YA</button>
-                      <button class="sim3d-door-btn sim3d-door-no" id="sim3d-door-no">BATAL</button>
-                    </div>
-                  </div>
-                </div>
+            <!-- Fallback: folio server not running -->
+            <div id="sim3d-fallback" style="display:none;position:absolute;inset:0;background:rgba(8,12,24,0.95);z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#b8ddf0;font-family:'Courier New',monospace">
+              <i class="fa-solid fa-cube" style="font-size:48px;color:var(--accent,#4488ff)"></i>
+              <div style="font-size:18px;font-weight:700">3D World Offline</div>
+              <div style="font-size:12px;color:#556677;text-align:center;max-width:400px;line-height:1.6">
+                XORA world belum berjalan.<br>
+                Jalankan perintah berikut di terminal:
               </div>
+              <div style="background:rgba(0,0,0,0.5);border:1px solid rgba(0,220,180,0.3);border-radius:6px;padding:12px 18px;font-size:12px;color:#00e8c0;user-select:all">
+                cd agv-iot/web-dashboard/folio && npm run dev
+              </div>
+              <button class="btn-sm" onclick="document.getElementById('sim3d-iframe').src='http://localhost:5173';document.getElementById('sim3d-fallback').style.display='none'" style="margin-top:8px">
+                <i class="fa-solid fa-arrows-rotate icon"></i>Retry Connection
+              </button>
             </div>
           </div>
+        </div>
         <!-- /page-simulation3d -->
       </main>
     </div>
@@ -1783,5 +1731,82 @@
     <script src="js/controls.js"></script>
     <script src="js/ops.js"></script>
     <script type="module" src="js/simulation3d.js"></script>
+    <script>
+      // FASE 8: 3D Sim — XORA World integration
+      (function() {
+        const iframe = document.getElementById('sim3d-iframe');
+        const fallback = document.getElementById('sim3d-fallback');
+        const openTab = document.getElementById('sim3d-open-tab');
+        const reloadFrame = document.getElementById('sim3d-reload-frame');
+
+        // Health check: cek apakah folio server berjalan
+        function checkFolioServer() {
+          fetch('http://localhost:5173', { mode: 'no-cors', cache: 'no-store' })
+            .then(() => {
+              // Server berjalan — sembunyikan fallback, load iframe
+              if (fallback) fallback.style.display = 'none';
+              if (iframe && !iframe.src.includes('localhost:5173')) {
+                iframe.src = 'http://localhost:5173';
+              }
+            })
+            .catch(() => {
+              // Server tidak berjalan — tampilkan fallback
+              if (fallback) fallback.style.display = 'flex';
+            });
+        }
+
+        // Cek saat page pertama kali diakses
+        if (fallback) fallback.style.display = 'flex'; // tampilkan fallback dulu
+        checkFolioServer();
+
+        // Cek ulang setiap 10 detik (auto-reconnect)
+        setInterval(checkFolioServer, 10000);
+
+        // Open in new tab
+        if (openTab) {
+          openTab.addEventListener('click', () => {
+            window.open('http://localhost:5173', '_blank');
+          });
+        }
+
+        // Reload iframe
+        if (reloadFrame) {
+          reloadFrame.addEventListener('click', () => {
+            checkFolioServer();
+            if (iframe) iframe.src = 'http://localhost:5173';
+          });
+        }
+
+        // Fullscreen
+        const fsBtn = document.getElementById('sim3d-fullscreen');
+        function refocusIframe() {
+          const f = document.getElementById('sim3d-iframe');
+          if (f) setTimeout(() => f.focus(), 200);
+        }
+        if (fsBtn) {
+          fsBtn.addEventListener('click', () => {
+            const wrap = document.querySelector('.sim3d-page');
+            if (!wrap) return;
+            if (!document.fullscreenElement) {
+              wrap.requestFullscreen().then(() => {
+                fsBtn.innerHTML = '<i class="fa-solid fa-compress icon"></i>Exit Fullscreen';
+                refocusIframe();
+              }).catch(() => {});
+            } else {
+              document.exitFullscreen().then(() => {
+                fsBtn.innerHTML = '<i class="fa-solid fa-expand icon"></i>Fullscreen';
+                refocusIframe();
+              }).catch(() => {});
+            }
+          });
+          document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+              fsBtn.innerHTML = '<i class="fa-solid fa-expand icon"></i>Fullscreen';
+            }
+            refocusIframe();
+          });
+        }
+      })();
+    </script>
   </body>
 </html>

@@ -75,6 +75,14 @@
   color: var(--accent);
 }
 
+/* ── Alive Mode Toggle ────────────────────────────────────────────────────── */
+.btn-sm.btn-alive.active {
+  background: rgba(0, 255, 136, 0.15);
+  border-color: #00ff88;
+  color: #00ff88;
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+}
+
 /* ── State Badge ─────────────────────────────────────────────────────────── */
 .state-badge {
   background: var(--badge-bg);

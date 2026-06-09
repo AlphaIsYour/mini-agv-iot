@@ -1,497 +1,833 @@
-# 🤖 Agent Context — AGV IoT 3D Simulator Visual Overhaul
-> **Environment**: Windows + Node.js/Express + Claude Code (terminal)
-> **Goal**: Transform 3D simulator jadi sekelas bruno-simon.com, terima beres — AGV bisa langsung digerakin dengan 3D model nyata.
+# 🤖 AGENTS.md — Integrasi Bruno Simon World ke AGV IoT Dashboard
+
+> **Strategi**: "Copy & Own" — folio-2025 adalah **sumber aset dan referensi kode**, TIDAK PERNAH disentuh.
+> Semua pekerjaan dilakukan di dalam `agv-iot/web-dashboard/folio/` (copy dari folio-2025).
+> **Prinsip**: folio-2025 = patokan read-only. agv-iot = project aktif yang dimodifikasi.
 
 ---
 
-## Misi Utama
-Upgrade visual dari primitif blocky → **cinematic industrial night scene** bergaya bruno-simon.com. Stack tidak berubah, logic IoT/MQTT/WebSocket tidak boleh disentuh. Yang berubah: visual, model, lighting, kamera, UI.
+## GAMBARAN BESAR
+
+```
+agv-iot/web-dashboard/
+├── public/               → dashboard lama (tetap jalan, tidak diubah)
+├── folio/                → ← FOLDER BARU: copy folio-2025 yang sudah dimodifikasi
+│   ├── sources/          → copy dari folio-2025/sources/ lalu dimodifikasi
+│   ├── static/           → copy dari folio-2025/static/ (assets GLB, KTX, dll)
+│   ├── resources/        → copy dari folio-2025/resources/
+│   ├── index.html        → copy lalu dimodifikasi (hapus UI Bruno, inject AGV HUD)
+│   ├── vite.config.js    → copy persis dari folio-2025 (JANGAN ubah)
+│   └── package.json      → copy persis dari folio-2025 (JANGAN ubah)
+└── server.js             → TIDAK DIUBAH (backend tetap)
+```
+
+**Dua server jalan bersamaan:**
+
+- `agv-iot/web-dashboard/` → `node server.js` di port 3000 (HTTP + WS)
+- `agv-iot/web-dashboard/folio/` → `npm run dev` di port 5173 (Vite dev / Three.js world)
+
+Komunikasi: folio (port 5173) terhubung ke agv-iot WebSocket (port 3001) untuk terima telemetry AGV.
 
 ---
 
-## LANGKAH 0 — Download Semua 3D Model (Jalankan PERTAMA)
+## FASE 0 — PERSIAPAN (Lakukan PERTAMA, sekali saja)
 
-> Claude Code: jalankan script ini dari root project (`web-dashboard/`) di terminal.
-> Ini download semua model `.glb` gratis CC0 dari Kenney.nl dan sumber terpercaya.
+### 0A. Pastikan kedua project berjalan normal dulu
 
 ```bash
-# Buat folder model
-mkdir -p public\models\agv
-mkdir -p public\models\warehouse
-mkdir -p public\models\props
-mkdir -p public\models\vehicles
+# Terminal 1 — agv-iot backend
+cd C:/laragon/www/agv-iot/web-dashboard
+node server.js
+# Pastikan: HTTP port 3000, WS port 3001
 
-# ── AGV / Forklift ──────────────────────────────────────────
-# Kenney Industrial Pack (CC0) — forklift, shelves, crates
-curl -L "https://kenney.nl/content/assets/forklift.glb" -o public\models\agv\forklift.glb 2>nul || echo "SKIP forklift.glb"
-
-# ── Warehouse props ──────────────────────────────────────────
-# Cardboard box
-curl -L "https://kenney.nl/content/assets/cardboard-box.glb" -o public\models\props\box.glb 2>nul || echo "SKIP box"
-
-# Barrel
-curl -L "https://kenney.nl/content/assets/oil-drum.glb" -o public\models\props\barrel.glb 2>nul || echo "SKIP barrel"
-
-echo "=== Download selesai, cek folder public/models/ ==="
+# Terminal 2 — folio-2025 original (untuk verifikasi saja)
+cd C:/laragon/www/folio-2025
+npm run dev
+# Buka browser localhost:5173 → pastikan world Bruno jalan normal
+# Setelah verifikasi, CTRL+C, jangan ubah apapun
 ```
 
-> ⚠️ **Catatan penting**: Kenney tidak serve file `.glb` direct via curl karena CDN-nya butuh browser.
-> Gunakan **fallback script Node.js** di bawah ini sebagai gantinya — ini yang benar-benar akan jalan:
+### 0B. Copy folio-2025 ke dalam agv-iot
+
+```bash
+# Copy seluruh folio-2025 ke dalam agv-iot/web-dashboard/folio/
+cp -r C:/laragon/www/folio-2025 C:/laragon/www/agv-iot/web-dashboard/folio
+
+# Masuk ke folder copy-an
+cd C:/laragon/www/agv-iot/web-dashboard/folio
+
+# Install dependencies (sama persis dengan folio-2025)
+npm install
+
+# Verifikasi: harus jalan normal persis seperti folio-2025 asli
+npm run dev
+# Buka localhost:5173 → world Bruno harus muncul
+```
+
+> ✅ Setelah ini, **folio-2025 asli tidak pernah disentuh lagi**.
+> Semua pekerjaan selanjutnya hanya di `agv-iot/web-dashboard/folio/`.
+
+### 0C. Verifikasi WebSocket agv-iot
+
+Pastikan port WS yang dipakai. Buka `agv-iot/web-dashboard/server.js`, cari:
 
 ```js
-// scripts/download-models.mjs
-// Jalankan: node scripts/download-models.mjs
+const WS_PORT = parseInt(process.env.WS_PORT) || 3001;
+```
 
-import { createWriteStream, mkdirSync } from "fs";
-import { get } from "https";
-import { dirname } from "path";
+Catat portnya → default **3001**. Ini yang akan dipakai folio untuk konek.
 
-const models = [
-  // Quaternius — CC0 low-poly models (langsung .glb, no login)
-  {
-    url: "https://quaternius.com/packs/UltimateForklift.zip",
-    out: "public/models/_zips/forklift.zip",
-  },
-  // Market PMNDRS — Three.js ecosystem CC0 assets
-  {
-    url: "https://market.pmnd.rs/model/low-poly-warehouse",
-    out: "public/models/_zips/warehouse.zip",
-  },
+---
+
+## FASE 1 — BERSIHKAN KONTEN PORTFOLIO BRUNO
+
+> ⚠️ Semua perubahan ini di `agv-iot/web-dashboard/folio/` — BUKAN folio-2025 asli.
+
+### 1A. Kosongkan data portfolio
+
+File-file ini berisi data pribadi Bruno — kosongkan isinya, JANGAN hapus file-nya:
+
+**`sources/data/projects.js`**:
+
+```js
+export const projects = [];
+```
+
+**`sources/data/social.js`**:
+
+```js
+export const social = [];
+```
+
+**`sources/data/lab.js`**:
+
+```js
+export const lab = [];
+```
+
+**`sources/data/achievements.js`** → **BIARKAN**, bisa dipakai untuk gamifikasi AGV nanti.
+
+### 1B. Disable area-area portfolio di `sources/Game/World/Areas/Areas.js`
+
+Ganti `list` array — pertahankan hanya area yang relevan:
+
+```js
+// GANTI isi list array:
+const list = [
+  ["landing", LandingArea], // spawn point AGV
+  ["circuit", CircuitArea], // lintasan/track AGV
+  // HAPUS: career, projects, social, toilet, bowling,
+  //        altar, behindTheScene, timeMachine, lab, cookie
 ];
-
-// ── ALTERNATIF TERPERCAYA: Sketchfab embed + manual download ──
-// Buka link ini di browser, klik Download (pilih GLB/GLTF):
-//
-// 🚗 AGV / Robot:
-//   https://sketchfab.com/3d-models/agv-robot-low-poly-free-cc0-abc123  (search: "AGV robot CC0 free")
-//
-// 🏭 Forklift:
-//   https://sketchfab.com/3d-models/forklift-low-poly-free (search: "forklift low poly free")
-//
-// 📦 Warehouse shelf:
-//   https://sketchfab.com/3d-models/industrial-shelf-free-cc0
-//
-// 🛢️ Barrel:
-//   https://sketchfab.com/3d-models/oil-barrel-free-cc0
-//
-// Setelah download, simpan di:
-//   public/models/agv/agv.glb
-//   public/models/vehicles/forklift.glb
-//   public/models/props/shelf.glb
-//   public/models/props/barrel.glb
 ```
 
-### Cara Download Manual (Windows, 2 menit):
-1. Buka https://kenney.nl/assets/category:3D — filter "Free"
-2. Download **"Industrial Pack"** dan **"Vehicle Pack"** → extract
-3. Salin file `.glb` ke:
-   ```
-   public/models/agv/agv.glb           ← model utama AGV
-   public/models/vehicles/forklift.glb
-   public/models/props/barrel.glb
-   public/models/props/shelf.glb
-   public/models/props/box.glb
-   public/models/props/cone.glb
-   ```
-4. Lanjut ke FASE 1.
+Hapus juga import yang tidak dipakai di bagian atas file (semua import Area yang dihapus dari list).
 
 ---
 
-## LANGKAH 1 — Setup GLTFLoader di index.html
+## FASE 2 — GANTI SERVER.JS FOLIO DENGAN AGV BRIDGE
 
-Tambahkan ke `<script type="importmap">` yang sudah ada:
+> folio-2025 punya `sources/Game/Server.js` — ini yang handle multiplayer Bruno.
+> Kita GANTI seluruh isinya dengan koneksi ke agv-iot WebSocket.
 
-```json
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-    "postprocessing": "https://cdn.jsdelivr.net/npm/postprocessing@6.36.3/build/index.esm.js"
+Buka **`agv-iot/web-dashboard/folio/sources/Game/Server.js`**, ganti seluruh isi dengan:
+
+```js
+/**
+ * Server.js — AGV WebSocket Bridge
+ * Menggantikan multiplayer server Bruno Simon.
+ * Konek ke agv-iot backend (Express + WS di port 3001).
+ *
+ * Auth flow agv-iot:
+ *   1. GET /api/ws-token (butuh session cookie dari login)
+ *   2. Kirim { wsToken } sebagai pesan pertama ke WebSocket
+ *
+ * Karena folio jalan di port berbeda (5173) dan agv-iot di 3000,
+ * kita pakai token yang di-inject dari agv-iot saat serve halaman folio.
+ * Untuk dev: gunakan mode bypass (lihat DEV_MODE di bawah).
+ */
+
+import { Events } from "./Events.js";
+
+// ─── Konfigurasi ──────────────────────────────────────────────────────────────
+// SESUAIKAN jika port WS agv-iot berbeda
+const AGV_WS_URL = "ws://localhost:3001";
+
+// Mode dev: bypass auth (hanya untuk development lokal)
+// Set ke false saat production / integrasi penuh dengan agv-iot auth
+const DEV_BYPASS_AUTH = true;
+
+// ─── AGV State (shared state untuk semua modul) ───────────────────────────────
+export const agvState = {
+  // Identitas
+  id: "agv-01",
+
+  // Status
+  state: "IDLE", // IDLE, MENUNGGU_BARANG, KEBERANGKATAN, SAMPAI, PULANG, SELESAI
+  destination: "BASE", // BASE, A, B, C
+  mode: "AUTO", // AUTO, MANUAL
+
+  // Motor
+  motorLeft: 0,
+  motorRight: 0,
+
+  // Sensor
+  distanceCm: 0,
+  loadcellG: 0,
+  battery: 100,
+  ir: { s1: 0, s2: 0, s3: 1, s4: 0, s5: 0 },
+
+  // Koneksi
+  connected: false,
+  lastUpdate: 0,
+
+  // Event emitter (gunakan Events.js milik Bruno)
+  events: new Events(),
+};
+
+// Helper: konversi mission number → label
+function missionToLabel(mission) {
+  const n = Number(mission);
+  if (!Number.isFinite(n) || n <= 0) return "BASE";
+  return String.fromCharCode(64 + n); // 1→A, 2→B, 3→C
+}
+
+// ─── Server Class ─────────────────────────────────────────────────────────────
+export class Server {
+  constructor() {
+    this.ws = null;
+    this.reconnectTimer = null;
+    this.reconnectDelay = 3000;
+
+    this.connect();
+  }
+
+  connect() {
+    try {
+      this.ws = new WebSocket(AGV_WS_URL);
+
+      this.ws.addEventListener("open", () => {
+        console.log("[AGV] WebSocket connected");
+        clearTimeout(this.reconnectTimer);
+
+        // Auth handshake
+        if (DEV_BYPASS_AUTH) {
+          // Dev mode: kirim token dummy, agv-iot server.js perlu
+          // ditambahkan bypass untuk ini (lihat catatan Fase 2B)
+          this.ws.send(JSON.stringify({ wsToken: "__DEV__" }));
+        } else {
+          // Production: ambil token dari cookie/meta tag yang
+          // di-inject agv-iot saat serve halaman folio
+          const token = document.querySelector(
+            'meta[name="ws-token"]',
+          )?.content;
+          if (token) this.ws.send(JSON.stringify({ wsToken: token }));
+        }
+      });
+
+      this.ws.addEventListener("message", (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          this._handleMessage(msg);
+        } catch (e) {
+          console.warn("[AGV] Invalid message:", e);
+        }
+      });
+
+      this.ws.addEventListener("close", () => {
+        console.log("[AGV] Disconnected, retrying...");
+        agvState.connected = false;
+        agvState.events.emit("disconnect");
+        this.reconnectTimer = setTimeout(
+          () => this.connect(),
+          this.reconnectDelay,
+        );
+      });
+
+      this.ws.addEventListener("error", () => {
+        this.ws.close();
+      });
+    } catch (e) {
+      console.warn("[AGV] Connect error:", e);
+    }
+  }
+
+  _handleMessage(msg) {
+    const { topic, data } = msg;
+    if (!data || typeof data !== "object") return;
+
+    const prev = { state: agvState.state, destination: agvState.destination };
+
+    // Snapshot awal saat koneksi
+    if (topic === "xora/snapshot") {
+      agvState.connected = true;
+      this._applySnapshot(data);
+      return;
+    }
+
+    // Telemetry real-time dari firmware
+    if (topic === `agv/agv-01/telemetry`) {
+      if (data.state) agvState.state = data.state;
+      if (data.mission != null)
+        agvState.destination = missionToLabel(data.mission);
+      if (data.motor_left != null) agvState.motorLeft = data.motor_left;
+      if (data.motor_right != null) agvState.motorRight = data.motor_right;
+      if (data.distance_cm != null) agvState.distanceCm = data.distance_cm;
+      if (data.loadcell_g != null) agvState.loadcellG = data.loadcell_g;
+    }
+
+    // State dari firmware
+    if (topic === `agv/agv-01/state`) {
+      if (data.state) agvState.state = data.state;
+      if (data.mission != null)
+        agvState.destination = missionToLabel(data.mission);
+    }
+
+    // Topic lama (xora/)
+    if (topic === "xora/state")
+      agvState.state =
+        typeof data === "string" ? data : data.state || agvState.state;
+    if (topic === "xora/destination")
+      agvState.destination =
+        typeof data === "string"
+          ? data
+          : data.destination || agvState.destination;
+    if (topic === "xora/mode")
+      agvState.mode =
+        typeof data === "string" ? data : data.mode || agvState.mode;
+    if (topic === "xora/battery")
+      agvState.battery = typeof data === "number" ? data : parseFloat(data);
+    if (topic === "xora/sensor/ir")
+      agvState.ir = typeof data === "object" ? data : agvState.ir;
+    if (topic === "xora/sensor/ultrasonic")
+      agvState.distanceCm = typeof data === "number" ? data : parseFloat(data);
+    if (topic === "xora/sensor/loadcell")
+      agvState.loadcellG = typeof data === "number" ? data : parseFloat(data);
+
+    agvState.lastUpdate = Date.now();
+    agvState.connected = true;
+
+    // Emit events jika ada perubahan
+    agvState.events.emit("update", agvState);
+    if (agvState.state !== prev.state)
+      agvState.events.emit("stateChange", agvState.state);
+    if (agvState.destination !== prev.destination)
+      agvState.events.emit("destinationChange", agvState.destination);
+  }
+
+  _applySnapshot(data) {
+    if (data.state) agvState.state = data.state;
+    if (data.destination) agvState.destination = data.destination;
+    if (data.mode) agvState.mode = data.mode;
+    if (data.battery) agvState.battery = data.battery;
+    if (data.motorLeft != null) agvState.motorLeft = data.motorLeft;
+    if (data.motorRight != null) agvState.motorRight = data.motorRight;
+    if (data.sensors?.ultrasonic != null)
+      agvState.distanceCm = data.sensors.ultrasonic;
+    if (data.sensors?.loadcell != null)
+      agvState.loadcellG = data.sensors.loadcell;
+    if (data.sensors?.ir) agvState.ir = data.sensors.ir;
+    agvState.connected = true;
+    agvState.events.emit("snapshot", agvState);
+    agvState.events.emit("update", agvState);
+    console.log(
+      "[AGV] Snapshot received:",
+      agvState.state,
+      "→",
+      agvState.destination,
+    );
+  }
+
+  sendCommand(command) {
+    this._send({ command });
+  }
+
+  sendManual(command) {
+    this._send({ manualCmd: command });
+  }
+
+  _send(payload) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(payload));
+    }
   }
 }
 ```
 
-> `GLTFLoader` sudah include di `three/addons/loaders/GLTFLoader.js` — tidak perlu install apapun.
+### 2B. Tambahkan DEV bypass di agv-iot server.js (khusus development)
 
----
-
-## LANGKAH 2 — Ganti AGV Primitif dengan Model GLTF
-
-**File: `sim3d/agv.js`** — ganti seluruh buildAGV function:
+Di `agv-iot/web-dashboard/server.js`, cari bagian auth WebSocket:
 
 ```js
-import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { S } from "./state.js";
-
-const loader = new GLTFLoader();
-
-export async function buildAGV() {
-  return new Promise((resolve) => {
-    loader.load(
-      "/models/agv/agv.glb",
-      (gltf) => {
-        const model = gltf.scene;
-
-        // Scale & posisi
-        model.scale.set(0.5, 0.5, 0.5);
-        model.position.set(0, 0, 0);
-
-        // Traverse: aktifkan shadow + tweak material
-        model.traverse((child) => {
-          if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-            // Override material jadi metallic industrial
-            child.material = new THREE.MeshStandardMaterial({
-              color: child.material.color || 0xff5500,
-              roughness: 0.3,
-              metalness: 0.7,
-              emissive: 0x110200,
-            });
-          }
-        });
-
-        S.agvGroup = new THREE.Group();
-        S.agvGroup.add(model);
-
-        // Headlight
-        const headlight = new THREE.PointLight(0xffddaa, 3, 8);
-        headlight.position.set(0, 0.5, 1.2);
-        S.agvGroup.add(headlight);
-
-        // Underglow oranye
-        const underglow = new THREE.PointLight(0xff3300, 2, 3);
-        underglow.position.set(0, -0.2, 0);
-        S.agvGroup.add(underglow);
-
-        S.scene.add(S.agvGroup);
-        resolve(S.agvGroup);
-      },
-      undefined,
-      // Fallback jika model tidak ada — pakai primitif lama
-      (error) => {
-        console.warn("AGV model not found, using primitive fallback:", error);
-        buildAGVPrimitive();
-        resolve(S.agvGroup);
-      }
-    );
-  });
+// Cari ini:
+if (!msg.wsToken) {
+  ws.close(4003, "Token required");
+  return;
 }
+const username = auth.validateWSToken(msg.wsToken);
+if (!username) {
+  ws.close(4003, "Invalid token");
+  return;
+}
+```
 
-// Fallback primitif (kode lama kamu, jangan hapus)
-function buildAGVPrimitive() {
-  S.agvGroup = new THREE.Group();
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 0.5, 1.5),
-    new THREE.MeshStandardMaterial({ color: 0xff5500, roughness: 0.3, metalness: 0.7 })
+Tambahkan bypass DEV di atasnya:
+
+```js
+// DEV BYPASS — hapus di production!
+if (msg.wsToken === "__DEV__" && process.env.NODE_ENV !== "production") {
+  clearTimeout(authTimeout);
+  ws.authenticated = true;
+  ws.username = "dev";
+  console.log("[WS] DEV bypass auth");
+  ws.send(
+    JSON.stringify({
+      topic: "xora/snapshot",
+      data: agvState,
+      ts: new Date().toISOString(),
+    }),
   );
-  body.castShadow = true;
-  S.agvGroup.add(body);
-  S.scene.add(S.agvGroup);
+  return;
 }
 ```
 
-> ✅ Pola ini: coba load GLTF → kalau file tidak ada, fallback ke primitif. Tidak akan crash.
+> ⚠️ Blok ini hanya untuk development. Wajib dihapus sebelum deploy production.
 
 ---
 
-## LANGKAH 3 — Ganti Props dengan Model GLTF
+## FASE 3 — EXPOSE agvState KE GAME.JS
 
-**File: `sim3d/props/barrels.js`**:
+Buka **`agv-iot/web-dashboard/folio/sources/Game/Game.js`**.
+
+Cari baris yang ada `this.server = new Server()`. Tambahkan setelahnya:
 
 ```js
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import * as THREE from "three";
-import { S } from "../state.js";
+this.server = new Server();
+this.agvState = agvState; // import { agvState } from './Server.js'
+```
 
-const loader = new GLTFLoader();
+Pastikan import di atas Game.js sudah include `agvState`:
 
-export function buildBarrels() {
-  const positions = [
-    [5, 0, 3], [-4, 0, 5], [8, 0, -2], [-6, 0, 1]
-  ];
+```js
+import { Server, agvState } from "./Server.js";
+```
 
-  positions.forEach(([x, , z]) => {
-    loader.load(
-      "/models/props/barrel.glb",
-      (gltf) => {
-        const m = gltf.scene.clone();
-        m.scale.set(0.4, 0.4, 0.4);
-        m.position.set(x, 0, z);
-        m.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
-        S.scene.add(m);
-      },
-      undefined,
-      () => buildBarrelPrimitive(x, z) // fallback
-    );
-  });
+---
+
+## FASE 4 — MODIFIKASI PLAYER.JS UNTUK HYBRID CONTROL
+
+Buka **`agv-iot/web-dashboard/folio/sources/Game/Player.js`**.
+
+Tambahkan method baru di dalam class Player:
+
+```js
+// Tambahkan method ini di Player class
+syncFromAGV() {
+    const state = this.game.agvState
+    if (!state || state.mode !== 'AUTO') return
+
+    const ml = state.motorLeft
+    const mr = state.motorRight
+
+    // Differential drive → normalized steering & acceleration
+    // SESUAIKAN 255 dengan max motor value AGV kamu
+    const MAX_MOTOR = 255
+    const avgSpeed = (ml + mr) / 2
+    const diff = ml - mr
+
+    this.accelerating = avgSpeed / MAX_MOTOR
+    this.steering = -(diff / MAX_MOTOR) * 0.5
 }
-
-function buildBarrelPrimitive(x, z) {
-  const mesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.3, 0.3, 0.8, 8),
-    new THREE.MeshStandardMaterial({ color: 0x334455, roughness: 0.6, metalness: 0.4 })
-  );
-  mesh.position.set(x, 0.4, z);
-  mesh.castShadow = true;
-  S.scene.add(mesh);
-}
 ```
 
-> Terapkan pola sama untuk `box.js`, `forklift.js` — load GLTF + fallback primitif.
-
----
-
-## LANGKAH 4 — Lighting & Atmosphere (Dampak Visual Terbesar)
-
-**File: `simulation3d.js`** — ganti semua light setup yang ada:
+Di method `update()` / `tick()` Player.js, tambahkan di paling awal:
 
 ```js
-// Hapus semua AmbientLight dan DirectionalLight lama
-
-// 1. Ambient gelap — hanya fill ringan
-const ambient = new THREE.AmbientLight(0x0a0f1e, 0.4);
-S.scene.add(ambient);
-
-// 2. Moonlight — biru dingin dari atas
-const moonLight = new THREE.DirectionalLight(0x4466aa, 1.2);
-moonLight.position.set(-50, 100, -30);
-moonLight.castShadow = true;
-moonLight.shadow.mapSize.width = 2048;
-moonLight.shadow.mapSize.height = 2048;
-moonLight.shadow.camera.near = 0.5;
-moonLight.shadow.camera.far = 500;
-moonLight.shadow.camera.left = -100;
-moonLight.shadow.camera.right = 100;
-moonLight.shadow.camera.top = 100;
-moonLight.shadow.camera.bottom = -100;
-moonLight.shadow.bias = -0.001;
-S.scene.add(moonLight);
-
-// 3. Warm bounce dari depan
-const fillLight = new THREE.DirectionalLight(0xff6600, 0.3);
-fillLight.position.set(30, 5, 50);
-S.scene.add(fillLight);
-
-// 4. Renderer settings
-S.renderer.shadowMap.enabled = true;
-S.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-S.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-S.renderer.toneMappingExposure = 0.8;
-S.renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-// 5. Fog & background
-S.scene.fog = new THREE.FogExp2(0x0a0f1e, 0.008);
-S.scene.background = new THREE.Color(0x0a0f1e);
-```
-
----
-
-## LANGKAH 5 — Post-Processing (Bloom + Vignette)
-
-**File: `simulation3d.js`** — tambahkan setelah renderer setup:
-
-```js
-import { EffectComposer, RenderPass, BloomEffect, EffectPass, VignetteEffect, SMAAEffect } from "postprocessing";
-
-const composer = new EffectComposer(S.renderer);
-composer.addPass(new RenderPass(S.scene, S.camera));
-
-const bloom = new BloomEffect({
-  intensity: 1.5,
-  luminanceThreshold: 0.4,
-  luminanceSmoothing: 0.1,
-  mipmapBlur: true,
-});
-
-const vignette = new VignetteEffect({ offset: 0.35, darkness: 0.6 });
-const smaa = new SMAAEffect();
-
-composer.addPass(new EffectPass(S.camera, smaa, bloom, vignette));
-S.composer = composer;
-
-// Di animate loop — ganti renderer.render(scene, camera) dengan:
-// S.composer.render(deltaTime);
-```
-
----
-
-## LANGKAH 6 — Smooth Camera (Bruno Simon Style)
-
-**File: `simulation3d.js`** — ganti camera update di animate loop:
-
-```js
-const _camTarget = new THREE.Vector3();
-const _camCurrent = new THREE.Vector3();
-const CAM_LERP = 0.05;
-
-function updateCamera() {
-  if (!S.agvGroup) return;
-  const p = S.agvGroup.position;
-  const ry = S.agvGroup.rotation.y;
-
-  _camTarget.set(
-    p.x + Math.sin(ry) * -8,
-    p.y + 5,
-    p.z + Math.cos(ry) * -8
-  );
-  _camCurrent.lerp(_camTarget, CAM_LERP);
-  S.camera.position.copy(_camCurrent);
-  S.camera.lookAt(p.x, p.y + 0.5, p.z);
+// Sync dari AGV jika mode AUTO
+if (this.game.agvState?.mode === "AUTO") {
+  this.syncFromAGV();
+  return; // skip keyboard input
 }
 ```
 
 ---
 
-## LANGKAH 7 — Arena Floor Upgrade
+## FASE 5 — BUAT AGV STATIONS
 
-**File: `sim3d/arena.js`**:
-
-```js
-// Floor: dark concrete + cyan grid
-const floorMat = new THREE.MeshStandardMaterial({
-  color: 0x1a1a2e, roughness: 0.8, metalness: 0.1,
-});
-floor.receiveShadow = true;
-
-const grid = new THREE.GridHelper(20, 20, 0x00ffff, 0x003333);
-grid.position.y = 0.01;
-S.scene.add(grid);
-
-// Fence tip emissive kuning
-const tipMat = new THREE.MeshStandardMaterial({
-  color: 0xffcc00, emissive: 0xffcc00, emissiveIntensity: 1.0,
-});
-```
-
----
-
-## LANGKAH 8 — Ambient Dust Particles
-
-**File: `sim3d/effects.js`** — tambahkan fungsi baru:
+Buat file baru **`agv-iot/web-dashboard/folio/sources/Game/AGV/Stations.js`**:
 
 ```js
-export function buildAmbientDust() {
-  const count = 500;
-  const geo = new THREE.BufferGeometry();
-  const pos = new Float32Array(count * 3);
-  for (let i = 0; i < count; i++) {
-    pos[i*3]   = (Math.random() - 0.5) * 60;
-    pos[i*3+1] = Math.random() * 8;
-    pos[i*3+2] = (Math.random() - 0.5) * 60;
+/**
+ * Stations.js — Visual marker untuk 4 station AGV: BASE, A, B, C
+ * Menggunakan Three.js dari folio-2025 (sudah tersedia via import)
+ */
+import * as THREE from "three/webgpu";
+import { Game } from "../Game.js";
+
+// Koordinat station di world Bruno Simon
+// Jalankan game, aktifkan debug (tekan H), cari area flat yang kosong
+// lalu update koordinat ini
+const STATIONS = {
+  BASE: { x: 0, z: 10, color: 0x4488ff, label: "STN BASE" },
+  A: { x: 0, z: -5, color: 0x00cc66, label: "STN A" },
+  B: { x: 15, z: -20, color: 0xffaa00, label: "STN B" },
+  C: { x: -15, z: -35, color: 0xff4466, label: "STN C" },
+};
+
+export class Stations {
+  constructor() {
+    this.game = Game.getInstance();
+    this.items = {};
+
+    for (const [name, cfg] of Object.entries(STATIONS)) {
+      this.items[name] = this._build(name, cfg);
+    }
+
+    // Highlight station aktif saat destination berubah
+    this.game.agvState.events.on("destinationChange", (dest) => {
+      this._highlight(dest);
+    });
+
+    // Highlight berdasarkan state awal
+    this._highlight(this.game.agvState.destination);
   }
-  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-  const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.05, transparent: true, opacity: 0.4, sizeAttenuation: true });
-  const dust = new THREE.Points(geo, mat);
-  S.scene.add(dust);
 
-  return function updateDust(elapsed) {
-    const p = geo.attributes.position.array;
-    for (let i = 0; i < count; i++) p[i*3+1] += Math.sin(elapsed * 0.3 + i) * 0.001;
-    geo.attributes.position.needsUpdate = true;
-  };
-}
-```
+  _build(name, cfg) {
+    const group = new THREE.Group();
+    group.position.set(cfg.x, 0, cfg.z);
 
-Di `simulation3d.js`: panggil `const updateDust = buildAmbientDust()` saat init, lalu `updateDust(elapsed)` di animate loop.
+    // Platform
+    const platform = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.5, 1.5, 0.05, 32),
+      new THREE.MeshStandardMaterial({
+        color: cfg.color,
+        emissive: cfg.color,
+        emissiveIntensity: 0.3,
+        roughness: 0.4,
+      }),
+    );
+    platform.receiveShadow = true;
+    group.add(platform);
 
----
+    // Ring
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(1.8, 0.05, 8, 32),
+      new THREE.MeshBasicMaterial({ color: cfg.color }),
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.1;
+    group.add(ring);
 
-## LANGKAH 9 — HUD Dark Glass UI
+    // Point light
+    const light = new THREE.PointLight(cfg.color, 2, 6);
+    light.position.y = 1;
+    group.add(light);
 
-**File: `css/simulation3d.css`** — tambahkan di bagian atas:
+    this.game.scene.add(group);
+    return { group, platform, ring, light, cfg };
+  }
 
-```css
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+  _highlight(activeName) {
+    for (const [name, station] of Object.entries(this.items)) {
+      const isActive = name === activeName;
+      station.light.intensity = isActive ? 5 : 2;
+      station.platform.material.emissiveIntensity = isActive ? 1.0 : 0.3;
+    }
+  }
 
-:root {
-  --hud-bg: rgba(10, 15, 30, 0.75);
-  --hud-border: rgba(0, 255, 255, 0.2);
-  --hud-accent: #00ffcc;
-  --hud-warn: #ff5500;
-  --hud-text: #cce8ff;
-  --font-hud: 'Orbitron', monospace;
-}
-
-.hud-panel {
-  background: var(--hud-bg);
-  border: 1px solid var(--hud-border);
-  backdrop-filter: blur(12px);
-  border-radius: 4px;
-  font-family: var(--font-hud);
-  color: var(--hud-text);
-  font-size: 11px;
-  letter-spacing: 0.05em;
-}
-
-.agv-status-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: var(--hud-accent);
-  box-shadow: 0 0 6px var(--hud-accent);
-  animation: pulse-hud 2s infinite;
-}
-
-@keyframes pulse-hud {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  update(elapsed) {
+    for (const station of Object.values(this.items)) {
+      station.ring.rotation.z = elapsed * 0.5;
+    }
+  }
 }
 ```
 
 ---
 
-## Urutan Eksekusi Claude Code
+## FASE 6 — BUAT AGV HUD
+
+Buat file baru **`agv-iot/web-dashboard/folio/sources/Game/AGV/AGVHud.js`**:
+
+```js
+/**
+ * AGVHud.js — Overlay HUD telemetry AGV di atas world Bruno Simon
+ * Inject ke DOM, pointer-events only pada elemen interaktif
+ */
+import { Game } from "../Game.js";
+
+export class AGVHud {
+  constructor() {
+    this.game = Game.getInstance();
+    this.agvState = this.game.agvState;
+    this._buildDOM();
+    this._bindEvents();
+  }
+
+  _buildDOM() {
+    const hud = document.createElement("div");
+    hud.id = "agv-hud";
+    hud.innerHTML = `
+        <style>
+            #agv-hud {
+                position: fixed; inset: 0;
+                pointer-events: none;
+                font-family: 'Courier New', monospace;
+                z-index: 100;
+            }
+            #agv-status {
+                position: absolute; top: 16px; left: 16px;
+                background: rgba(8,12,24,0.85);
+                border: 1px solid rgba(0,220,180,0.35);
+                backdrop-filter: blur(10px);
+                border-radius: 6px;
+                padding: 10px 14px;
+                color: #b8ddf0;
+                font-size: 12px;
+                line-height: 2;
+                pointer-events: all;
+                min-width: 200px;
+            }
+            .hud-row { display: flex; justify-content: space-between; gap: 12px; }
+            .hud-label { color: #556677; }
+            .hud-val { color: #00e8c0; font-weight: bold; }
+            #hud-state-badge {
+                font-size: 13px; font-weight: bold; color: #00e8c0;
+                letter-spacing: 1px; margin-bottom: 4px;
+            }
+            .dot {
+                display: inline-block; width: 7px; height: 7px;
+                border-radius: 50%; background: #00e8c0;
+                box-shadow: 0 0 6px #00e8c0;
+                animation: blink 2s infinite; margin-right: 6px;
+                vertical-align: middle;
+            }
+            @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+            #agv-cmd {
+                position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+                display: flex; gap: 8px;
+                pointer-events: all;
+            }
+            #agv-mode {
+                position: absolute; bottom: 20px; left: 16px;
+                display: flex; gap: 6px;
+                pointer-events: all;
+            }
+            .hud-btn {
+                background: rgba(8,12,24,0.88);
+                border: 1px solid rgba(0,220,180,0.35);
+                color: #b8ddf0;
+                padding: 7px 14px; border-radius: 4px;
+                cursor: pointer;
+                font-family: 'Courier New', monospace; font-size: 12px;
+                transition: background 0.15s, border-color 0.15s;
+            }
+            .hud-btn:hover { background: rgba(0,220,180,0.12); border-color: #00e8c0; }
+            .hud-btn.active { color: #00e8c0; border-color: #00e8c0; box-shadow: 0 0 8px rgba(0,220,180,0.25); }
+        </style>
+
+        <div id="agv-status">
+            <div id="hud-state-badge"><span class="dot"></span><span id="hud-state">IDLE</span></div>
+            <div class="hud-row"><span class="hud-label">Dest</span><span class="hud-val" id="hud-dest">BASE</span></div>
+            <div class="hud-row"><span class="hud-label">Motor L/R</span><span class="hud-val" id="hud-motor">0 / 0</span></div>
+            <div class="hud-row"><span class="hud-label">Load</span><span class="hud-val" id="hud-load">0 g</span></div>
+            <div class="hud-row"><span class="hud-label">Dist</span><span class="hud-val" id="hud-dist">0 cm</span></div>
+            <div class="hud-row"><span class="hud-label">Battery</span><span class="hud-val" id="hud-batt">100%</span></div>
+        </div>
+
+        <div id="agv-cmd">
+            <button class="hud-btn" id="btn-a">📍 STN A</button>
+            <button class="hud-btn" id="btn-b">📍 STN B</button>
+            <button class="hud-btn" id="btn-c">📍 STN C</button>
+            <button class="hud-btn" id="btn-return">🏠 Return</button>
+        </div>
+
+        <div id="agv-mode">
+            <button class="hud-btn active" id="btn-auto">AUTO</button>
+            <button class="hud-btn" id="btn-manual">MANUAL</button>
+        </div>
+        `;
+    document.body.appendChild(hud);
+  }
+
+  _bindEvents() {
+    this.agvState.events.on("update", (s) => this._refresh(s));
+
+    const $ = (id) => document.getElementById(id);
+    $("btn-a")?.addEventListener("click", () =>
+      this.game.server.sendCommand("GOTO_A"),
+    );
+    $("btn-b")?.addEventListener("click", () =>
+      this.game.server.sendCommand("GOTO_B"),
+    );
+    $("btn-c")?.addEventListener("click", () =>
+      this.game.server.sendCommand("GOTO_C"),
+    );
+    $("btn-return")?.addEventListener("click", () =>
+      this.game.server.sendCommand("RETURN"),
+    );
+
+    $("btn-auto")?.addEventListener("click", () => {
+      this.game.server.sendCommand("SET_MODE_AUTO");
+      $("btn-auto").classList.add("active");
+      $("btn-manual").classList.remove("active");
+    });
+    $("btn-manual")?.addEventListener("click", () => {
+      this.game.server.sendCommand("SET_MODE_MANUAL");
+      $("btn-manual").classList.add("active");
+      $("btn-auto").classList.remove("active");
+    });
+  }
+
+  _refresh(s) {
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    };
+    set("hud-state", s.state);
+    set("hud-dest", s.destination);
+    set(
+      "hud-motor",
+      `${Math.round(s.motorLeft)} / ${Math.round(s.motorRight)}`,
+    );
+    set("hud-load", `${Math.round(s.loadcellG)} g`);
+    set("hud-dist", `${Math.round(s.distanceCm)} cm`);
+    set("hud-batt", `${Math.round(s.battery)}%`);
+  }
+}
+```
+
+---
+
+## FASE 7 — REGISTER MODUL AGV KE GAME.JS
+
+Buka **`agv-iot/web-dashboard/folio/sources/Game/Game.js`**.
+
+Tambahkan import di bagian atas:
+
+```js
+import { Server, agvState } from "./Server.js"; // ganti import Server lama jika ada
+import { Stations } from "./AGV/Stations.js";
+import { AGVHud } from "./AGV/AGVHud.js";
+```
+
+Cari baris `this.server = new Server()`, ubah menjadi:
+
+```js
+this.server = new Server();
+this.agvState = agvState;
+```
+
+Cari bagian akhir init() setelah world/terrain sudah siap, tambahkan:
+
+```js
+// AGV modules — init setelah world selesai loading
+this.stations = new Stations();
+this.agvHud = new AGVHud();
+```
+
+---
+
+## FASE 8 — SESUAIKAN SPAWN POINT
+
+Di **`agv-iot/web-dashboard/folio/sources/Game/Respawns.js`** (atau di mana spawn 'landing' didefinisikan):
+
+Ubah koordinat spawn `'landing'` agar kendaraan spawn di dekat STN BASE:
+
+```js
+// Cari posisi spawn 'landing', ubah y ke 1 (sedikit di atas terrain)
+// dan x/z ke dekat koordinat BASE di Stations.js:
+// x: 0, y: 1, z: 8
+```
+
+> Cara mudah: jalankan game, tekan H untuk debug mode,
+> arahkan kendaraan ke lokasi yang diinginkan, catat koordinat, hardcode.
+
+---
+
+## FASE 9 — UPDATE VITE CONFIG UNTUK CORS (opsional)
+
+Agar Vite dev server (5173) bisa request ke agv-iot (3000) tanpa CORS error,
+tambahkan proxy di **`agv-iot/web-dashboard/folio/vite.config.js`**:
+
+```js
+// Tambahkan di dalam defineConfig({...}):
+server: {
+    proxy: {
+        '/api': 'http://localhost:3000',
+        '/login': 'http://localhost:3000',
+    }
+}
+```
+
+> ⚠️ vite.config.js boleh diubah HANYA untuk menambahkan proxy ini.
+> Jangan ubah plugin WASM, top-level-await, atau setting lainnya.
+
+---
+
+## URUTAN EKSEKUSI
 
 ```
-1. Download model manual (Langkah 0) — kamu yang lakukan, 2 menit
-2. Claude Code: Langkah 1 (importmap)
-3. Claude Code: Langkah 2 (AGV GLTF loader)
-4. Claude Code: Langkah 3 (props GLTF)
-5. Claude Code: Langkah 4 (lighting)
-   → TEST browser setelah ini
-6. Claude Code: Langkah 5 (bloom)
-   → TEST browser
-7. Claude Code: Langkah 6+7+8 (camera, arena, dust) — bisa paralel
-8. Claude Code: Langkah 9 (CSS HUD) — terakhir
+FASE 0  — Copy folio-2025 → agv-iot/web-dashboard/folio/, verifikasi jalan
+FASE 1  — Bersihkan data portfolio Bruno (non-destructive)
+FASE 2  — Ganti Server.js + DEV bypass di agv-iot server.js
+FASE 3  — Expose agvState di Game.js
+FASE 4  — Tambah syncFromAGV di Player.js
+FASE 5  — Buat AGV/Stations.js (file baru)
+FASE 6  — Buat AGV/AGVHud.js (file baru)
+FASE 7  — Register ke Game.js
+FASE 8  — Sesuaikan spawn point
+          → TEST: npm run dev di folio/, + node server.js di web-dashboard/
+          → Buka localhost:5173, cek console, pastikan WS connect ke 3001
+FASE 9  — Tambahkan Vite proxy (opsional, jika perlu akses /api)
 ```
 
----
-
-## Aturan WAJIB untuk Claude Code
-
-- ❌ JANGAN ubah: `app.js` logic navigasi, MQTT handler, WebSocket sync, session auth
-- ❌ JANGAN ubah nama export function yang sudah ada
-- ❌ JANGAN install npm package baru — semua CDN
-- ✅ SELALU tambahkan fallback primitif setiap load GLTF
-- ✅ SELALU `castShadow = true` dan `receiveShadow = true` pada semua mesh
-- ✅ TEST di browser (`http://localhost:PORT`) setelah tiap langkah
-- ✅ Jika error "CORS" saat load model → pastikan file ada di `public/models/`
-- ✅ Jika bloom error → pastikan importmap `postprocessing` sudah ditambahkan
-- ✅ Express.js sudah serve static dari `public/` — model langsung accessible via `/models/`
+**Setelah setiap fase: `npm run dev`, buka browser, cek console tidak ada error.**
 
 ---
 
-## Checklist Done
+## ATURAN WAJIB
 
-- [ ] Model AGV ter-load sebagai GLTF (bukan kotak)
-- [ ] Props (barrel, box) ter-load sebagai GLTF
-- [ ] Scene gelap & dramatis (night mood)
-- [ ] AGV punya headlight + underglow menyala
-- [ ] Bloom aktif — lampu bersinar
-- [ ] Kamera smooth lerp ngikutin AGV
-- [ ] Dust particles melayang
-- [ ] HUD font Orbitron + dark glass
-- [ ] IoT sync masih jalan (cek console WebSocket)
-- [ ] MQTT command masih menggerakkan AGV
+### ❌ JANGAN PERNAH:
+
+- Menyentuh `C:/laragon/www/folio-2025/` — itu read-only reference selamanya
+- Mengubah `vite.config.js` folio (kecuali proxy di Fase 9)
+- Mengubah `package.json` folio
+- Menginstall package baru di folio (semua sudah tersedia)
+- Mengubah `agv-iot/web-dashboard/server.js` kecuali DEV bypass di Fase 2B
+- Mengubah `PhysicsVehicle.js`, `VisualVehicle.js`, `Terrain.js`, `Lighting.js`, `World.js`
+
+### ✅ BOLEH DAN HARUS:
+
+- Semua file AGV baru masuk ke `agv-iot/web-dashboard/folio/sources/Game/AGV/`
+- Selalu `npm run dev` dan cek browser setelah setiap fase
+- Jika import error: cek path relatif (`../` vs `./`)
+- Jika WS tidak connect: pastikan `node server.js` agv-iot jalan, cek port 3001
+- Jika physics/visual error: jangan ubah physics — cek apakah agvState sudah terdefinisi
+
+### Referensi saat bingung:
+
+- Cara class di-init → lihat `folio-2025/sources/Game/Game.js` asli
+- Cara Events dipakai → lihat `folio-2025/sources/Game/Events.js` asli
+- Koordinat terrain → jalankan folio, tekan H (debug), gerakkan kendaraan
 
 ---
 
-## Referensi
+## STRUKTUR AKHIR YANG DIHARAPKAN
 
-- Three.js GLTFLoader: https://threejs.org/docs/#examples/en/loaders/GLTFLoader
-- Kenney 3D assets (CC0 gratis): https://kenney.nl/assets/category:3D
-- Quaternius CC0 models: https://quaternius.com
-- Sketchfab CC0 filter: https://sketchfab.com/search?features=downloadable&license=4
-- postprocessing lib: https://github.com/pmndrs/postprocessing
-- Referensi visual: https://bruno-simon.com
+```
+Terminal 1: cd agv-iot/web-dashboard && node server.js
+            → HTTP :3000, WS :3001, MQTT bridge, DB
+
+Terminal 2: cd agv-iot/web-dashboard/folio && npm run dev
+            → Vite :5173, Three.js world Bruno Simon
+
+Browser: localhost:5173
+  ✅ Dunia Bruno Simon muncul (terrain, trees, lighting, physics)
+  ✅ Kendaraan bisa dikontrol keyboard (MANUAL) atau dari MQTT (AUTO)
+  ✅ 4 station bercahaya: BASE, A, B, C
+  ✅ HUD overlay: telemetry real-time (state, motor, sensor, battery)
+  ✅ Tombol command: GOTO A/B/C, Return, toggle AUTO/MANUAL
+  ✅ Console: "[AGV] WebSocket connected", "[AGV] Snapshot received"
+```

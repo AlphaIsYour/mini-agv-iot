@@ -1309,10 +1309,23 @@ bool tareLoadcell(const char* reason) {
     Serial.print("HX711: TARE gagal"); Serial.println(" - NOT READY");
     return false;
   }
-  delay(250);
+
+  // Power cycle HX711 — reset internal amplifier
+  scale.power_down();
+  delay(200);
+  scale.power_up();
+  delay(300);
+
+  // Baca raw average tanpa offset (software tare)
+  // Hindari scale.tare() / set_offset() karena bikin HX711 "tidur"
   loadcellRawOffset = scale.read_average(LOADCELL_TARE_READS);
-  scale.set_offset(loadcellRawOffset);
-  delay(100);
+
+  // Flush ADC — buang beberapa pembacaan pertama
+  for (byte i = 0; i < 10; i++) {
+    scale.read();
+    delay(10);
+  }
+
   loadcellGram        = 0;
   loadcellFilterReady = false;
   cargoDetected       = false;
@@ -1320,9 +1333,10 @@ bool tareLoadcell(const char* reason) {
   loadcellCargoConfirm = 0;
   loadcellEmptyConfirm = 0;
   cargoStateChangedAt  = millis() - CARGO_STABLE_MS;
-  Serial.print("HX711: TARE OK");
-  if (reason) { Serial.print(" ("); Serial.print(reason); Serial.print(")"); }
-  Serial.println();
+  Serial.print("HX711: TARE OK (offset=");
+  Serial.print(loadcellRawOffset);
+  if (reason) { Serial.print(" "); Serial.print(reason); }
+  Serial.println(")");
   return true;
 }
 
@@ -1604,4 +1618,5 @@ void stopMotor() {
   digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
   ledcWrite(ENA, 0); ledcWrite(ENB, 0);
-  motorKiriTerakhir = 0; motorKananTerakhir
+  motorKiriTerakhir = 0; motorKananTerakhir = 0;
+}

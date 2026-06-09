@@ -116,7 +116,7 @@ function buildIndustrialGround() {
 function buildArenaFloor() {
   const arenaFloor = new THREE.Mesh(
     new THREE.PlaneGeometry(ARENA_W + 4, ARENA_H + 4),
-    new THREE.MeshStandardMaterial({ color: 0x5cba4c, roughness: 0.9 })
+    new THREE.MeshStandardMaterial({ color: 0x3a8c2d, roughness: 0.9 })
   );
   arenaFloor.rotation.x = -Math.PI / 2;
   arenaFloor.position.y = 0.03;
