@@ -8,484 +8,368 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    /* ══ RESET & BASE ═══════════════════════════════════════════════════════ */
+    /* ══ RESET ════════════════════════════════════════════════════════════ */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg: #0a0e1a;
-      --bg2: #0f1428;
-      --bg3: #141a30;
-      --surface: #1a2040;
-      --border: #1e2a4a;
-      --border2: #2a3a5a;
-      --text: #c8d8f0;
-      --text-dim: #6a7a9a;
-      --accent: #00d4ff;
-      --accent-dim: rgba(0,212,255,0.15);
-      --accent-glow: rgba(0,212,255,0.08);
-      --green: #00ff88;
-      --green-dim: rgba(0,255,136,0.15);
-      --amber: #ffb300;
-      --red: #ff3366;
-      --purple: #a855f7;
-      --mono: 'JetBrains Mono', monospace;
-      --sans: 'Inter', sans-serif;
+      --bg: #060a14; --bg2: #0a0f1e; --bg3: #0e1428;
+      --surface: #111830; --border: #1a2444; --border2: #243056;
+      --text: #b8ccee; --text-dim: #556688; --text-bright: #e0eaff;
+      --accent: #00d4ff; --accent-dim: rgba(0,212,255,0.12);
+      --accent-glow: rgba(0,212,255,0.06); --green: #00ff88;
+      --green-dim: rgba(0,255,136,0.12); --amber: #ffb300;
+      --red: #ff3366; --purple: #a855f7; --purple-dim: rgba(168,85,247,0.12);
+      --mono: 'JetBrains Mono', monospace; --sans: 'Inter', sans-serif;
       --display: 'Rajdhani', sans-serif;
     }
-
     html { scroll-behavior: smooth; }
-    body {
-      font-family: var(--sans);
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      overflow-x: hidden;
-    }
-
+    body { font-family: var(--sans); background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
     a { color: var(--accent); text-decoration: none; }
 
-    /* ══ GRID BACKGROUND ═══════════════════════════════════════════════════ */
+    /* ══ GRID + NOISE OVERLAY ═══════════════════════════════════════════ */
     body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
       background:
-        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px),
-        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px);
-      background-size: 60px 60px;
-      pointer-events: none;
-      z-index: 0;
+        linear-gradient(90deg, rgba(0,212,255,0.02) 1px, transparent 1px),
+        linear-gradient(rgba(0,212,255,0.02) 1px, transparent 1px);
+      background-size: 80px 80px;
+    }
+    body::after {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      opacity: 0.4;
     }
 
-    /* ══ NAVBAR ════════════════════════════════════════════════════════════ */
+    /* ══ PARALLAX STARS ═════════════════════════════════════════════════ */
+    #stars-canvas {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    }
+
+    /* ══ NAVBAR ═════════════════════════════════════════════════════════ */
     .nav {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
       padding: 16px 40px;
-      background: rgba(10,14,26,0.85);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
+      background: rgba(6,10,20,0.7); backdrop-filter: blur(20px) saturate(1.5);
+      border-bottom: 1px solid rgba(0,212,255,0.08);
+      transition: all 0.4s;
     }
+    .nav.scrolled { background: rgba(6,10,20,0.92); border-bottom-color: rgba(0,212,255,0.15); }
     .nav-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-family: var(--display);
-      font-weight: 700;
-      font-size: 24px;
-      color: var(--accent);
-      letter-spacing: 4px;
+      display: flex; align-items: center; gap: 10px;
+      font-family: var(--display); font-weight: 700; font-size: 22px;
+      color: var(--accent); letter-spacing: 6px;
     }
-    .nav-brand svg { filter: drop-shadow(0 0 8px rgba(0,212,255,0.4)); }
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 32px;
-    }
+    .nav-links { display: flex; align-items: center; gap: 28px; }
     .nav-link {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--text-dim);
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      transition: color 0.2s;
-      cursor: pointer;
+      font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+      letter-spacing: 2px; text-transform: uppercase; transition: color 0.2s;
+      cursor: pointer; position: relative;
+    }
+    .nav-link::after {
+      content: ''; position: absolute; bottom: -4px; left: 0; width: 0; height: 1px;
+      background: var(--accent); transition: width 0.3s;
     }
     .nav-link:hover { color: var(--accent); }
+    .nav-link:hover::after { width: 100%; }
     .btn-enter {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      display: flex; align-items: center; gap: 8px;
       padding: 10px 24px;
-      background: linear-gradient(135deg, rgba(0,212,255,0.15), rgba(0,212,255,0.05));
-      border: 1px solid var(--accent);
-      border-radius: 4px;
-      color: var(--accent);
-      font-family: var(--mono);
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: all 0.3s;
-      text-decoration: none;
+      background: linear-gradient(135deg, rgba(0,212,255,0.1), rgba(0,212,255,0.03));
+      border: 1px solid rgba(0,212,255,0.4); border-radius: 4px;
+      color: var(--accent); font-family: var(--mono); font-size: 10px;
+      font-weight: 600; letter-spacing: 3px; text-transform: uppercase;
+      cursor: pointer; transition: all 0.4s; text-decoration: none;
+      position: relative; overflow: hidden;
     }
+    .btn-enter::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(0,212,255,0.15), transparent);
+      transform: translateX(-100%); transition: transform 0.6s;
+    }
+    .btn-enter:hover::before { transform: translateX(100%); }
     .btn-enter:hover {
-      background: linear-gradient(135deg, rgba(0,212,255,0.3), rgba(0,212,255,0.1));
-      box-shadow: 0 0 20px rgba(0,212,255,0.3), inset 0 0 20px rgba(0,212,255,0.1);
-      transform: translateY(-1px);
+      border-color: var(--accent);
+      box-shadow: 0 0 30px rgba(0,212,255,0.2), inset 0 0 30px rgba(0,212,255,0.05);
+      transform: translateY(-2px);
     }
 
-    /* ══ HERO ══════════════════════════════════════════════════════════════ */
+    /* ══ HERO ═══════════════════════════════════════════════════════════ */
     .hero {
-      position: relative;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 120px 40px 80px;
+      position: relative; min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 120px 40px 80px;
     }
     .hero-glow {
-      position: absolute;
-      width: 600px; height: 600px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(0,212,255,0.08), transparent 70%);
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      pointer-events: none;
+      position: absolute; width: 800px; height: 800px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,212,255,0.06), rgba(168,85,247,0.03), transparent 70%);
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
+      pointer-events: none; animation: glow-pulse 6s ease-in-out infinite;
     }
+    @keyframes glow-pulse { 0%, 100% { opacity: 0.6; transform: translate(-50%,-50%) scale(1); } 50% { opacity: 1; transform: translate(-50%,-50%) scale(1.1); } }
     .hero-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 16px;
-      background: var(--accent-dim);
-      border: 1px solid rgba(0,212,255,0.3);
-      border-radius: 20px;
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--accent);
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      margin-bottom: 24px;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 18px; background: rgba(0,212,255,0.08);
+      border: 1px solid rgba(0,212,255,0.2); border-radius: 20px;
+      font-family: var(--mono); font-size: 10px; color: var(--accent);
+      letter-spacing: 3px; text-transform: uppercase; margin-bottom: 28px;
+      animation: fade-in-up 1s ease-out;
     }
-    .hero-badge .dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--green);
-      animation: pulse-dot 2s infinite;
-    }
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
+    .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse-dot 2s infinite; }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,255,136,0.4); } 50% { opacity: 0.6; box-shadow: 0 0 0 6px rgba(0,255,136,0); } }
     .hero-title {
-      font-family: var(--display);
-      font-size: clamp(48px, 8vw, 96px);
-      font-weight: 700;
-      letter-spacing: 8px;
-      color: #fff;
-      line-height: 1;
-      margin-bottom: 16px;
+      font-family: var(--display); font-size: clamp(64px, 10vw, 120px);
+      font-weight: 700; letter-spacing: 12px; color: #fff; line-height: 0.9;
+      margin-bottom: 20px; animation: fade-in-up 1s ease-out 0.1s both;
     }
-    .hero-title span { color: var(--accent); }
+    .hero-title .accent {
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
     .hero-sub {
-      font-family: var(--mono);
-      font-size: 14px;
-      color: var(--text-dim);
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      margin-bottom: 48px;
+      font-family: var(--mono); font-size: 13px; color: var(--text-dim);
+      letter-spacing: 4px; text-transform: uppercase; margin-bottom: 48px;
+      animation: fade-in-up 1s ease-out 0.2s both;
     }
+    @keyframes fade-in-up { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
     .hero-stats {
-      display: flex;
-      gap: 48px;
-      margin-top: 48px;
+      display: flex; gap: 56px; margin-top: 56px;
+      animation: fade-in-up 1s ease-out 0.4s both;
     }
-    .hero-stat {
-      text-align: center;
+    .hero-stat { text-align: center; position: relative; }
+    .hero-stat::after {
+      content: ''; position: absolute; right: -28px; top: 50%; transform: translateY(-50%);
+      width: 1px; height: 40px; background: var(--border);
     }
+    .hero-stat:last-child::after { display: none; }
     .hero-stat-val {
-      font-family: var(--display);
-      font-size: 36px;
-      font-weight: 700;
-      color: var(--accent);
+      font-family: var(--display); font-size: 42px; font-weight: 700; color: var(--accent);
+      text-shadow: 0 0 30px rgba(0,212,255,0.3);
     }
     .hero-stat-label {
-      font-family: var(--mono);
-      font-size: 9px;
-      color: var(--text-dim);
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      margin-top: 4px;
+      font-family: var(--mono); font-size: 9px; color: var(--text-dim);
+      letter-spacing: 2px; text-transform: uppercase; margin-top: 4px;
     }
 
-    /* ══ SECTIONS ══════════════════════════════════════════════════════════ */
-    section {
-      position: relative;
-      z-index: 1;
-      padding: 100px 40px;
+    /* ══ SCROLL INDICATOR ══════════════════════════════════════════════ */
+    .scroll-indicator {
+      position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      animation: fade-in-up 1s ease-out 0.6s both;
     }
-    .section-header {
-      text-align: center;
-      margin-bottom: 64px;
+    .scroll-indicator span {
+      font-family: var(--mono); font-size: 9px; color: var(--text-dim);
+      letter-spacing: 3px; text-transform: uppercase;
     }
+    .scroll-line {
+      width: 1px; height: 40px; background: linear-gradient(to bottom, var(--accent), transparent);
+      animation: scroll-line 2s ease-in-out infinite;
+    }
+    @keyframes scroll-line { 0%, 100% { opacity: 0.3; transform: scaleY(0.5); } 50% { opacity: 1; transform: scaleY(1); } }
+
+    /* ══ SECTIONS ═══════════════════════════════════════════════════════ */
+    section { position: relative; z-index: 1; padding: 120px 40px; }
+    .section-header { text-align: center; margin-bottom: 72px; }
     .section-tag {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--accent);
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      margin-bottom: 12px;
+      font-family: var(--mono); font-size: 10px; color: var(--accent);
+      letter-spacing: 4px; text-transform: uppercase; margin-bottom: 12px;
     }
     .section-title {
-      font-family: var(--display);
-      font-size: 36px;
-      font-weight: 700;
-      color: #fff;
-      letter-spacing: 2px;
+      font-family: var(--display); font-size: 40px; font-weight: 700;
+      color: #fff; letter-spacing: 3px;
     }
     .section-line {
-      width: 60px;
-      height: 2px;
-      background: var(--accent);
-      margin: 16px auto 0;
-      box-shadow: 0 0 10px rgba(0,212,255,0.5);
+      width: 60px; height: 2px; margin: 20px auto 0;
+      background: linear-gradient(90deg, var(--accent), var(--purple));
+      box-shadow: 0 0 15px rgba(0,212,255,0.4);
     }
 
-    /* ══ FEATURES GRID ═════════════════════════════════════════════════════ */
+    /* ══ REVEAL ANIMATION ══════════════════════════════════════════════ */
+    .reveal {
+      opacity: 0; transform: translateY(40px);
+      transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+    .reveal-delay-4 { transition-delay: 0.4s; }
+    .reveal-delay-5 { transition-delay: 0.5s; }
+
+    /* ══ FEATURES GRID ═════════════════════════════════════════════════ */
     .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 24px;
-      max-width: 1200px;
-      margin: 0 auto;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px; max-width: 1200px; margin: 0 auto;
     }
     .feature-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 32px 24px;
-      transition: all 0.3s;
-      position: relative;
-      overflow: hidden;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 36px 28px; transition: all 0.4s cubic-bezier(0.22,1,0.36,1);
+      position: relative; overflow: hidden; cursor: default;
     }
     .feature-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, var(--accent), transparent);
-      opacity: 0;
-      transition: opacity 0.3s;
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), var(--purple), transparent);
+      opacity: 0; transition: opacity 0.4s;
     }
-    .feature-card:hover {
-      border-color: var(--accent);
-      transform: translateY(-4px);
-      box-shadow: 0 8px 32px rgba(0,212,255,0.1);
+    .feature-card::after {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(0,212,255,0.06), transparent 60%);
+      opacity: 0; transition: opacity 0.4s; pointer-events: none;
     }
+    .feature-card:hover { border-color: rgba(0,212,255,0.3); transform: translateY(-6px); }
     .feature-card:hover::before { opacity: 1; }
+    .feature-card:hover::after { opacity: 1; }
     .feature-icon {
-      width: 48px; height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 16px;
+      width: 52px; height: 52px; display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px; border-radius: 12px;
+      background: var(--accent-dim); border: 1px solid rgba(0,212,255,0.15);
     }
-    .feature-icon svg {
-      width: 40px; height: 40px;
-      filter: drop-shadow(0 0 8px rgba(0,212,255,0.3));
-    }
+    .feature-icon svg { width: 24px; height: 24px; }
     .feature-title {
-      font-family: var(--display);
-      font-size: 18px;
-      font-weight: 600;
-      color: #fff;
-      margin-bottom: 8px;
-      letter-spacing: 1px;
+      font-family: var(--display); font-size: 18px; font-weight: 600;
+      color: #fff; margin-bottom: 8px; letter-spacing: 1px;
     }
-    .feature-desc {
-      font-size: 13px;
-      color: var(--text-dim);
-      line-height: 1.6;
-    }
+    .feature-desc { font-size: 13px; color: var(--text-dim); line-height: 1.7; }
 
-    /* ══ ARENA SECTION ═════════════════════════════════════════════════════ */
+    /* ══ ARENA ══════════════════════════════════════════════════════════ */
     .arena-section {
       background: var(--bg2);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
+      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
     }
     .arena-content {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 64px;
-      max-width: 1000px;
-      margin: 0 auto;
-      flex-wrap: wrap;
+      display: flex; align-items: center; justify-content: center;
+      gap: 64px; max-width: 1000px; margin: 0 auto; flex-wrap: wrap;
     }
     .arena-svg-wrap {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 24px;
-      box-shadow: 0 0 40px rgba(0,212,255,0.05);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 28px;
+      box-shadow: 0 0 60px rgba(0,212,255,0.04);
+      position: relative;
     }
-    .arena-info {
-      max-width: 400px;
+    .arena-svg-wrap::before {
+      content: ''; position: absolute; inset: -1px; border-radius: 12px;
+      background: linear-gradient(135deg, rgba(0,212,255,0.15), transparent, rgba(168,85,247,0.1));
+      z-index: -1; opacity: 0; transition: opacity 0.4s;
     }
+    .arena-svg-wrap:hover::before { opacity: 1; }
+    .arena-info { max-width: 420px; }
     .arena-info h3 {
-      font-family: var(--display);
-      font-size: 24px;
-      font-weight: 700;
-      color: #fff;
-      margin-bottom: 16px;
+      font-family: var(--display); font-size: 28px; font-weight: 700;
+      color: #fff; margin-bottom: 16px;
     }
-    .arena-info p {
-      font-size: 14px;
-      color: var(--text-dim);
-      margin-bottom: 16px;
-      line-height: 1.7;
-    }
-    .arena-nodes {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
+    .arena-info p { font-size: 14px; color: var(--text-dim); margin-bottom: 16px; line-height: 1.8; }
+    .arena-nodes { display: flex; gap: 10px; flex-wrap: wrap; }
     .arena-node-chip {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--text);
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; font-family: var(--mono); font-size: 11px; color: var(--text);
+      transition: all 0.3s;
     }
-    .arena-node-chip .dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-    }
-    .dot-base { background: var(--green); }
-    .dot-a { background: var(--accent); }
-    .dot-b { background: var(--amber); }
-    .dot-c { background: var(--red); }
+    .arena-node-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot-base { background: var(--green); box-shadow: 0 0 8px rgba(0,255,136,0.4); }
+    .dot-a { background: var(--accent); box-shadow: 0 0 8px rgba(0,212,255,0.4); }
+    .dot-b { background: var(--amber); box-shadow: 0 0 8px rgba(255,179,0,0.4); }
+    .dot-c { background: var(--red); box-shadow: 0 0 8px rgba(255,51,102,0.4); }
 
-    /* ══ TECH STACK ════════════════════════════════════════════════════════ */
+    /* ══ TECH STACK ═════════════════════════════════════════════════════ */
     .tech-grid {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 16px;
-      max-width: 800px;
-      margin: 0 auto;
+      display: flex; flex-wrap: wrap; justify-content: center;
+      gap: 12px; max-width: 800px; margin: 0 auto;
     }
     .tech-chip {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 20px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--text);
-      transition: all 0.2s;
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 18px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px;
+      font-family: var(--mono); font-size: 12px; color: var(--text);
+      transition: all 0.3s;
     }
-    .tech-chip:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-    .tech-chip svg { width: 18px; height: 18px; }
+    .tech-chip:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+    .tech-chip svg { width: 16px; height: 16px; }
 
-    /* ══ CREATOR ═══════════════════════════════════════════════════════════ */
-    .creator-section {
-      text-align: center;
-    }
+    /* ══ CREATOR ════════════════════════════════════════════════════════ */
+    .creator-section { text-align: center; }
     .creator-card {
-      display: inline-flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-      padding: 40px 60px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
+      display: inline-flex; flex-direction: column; align-items: center;
+      gap: 16px; padding: 48px 64px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 16px;
+      position: relative; overflow: hidden;
     }
+    .creator-card::before {
+      content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+      background: conic-gradient(from 0deg, transparent, rgba(0,212,255,0.05), transparent, rgba(168,85,247,0.05), transparent);
+      animation: rotate-bg 10s linear infinite;
+    }
+    @keyframes rotate-bg { to { transform: rotate(360deg); } }
     .creator-avatar {
-      width: 80px; height: 80px;
-      border-radius: 50%;
+      width: 80px; height: 80px; border-radius: 50%;
       background: linear-gradient(135deg, var(--accent), var(--purple));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--display);
-      font-size: 32px;
-      font-weight: 700;
-      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--display); font-size: 32px; font-weight: 700; color: #fff;
+      position: relative; z-index: 1;
+      box-shadow: 0 0 30px rgba(0,212,255,0.3);
     }
     .creator-name {
-      font-family: var(--display);
-      font-size: 24px;
-      font-weight: 700;
-      color: #fff;
+      font-family: var(--display); font-size: 28px; font-weight: 700; color: #fff;
+      position: relative; z-index: 1;
     }
     .creator-role {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--accent);
-      letter-spacing: 2px;
-      text-transform: uppercase;
+      font-family: var(--mono); font-size: 11px; color: var(--accent);
+      letter-spacing: 2px; text-transform: uppercase;
+      position: relative; z-index: 1;
     }
-    .creator-team {
-      display: flex;
-      gap: 24px;
-      margin-top: 24px;
-    }
-    .team-member {
-      text-align: center;
-    }
+    .creator-team { display: flex; gap: 28px; margin-top: 28px; position: relative; z-index: 1; }
+    .team-member { text-align: center; }
     .team-avatar {
-      width: 48px; height: 48px;
-      border-radius: 50%;
-      background: var(--bg);
-      border: 2px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--display);
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--text-dim);
-      margin: 0 auto 8px;
+      width: 48px; height: 48px; border-radius: 50%; background: var(--bg);
+      border: 2px solid var(--border); display: flex; align-items: center; justify-content: center;
+      font-family: var(--display); font-size: 18px; font-weight: 700; color: var(--text-dim);
+      margin: 0 auto 8px; transition: all 0.3s;
     }
-    .team-name {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--text-dim);
-    }
+    .team-member:hover .team-avatar { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 15px rgba(0,212,255,0.2); }
+    .team-name { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
 
-    /* ══ CTA ═══════════════════════════════════════════════════════════════ */
+    /* ══ CTA ════════════════════════════════════════════════════════════ */
     .cta-section {
-      text-align: center;
-      padding: 120px 40px;
+      text-align: center; padding: 140px 40px;
+      position: relative;
+    }
+    .cta-section::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center, rgba(0,212,255,0.04), transparent 70%);
     }
     .cta-title {
-      font-family: var(--display);
-      font-size: 36px;
-      font-weight: 700;
-      color: #fff;
-      margin-bottom: 16px;
+      font-family: var(--display); font-size: 42px; font-weight: 700;
+      color: #fff; margin-bottom: 16px; position: relative;
     }
     .cta-sub {
-      font-size: 14px;
-      color: var(--text-dim);
-      margin-bottom: 32px;
+      font-size: 14px; color: var(--text-dim); margin-bottom: 36px; position: relative;
     }
 
-    /* ══ FOOTER ════════════════════════════════════════════════════════════ */
+    /* ══ FOOTER ═════════════════════════════════════════════════════════ */
     footer {
-      text-align: center;
-      padding: 32px 40px;
+      text-align: center; padding: 32px 40px;
       border-top: 1px solid var(--border);
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--text-dim);
-      letter-spacing: 1px;
+      font-family: var(--mono); font-size: 10px; color: var(--text-dim); letter-spacing: 1px;
     }
     footer span { color: var(--accent); }
 
-    /* ══ RESPONSIVE ════════════════════════════════════════════════════════ */
+    /* ══ PARALLAX ELEMENTS ═════════════════════════════════════════════ */
+    .parallax-layer {
+      position: absolute; pointer-events: none;
+      transition: transform 0.1s linear;
+    }
+    .float-element {
+      position: absolute; border-radius: 50%; pointer-events: none;
+      animation: float 6s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      33% { transform: translateY(-15px) rotate(5deg); }
+      66% { transform: translateY(10px) rotate(-3deg); }
+    }
+
+    /* ══ RESPONSIVE ═════════════════════════════════════════════════════ */
     @media (max-width: 768px) {
       .nav { padding: 12px 20px; }
       .nav-links { gap: 16px; }
@@ -493,6 +377,7 @@
       .hero { padding: 100px 20px 60px; }
       .hero-stats { gap: 24px; }
       .hero-stat-val { font-size: 28px; }
+      .hero-stat::after { display: none; }
       section { padding: 60px 20px; }
       .arena-content { flex-direction: column; gap: 32px; }
     }
@@ -500,15 +385,18 @@
 </head>
 <body>
 
-  <!-- ══ NAVBAR ═══════════════════════════════════════════════════════════ -->
-  <nav class="nav">
+  <!-- ══ STARS CANVAS ══════════════════════════════════════════════════ -->
+  <canvas id="stars-canvas"></canvas>
+
+  <!-- ══ NAVBAR ════════════════════════════════════════════════════════ -->
+  <nav class="nav" id="nav">
     <div class="nav-brand">
-      <!-- XORA Logo SVG -->
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-        <rect x="1" y="1" width="30" height="30" rx="4" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
-        <path d="M8 8L16 20L24 8" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" fill="none"/>
-        <path d="M8 24L16 12L24 24" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.5"/>
-        <circle cx="16" cy="16" r="2" fill="#00d4ff"/>
+      <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+        <rect x="1" y="1" width="30" height="30" rx="4" stroke="url(#logo-grad)" stroke-width="1.5" fill="none"/>
+        <path d="M8 8L16 20L24 8" stroke="url(#logo-grad)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        <path d="M8 24L16 12L24 24" stroke="url(#logo-grad)" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.3"/>
+        <circle cx="16" cy="16" r="2.5" fill="url(#logo-grad)"/>
+        <defs><linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#00d4ff"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs>
       </svg>
       XORA
     </div>
@@ -518,183 +406,138 @@
       <a class="nav-link" href="#tech">Tech</a>
       <a class="nav-link" href="#team">Team</a>
       <a class="btn-enter" href="/login">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <rect x="1" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/>
-          <path d="M5 3V1.5A2.5 2.5 0 017.5-1h1A2.5 2.5 0 0111 1.5V3" stroke="currentColor" stroke-width="1.5" fill="none"/>
-          <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
-        </svg>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M5 3V1.5A2.5 2.5 0 017.5-1h1A2.5 2.5 0 0111 1.5V3" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/></svg>
         Enter Terminal
       </a>
     </div>
   </nav>
 
-  <!-- ══ HERO ═════════════════════════════════════════════════════════════ -->
-  <section class="hero">
+  <!-- ══ HERO ══════════════════════════════════════════════════════════ -->
+  <section class="hero" id="hero">
     <div class="hero-glow"></div>
-    <div class="hero-badge">
-      <div class="dot"></div>
-      System Online
-    </div>
-    <h1 class="hero-title"><span>X</span>ORA</h1>
+    <!-- Floating elements -->
+    <div class="float-element" style="width:6px;height:6px;background:var(--accent);top:20%;left:15%;animation-delay:0s;opacity:0.4"></div>
+    <div class="float-element" style="width:4px;height:4px;background:var(--purple);top:30%;right:20%;animation-delay:1s;opacity:0.3"></div>
+    <div class="float-element" style="width:8px;height:8px;background:var(--green);bottom:25%;left:10%;animation-delay:2s;opacity:0.2"></div>
+    <div class="float-element" style="width:5px;height:5px;background:var(--amber);top:60%;right:15%;animation-delay:3s;opacity:0.3"></div>
+    <div class="float-element" style="width:3px;height:3px;background:var(--red);bottom:40%;right:30%;animation-delay:1.5s;opacity:0.2"></div>
+
+    <div class="hero-badge"><div class="dot"></div>System Online — v4.0</div>
+    <h1 class="hero-title"><span class="accent">X</span>ORA</h1>
     <p class="hero-sub">Autonomous Guided Vehicle — Mission Control System</p>
-    <a class="btn-enter" href="/login" style="font-size:13px;padding:14px 36px;">
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <path d="M7 3L13 9L7 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      </svg>
+    <a class="btn-enter" href="/login" style="font-size:12px;padding:14px 40px;">
+      <svg width="16" height="16" viewBox="0 0 18 18" fill="none"><path d="M7 3L13 9L7 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       Launch Terminal
     </a>
     <div class="hero-stats">
-      <div class="hero-stat">
-        <div class="hero-stat-val">3</div>
-        <div class="hero-stat-label">Destinations</div>
-      </div>
-      <div class="hero-stat">
-        <div class="hero-stat-val">5</div>
-        <div class="hero-stat-label">Sensors</div>
-      </div>
-      <div class="hero-stat">
-        <div class="hero-stat-val">24/7</div>
-        <div class="hero-stat-label">Autonomous</div>
-      </div>
+      <div class="hero-stat"><div class="hero-stat-val" data-count="3">0</div><div class="hero-stat-label">Destinations</div></div>
+      <div class="hero-stat"><div class="hero-stat-val" data-count="5">0</div><div class="hero-stat-label">Sensors</div></div>
+      <div class="hero-stat"><div class="hero-stat-val">24/7</div><div class="hero-stat-label">Autonomous</div></div>
+    </div>
+    <div class="scroll-indicator">
+      <span>Scroll</span>
+      <div class="scroll-line"></div>
     </div>
   </section>
 
-  <!-- ══ FEATURES ═════════════════════════════════════════════════════════ -->
+  <!-- ══ FEATURES ═════════════════════════════════════════════════════ -->
   <section id="features">
-    <div class="section-header">
+    <div class="section-header reveal">
       <div class="section-tag">// capabilities</div>
       <h2 class="section-title">System Features</h2>
       <div class="section-line"></div>
     </div>
     <div class="features-grid">
 
-      <div class="feature-card">
+      <div class="feature-card reveal reveal-delay-1">
         <div class="feature-icon">
-          <svg viewBox="0 0 40 40" fill="none">
-            <rect x="8" y="4" width="24" height="32" rx="3" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
-            <circle cx="20" cy="14" r="4" stroke="#00ff88" stroke-width="1.5" fill="none"/>
-            <path d="M12 24h16M12 28h10M12 32h14" stroke="#00d4ff" stroke-width="1.5" stroke-linecap="round"/>
-            <path d="M30 14l4-4M30 14l4 4" stroke="#ffb300" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"><rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="8" r="3"/><path d="M8 16h8M8 19h5"/><path d="M18 8l3-3M18 8l3 3" stroke="var(--green)"/></svg>
         </div>
         <div class="feature-title">Mission Control</div>
-        <div class="feature-desc">Assign destinations (A, B, C) with one click. AGV autonomously navigates line-following path, handles intersections, and returns to base.</div>
+        <div class="feature-desc">Assign destinations (A, B, C) with one click. AGV autonomously navigates, handles intersections, and returns to base.</div>
       </div>
 
-      <div class="feature-card">
+      <div class="feature-card reveal reveal-delay-2">
         <div class="feature-icon">
-          <svg viewBox="0 0 40 40" fill="none">
-            <circle cx="20" cy="20" r="14" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
-            <path d="M20 8v12l8 4" stroke="#00ff88" stroke-width="2" stroke-linecap="round"/>
-            <circle cx="20" cy="20" r="3" fill="#00d4ff"/>
-            <path d="M6 20h2M32 20h2M20 6v2M20 32v2" stroke="#00d4ff" stroke-width="1" opacity="0.5"/>
-          </svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l5 3"/><circle cx="12" cy="12" r="2" fill="var(--accent)" stroke="none"/></svg>
         </div>
         <div class="feature-title">Real-time Telemetry</div>
-        <div class="feature-desc">Live sensor data streaming: ultrasonic distance, IR line follower, load cell weight, motor PWM — all updated at 2Hz via MQTT.</div>
+        <div class="feature-desc">Live sensor data streaming: ultrasonic, IR line follower, load cell, motor PWM — all at 2Hz via MQTT.</div>
       </div>
 
-      <div class="feature-card">
+      <div class="feature-card reveal reveal-delay-3">
         <div class="feature-icon">
-          <svg viewBox="0 0 40 40" fill="none">
-            <rect x="4" y="12" width="32" height="20" rx="3" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
-            <path d="M4 20h32" stroke="#00d4ff" stroke-width="1" opacity="0.3"/>
-            <path d="M8 28l4-6 4 3 4-8 4 4 4-5" stroke="#00ff88" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-            <rect x="14" y="4" width="12" height="6" rx="2" stroke="#ffb300" stroke-width="1.5" fill="none"/>
-          </svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M2 10h20" opacity="0.3"/><path d="M6 16l3-4 3 2 3-5 3 3" stroke="var(--green)"/><rect x="8" y="1" width="8" height="3" rx="1" stroke="var(--amber)"/></svg>
         </div>
         <div class="feature-title">Analytics Dashboard</div>
-        <div class="feature-desc">Historical event charts, mission success rates, sensor trend graphs, and error tracking — all in one unified dashboard.</div>
+        <div class="feature-desc">Historical event charts, mission success rates, sensor trends, and error tracking — unified dashboard.</div>
       </div>
 
-      <div class="feature-card">
+      <div class="feature-card reveal reveal-delay-1">
         <div class="feature-icon">
-          <svg viewBox="0 0 40 40" fill="none">
-            <circle cx="14" cy="16" r="6" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
-            <circle cx="26" cy="16" r="6" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
-            <circle cx="14" cy="16" r="2.5" fill="#00d4ff"/>
-            <circle cx="26" cy="16" r="2.5" fill="#00d4ff"/>
-            <path d="M10 28c0-4 4-6 10-6s10 2 10 6" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-          </svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"><circle cx="9" cy="10" r="4"/><circle cx="15" cy="10" r="4"/><circle cx="9" cy="10" r="1.5" fill="var(--accent)" stroke="none"/><circle cx="15" cy="10" r="1.5" fill="var(--accent)" stroke="none"/><path d="M6 18c0-3 3-5 6-5s6 2 6 5" stroke="var(--purple)"/></svg>
         </div>
         <div class="feature-title">RoboEyes Expressions</div>
-        <div class="feature-desc">OLED display with animated robot eyes — happy, confused, surprised, angry. AGV shows emotions based on mission state.</div>
+        <div class="feature-desc">OLED with animated robot eyes — happy, confused, surprised, angry. AGV shows emotions based on state.</div>
       </div>
 
-      <div class="feature-card">
+      <div class="feature-card reveal reveal-delay-2">
         <div class="feature-icon">
-          <svg viewBox="0 0 40 40" fill="none">
-            <path d="M20 4l16 8v12l-16 12L4 24V12z" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
-            <path d="M20 4v12l16-4M20 16L4 12" stroke="#00d4ff" stroke-width="1" opacity="0.3"/>
-            <circle cx="20" cy="20" r="4" stroke="#00ff88" stroke-width="1.5" fill="none"/>
-            <path d="M18 20l1.5 1.5L22 19" stroke="#00ff88" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"><path d="M12 2l10 5v8l-10 5L2 15V7z"/><path d="M12 2v8l10-2M12 10L2 8" opacity="0.3"/><circle cx="12" cy="12" r="3" stroke="var(--green)"/><path d="M11 12l1 1 2-2" stroke="var(--green)"/></svg>
         </div>
         <div class="feature-title">3D Simulation</div>
-        <div class="feature-desc">Interactive 3D arena built with Three.js. Visualize AGV movement, line tracks, and mission progress in real-time 3D world.</div>
+        <div class="feature-desc">Interactive 3D arena with Three.js. Visualize AGV movement, tracks, and missions in real-time 3D world.</div>
       </div>
 
-      <div class="feature-card">
+      <div class="feature-card reveal reveal-delay-3">
         <div class="feature-icon">
-          <svg viewBox="0 0 40 40" fill="none">
-            <rect x="6" y="6" width="28" height="28" rx="4" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
-            <path d="M6 14h28M14 6v28" stroke="#00d4ff" stroke-width="1" opacity="0.3"/>
-            <circle cx="24" cy="24" r="6" stroke="#ff3366" stroke-width="1.5" fill="none"/>
-            <path d="M24 21v6M21 24h6" stroke="#ff3366" stroke-width="1.5" stroke-linecap="round"/>
-            <path d="M10 10l4 4M10 10h4M10 10v4" stroke="#00ff88" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M2 10h20M10 2v20" opacity="0.2"/><circle cx="17" cy="17" r="4" stroke="var(--red)"/><path d="M17 15v4M15 17h4" stroke="var(--red)"/><path d="M5 5l3 3M5 5h3M5 5v3" stroke="var(--green)"/></svg>
         </div>
         <div class="feature-title">Obstacle Avoidance</div>
-        <div class="feature-desc">Ultrasonic sensor detects obstacles at 25cm. Servo scans left-right, AGV automatically navigates around obstacles and re-finds the line.</div>
+        <div class="feature-desc">Ultrasonic detects obstacles at 25cm. Servo scans, AGV navigates around and re-finds the line automatically.</div>
       </div>
 
     </div>
   </section>
 
-  <!-- ══ ARENA ════════════════════════════════════════════════════════════ -->
+  <!-- ══ ARENA ════════════════════════════════════════════════════════ -->
   <section id="arena" class="arena-section">
-    <div class="section-header">
+    <div class="section-header reveal">
       <div class="section-tag">// navigation</div>
       <h2 class="section-title">Arena Map</h2>
       <div class="section-line"></div>
     </div>
     <div class="arena-content">
-      <div class="arena-svg-wrap">
+      <div class="arena-svg-wrap reveal">
         <svg width="160" height="400" viewBox="0 0 120 360" fill="none">
-          <rect x="1" y="1" width="118" height="358" rx="2" stroke="#1e2a4a" stroke-width="1" fill="rgba(10,14,26,0.8)"/>
-          <line x1="70" y1="18" x2="70" y2="340" stroke="#1e2a4a" stroke-width="0.5" stroke-dasharray="4 4"/>
-          <!-- Track -->
-          <path d="M70,332 L70,28" stroke="#00d4ff" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
-          <path d="M70,332 C34,332 24,316 24,286 L24,62 C24,36 40,28 70,28" stroke="#00d4ff" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.3"/>
-          <!-- BASE -->
-          <rect x="60" y="322" width="20" height="20" rx="2" stroke="#00ff88" stroke-width="1" fill="rgba(0,255,136,0.1)"/>
-          <text x="70" y="336" text-anchor="middle" fill="#00ff88" font-family="JetBrains Mono" font-size="9">BASE</text>
-          <!-- A -->
-          <rect x="60" y="238" width="20" height="20" rx="2" stroke="#00d4ff" stroke-width="1" fill="rgba(0,212,255,0.1)"/>
-          <text x="70" y="252" text-anchor="middle" fill="#00d4ff" font-family="JetBrains Mono" font-size="9">A</text>
-          <!-- B -->
-          <rect x="60" y="140" width="20" height="20" rx="2" stroke="#ffb300" stroke-width="1" fill="rgba(255,179,0,0.1)"/>
-          <text x="70" y="154" text-anchor="middle" fill="#ffb300" font-family="JetBrains Mono" font-size="9">B</text>
-          <!-- C -->
-          <rect x="60" y="18" width="20" height="20" rx="2" stroke="#ff3366" stroke-width="1" fill="rgba(255,51,102,0.1)"/>
-          <text x="70" y="32" text-anchor="middle" fill="#ff3366" font-family="JetBrains Mono" font-size="9">C</text>
-          <!-- Blackbox markers -->
-          <rect x="66" y="280" width="8" height="8" rx="1" fill="#1e2a4a" stroke="#2a3a5a" stroke-width="0.5"/>
-          <rect x="66" y="190" width="8" height="8" rx="1" fill="#1e2a4a" stroke="#2a3a5a" stroke-width="0.5"/>
-          <rect x="66" y="90" width="8" height="8" rx="1" fill="#1e2a4a" stroke="#2a3a5a" stroke-width="0.5"/>
-          <!-- AGV marker -->
+          <rect x="1" y="1" width="118" height="358" rx="2" stroke="var(--border)" stroke-width="1" fill="rgba(6,10,20,0.8)"/>
+          <line x1="70" y1="18" x2="70" y2="340" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4 4"/>
+          <path d="M70,332 L70,28" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+          <path d="M70,332 C34,332 24,316 24,286 L24,62 C24,36 40,28 70,28" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 4" opacity="0.2"/>
+          <rect x="60" y="322" width="20" height="20" rx="2" stroke="var(--green)" stroke-width="1" fill="rgba(0,255,136,0.08)"/>
+          <text x="70" y="336" text-anchor="middle" fill="var(--green)" font-family="JetBrains Mono" font-size="9">BASE</text>
+          <rect x="60" y="238" width="20" height="20" rx="2" stroke="var(--accent)" stroke-width="1" fill="rgba(0,212,255,0.08)"/>
+          <text x="70" y="252" text-anchor="middle" fill="var(--accent)" font-family="JetBrains Mono" font-size="9">A</text>
+          <rect x="60" y="140" width="20" height="20" rx="2" stroke="var(--amber)" stroke-width="1" fill="rgba(255,179,0,0.08)"/>
+          <text x="70" y="154" text-anchor="middle" fill="var(--amber)" font-family="JetBrains Mono" font-size="9">B</text>
+          <rect x="60" y="18" width="20" height="20" rx="2" stroke="var(--red)" stroke-width="1" fill="rgba(255,51,102,0.08)"/>
+          <text x="70" y="32" text-anchor="middle" fill="var(--red)" font-family="JetBrains Mono" font-size="9">C</text>
+          <rect x="66" y="280" width="8" height="8" rx="1" fill="var(--bg)" stroke="var(--border2)" stroke-width="0.5"/>
+          <rect x="66" y="190" width="8" height="8" rx="1" fill="var(--bg)" stroke="var(--border2)" stroke-width="0.5"/>
+          <rect x="66" y="90" width="8" height="8" rx="1" fill="var(--bg)" stroke="var(--border2)" stroke-width="0.5"/>
           <g transform="translate(70,332)">
-            <circle r="10" fill="rgba(0,212,255,0.15)" stroke="#00d4ff" stroke-width="1"/>
-            <circle r="4" fill="#00d4ff"/>
+            <circle r="10" fill="rgba(0,212,255,0.1)" stroke="var(--accent)" stroke-width="1"/>
+            <circle r="4" fill="var(--accent)"/>
+            <animateTransform attributeName="transform" type="scale" values="1;1.05;1" dur="2s" repeatCount="indefinite" additive="sum"/>
           </g>
         </svg>
       </div>
-      <div class="arena-info">
+      <div class="arena-info reveal reveal-delay-2">
         <h3>Straight-Line Track</h3>
-        <p>The arena features a straight track with 3 delivery destinations (A, B, C) and 3 blackbox intersection markers. AGV follows the line from BASE to assigned destination, waits for cargo pickup, then autonomously returns.</p>
+        <p>The arena features a straight track with 3 delivery destinations and 3 blackbox intersection markers. AGV follows the line from BASE to assigned destination, waits for cargo pickup, then autonomously returns.</p>
         <p>Each blackbox marker increments a counter, allowing the AGV to determine when it has reached the correct destination.</p>
         <div class="arena-nodes">
-          <div class="arena-node-chip"><div class="dot dot-base"></div>BASE — Start/Return</div>
+          <div class="arena-node-chip"><div class="dot dot-base"></div>BASE — Start</div>
           <div class="arena-node-chip"><div class="dot dot-a"></div>A — Nearest</div>
           <div class="arena-node-chip"><div class="dot dot-b"></div>B — Mid-range</div>
           <div class="arena-node-chip"><div class="dot dot-c"></div>C — Farthest</div>
@@ -703,97 +546,161 @@
     </div>
   </section>
 
-  <!-- ══ TECH STACK ═══════════════════════════════════════════════════════ -->
+  <!-- ══ TECH STACK ═══════════════════════════════════════════════════ -->
   <section id="tech">
-    <div class="section-header">
+    <div class="section-header reveal">
       <div class="section-tag">// technology</div>
       <h2 class="section-title">Tech Stack</h2>
       <div class="section-line"></div>
     </div>
-    <div class="tech-grid">
-      <div class="tech-chip">
-        <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="14" rx="2" stroke="#00d4ff" stroke-width="1.2"/><path d="M6 6h6M6 9h6M6 12h4" stroke="#00d4ff" stroke-width="1" stroke-linecap="round"/></svg>
-        ESP32
-      </div>
-      <div class="tech-chip">
-        <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="#00ff88" stroke-width="1.2"/><path d="M9 5v4l3 2" stroke="#00ff88" stroke-width="1.2" stroke-linecap="round"/></svg>
-        Arduino
-      </div>
-      <div class="tech-chip">
-        <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="6" width="12" height="8" rx="1.5" stroke="#ffb300" stroke-width="1.2"/><path d="M6 6V4.5A3 3 0 0112 4.5V6" stroke="#ffb300" stroke-width="1.2"/></svg>
-        MQTT
-      </div>
-      <div class="tech-chip">
-        <svg viewBox="0 0 18 18" fill="none"><path d="M9 2l7 4v6l-7 4-7-4V6z" stroke="#a855f7" stroke-width="1.2" fill="none"/></svg>
-        Node.js
-      </div>
-      <div class="tech-chip">
-        <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="14" rx="7" stroke="#00d4ff" stroke-width="1.2"/><path d="M6 9h6M9 6v6" stroke="#00d4ff" stroke-width="1.2" stroke-linecap="round"/></svg>
-        WebSocket
-      </div>
-      <div class="tech-chip">
-        <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="10" rx="2" stroke="#00ff88" stroke-width="1.2"/><path d="M5 8h8M5 11h5" stroke="#00ff88" stroke-width="1" stroke-linecap="round"/></svg>
-        PostgreSQL
-      </div>
-      <div class="tech-chip">
-        <svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="#ff3366" stroke-width="1.2"/><path d="M6 9c1-3 5-3 6 0s-3 5-6 0" stroke="#ff3366" stroke-width="1.2" fill="none"/></svg>
-        RoboEyes
-      </div>
-      <div class="tech-chip">
-        <svg viewBox="0 0 18 18" fill="none"><path d="M3 14l4-10 4 6 4-8" stroke="#00d4ff" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>
-        Three.js
-      </div>
-      <div class="tech-chip">
-        <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="14" rx="2" stroke="#ffb300" stroke-width="1.2"/><rect x="5" y="5" width="8" height="8" rx="1" stroke="#ffb300" stroke-width="1"/></svg>
-        Docker
-      </div>
+    <div class="tech-grid reveal">
+      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="14" rx="2" stroke="var(--accent)" stroke-width="1.2"/><path d="M6 6h6M6 9h6M6 12h4" stroke="var(--accent)" stroke-width="1" stroke-linecap="round"/></svg>ESP32</div>
+      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="var(--green)" stroke-width="1.2"/><path d="M9 5v4l3 2" stroke="var(--green)" stroke-width="1.2" stroke-linecap="round"/></svg>Arduino</div>
+      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><rect x="3" y="6" width="12" height="8" rx="1.5" stroke="var(--amber)" stroke-width="1.2"/><path d="M6 6V4.5A3 3 0 0112 4.5V6" stroke="var(--amber)" stroke-width="1.2"/></svg>MQTT</div>
+      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><path d="M9 2l7 4v6l-7 4-7-4V6z" stroke="var(--purple)" stroke-width="1.2" fill="none"/></svg>Node.js</div>
+      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="14" rx="7" stroke="var(--accent)" stroke-width="1.2"/><path d="M6 9h6M9 6v6" stroke="var(--accent)" stroke-width="1.2" stroke-linecap="round"/></svg>WebSocket</div>
+      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="10" rx="2" stroke="var(--green)" stroke-width="1.2"/><path d="M5 8h8M5 11h5" stroke="var(--green)" stroke-width="1" stroke-linecap="round"/></svg>PostgreSQL</div>
+      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="var(--red)" stroke-width="1.2"/><path d="M6 9c1-3 5-3 6 0s-3 5-6 0" stroke="var(--red)" stroke-width="1.2" fill="none"/></svg>RoboEyes</div>
+      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><path d="M3 14l4-10 4 6 4-8" stroke="var(--accent)" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>Three.js</div>
+      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="14" rx="2" stroke="var(--amber)" stroke-width="1.2"/><rect x="5" y="5" width="8" height="8" rx="1" stroke="var(--amber)" stroke-width="1"/></svg>Docker</div>
     </div>
   </section>
 
-  <!-- ══ CREATOR ══════════════════════════════════════════════════════════ -->
+  <!-- ══ CREATOR ══════════════════════════════════════════════════════ -->
   <section id="team" class="creator-section">
-    <div class="section-header">
+    <div class="section-header reveal">
       <div class="section-tag">// team</div>
       <h2 class="section-title">Built By</h2>
       <div class="section-line"></div>
     </div>
-    <div class="creator-card">
+    <div class="creator-card reveal">
       <div class="creator-avatar">A</div>
       <div class="creator-name">Alpha</div>
       <div class="creator-role">Lead Developer & System Architect</div>
       <div class="creator-team">
-        <div class="team-member">
-          <div class="team-avatar">D</div>
-          <div class="team-name">Dzaki</div>
-        </div>
-        <div class="team-member">
-          <div class="team-avatar">D</div>
-          <div class="team-name">Derby</div>
-        </div>
-        <div class="team-member">
-          <div class="team-avatar">I</div>
-          <div class="team-name">Ilyas</div>
-        </div>
+        <div class="team-member"><div class="team-avatar">D</div><div class="team-name">Dzaki</div></div>
+        <div class="team-member"><div class="team-avatar">D</div><div class="team-name">Derby</div></div>
+        <div class="team-member"><div class="team-avatar">I</div><div class="team-name">Ilyas</div></div>
       </div>
     </div>
   </section>
 
-  <!-- ══ CTA ══════════════════════════════════════════════════════════════ -->
+  <!-- ══ CTA ══════════════════════════════════════════════════════════ -->
   <section class="cta-section">
-    <h2 class="cta-title">Ready to Control?</h2>
-    <p class="cta-sub">Access the mission control terminal to start autonomous deliveries.</p>
-    <a class="btn-enter" href="/login" style="font-size:13px;padding:14px 36px;">
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <path d="M7 3L13 9L7 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      </svg>
+    <h2 class="cta-title reveal">Ready to Control?</h2>
+    <p class="cta-sub reveal reveal-delay-1">Access the mission control terminal to start autonomous deliveries.</p>
+    <a class="btn-enter reveal reveal-delay-2" href="/login" style="font-size:12px;padding:14px 40px;position:relative;">
+      <svg width="16" height="16" viewBox="0 0 18 18" fill="none"><path d="M7 3L13 9L7 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       Enter Terminal
     </a>
   </section>
 
-  <!-- ══ FOOTER ═══════════════════════════════════════════════════════════ -->
-  <footer>
-    <span>XORA</span> AGV System v4.0.0 &middot; ESP32 + Node.js + MQTT + PostgreSQL &middot; 2026
-  </footer>
+  <!-- ══ FOOTER ════════════════════════════════════════════════════════ -->
+  <footer><span>XORA</span> AGV System v4.0.0 &middot; ESP32 + Node.js + MQTT + PostgreSQL &middot; 2026</footer>
+
+  <!-- ══ SCRIPTS ═══════════════════════════════════════════════════════ -->
+  <script>
+    // ── Stars Canvas (Parallax Background) ─────────────────────────────
+    (function() {
+      const canvas = document.getElementById('stars-canvas');
+      const ctx = canvas.getContext('2d');
+      let w, h, stars = [], mouseX = 0, mouseY = 0;
+
+      function resize() {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      // Create stars
+      for (let i = 0; i < 120; i++) {
+        stars.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          size: Math.random() * 1.5 + 0.3,
+          speed: Math.random() * 0.3 + 0.05,
+          opacity: Math.random() * 0.5 + 0.1,
+          parallax: Math.random() * 0.5 + 0.1,
+        });
+      }
+
+      document.addEventListener('mousemove', e => {
+        mouseX = (e.clientX / w - 0.5) * 2;
+        mouseY = (e.clientY / h - 0.5) * 2;
+      });
+
+      function draw() {
+        ctx.clearRect(0, 0, w, h);
+        stars.forEach(s => {
+          const px = s.x + mouseX * s.parallax * 30;
+          const py = s.y + mouseY * s.parallax * 20;
+          ctx.beginPath();
+          ctx.arc(px, py, s.size, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(0, 212, 255, ${s.opacity})`;
+          ctx.fill();
+          // Subtle glow
+          if (s.size > 1) {
+            ctx.beginPath();
+            ctx.arc(px, py, s.size * 3, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(0, 212, 255, ${s.opacity * 0.1})`;
+            ctx.fill();
+          }
+        });
+        requestAnimationFrame(draw);
+      }
+      draw();
+    })();
+
+    // ── Nav Scroll Effect ──────────────────────────────────────────────
+    window.addEventListener('scroll', () => {
+      document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 50);
+    });
+
+    // ── Reveal on Scroll ──────────────────────────────────────────────
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+    // ── Counter Animation ─────────────────────────────────────────────
+    const counterObserver = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          const el = e.target;
+          const target = parseInt(el.dataset.count);
+          if (!target) return;
+          let current = 0;
+          const step = Math.max(1, Math.floor(target / 30));
+          const interval = setInterval(() => {
+            current += step;
+            if (current >= target) { current = target; clearInterval(interval); }
+            el.textContent = current;
+          }, 50);
+          counterObserver.unobserve(el);
+        }
+      });
+    }, { threshold: 0.5 });
+    document.querySelectorAll('[data-count]').forEach(el => counterObserver.observe(el));
+
+    // ── Feature Card Mouse Glow ───────────────────────────────────────
+    document.querySelectorAll('.feature-card').forEach(card => {
+      card.addEventListener('mousemove', e => {
+        const rect = card.getBoundingClientRect();
+        card.style.setProperty('--mx', ((e.clientX - rect.left) / rect.width * 100) + '%');
+        card.style.setProperty('--my', ((e.clientY - rect.top) / rect.height * 100) + '%');
+      });
+    });
+
+    // ── Parallax on Hero ──────────────────────────────────────────────
+    window.addEventListener('scroll', () => {
+      const scrollY = window.scrollY;
+      const hero = document.getElementById('hero');
+      if (!hero) return;
+      const glow = hero.querySelector('.hero-glow');
+      if (glow) glow.style.transform = `translate(-50%, calc(-50% + ${scrollY * 0.3}px))`;
+    });
+  </script>
 
 </body>
 </html>
