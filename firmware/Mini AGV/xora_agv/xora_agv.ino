@@ -1,4 +1,4 @@
-// XORA AGV — Mission-Based Firmware PERFECT/STABLE VERSION
+// XORA AGV — Mission-Based Firmware
 // ================= PIN MOTOR (L298N) =================
 #define ENA 25
 #define IN1 26
@@ -30,18 +30,17 @@
 
 // ================= LIBRARY =================
 #include <WiFi.h>
+#include <WiFiManager.h>        // AP portal untuk config WiFi tanpa compile ulang
 #include <PubSubClient.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <FluxGarage_RoboEyes.h> // RoboEyes library — mata ekspresif animasi
 #include <ESP32Servo.h>
 #include <HX711.h>
 
-// ================= WIFI & MQTT =================
-const char* WIFI_SSID     = "KOSTAN BUK NIE";
-const char* WIFI_PASSWORD = "OMAHAPIK4B";
-
-const char* MQTT_HOST     = "broker.hivemq.com";
+// ================= MQTT (WiFi via WiFiManager, tidak hardcoded) =================
+const char* MQTT_HOST     = "156.230.188.87";  // VPS MQTT broker
 const uint16_t MQTT_PORT  = 1883;
 const char* MQTT_USER     = "";
 const char* MQTT_PASSWORD = "";
@@ -55,13 +54,39 @@ String mqttTopicState;
 String mqttTopicTelemetry;
 String mqttTopicStatus;
 
-unsigned long wifiReconnectTimer = 0;
 unsigned long mqttReconnectTimer = 0;
 
 // ================= OLED =================
 #define OLED_WIDTH  128
 #define OLED_HEIGHT 64
 Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
+
+// ================= ROBOEYES (FluxGarage Library) =================
+RoboEyes<Adafruit_SSD1306> eyes(display);  // Instance RoboEyes dengan display SSD1306
+
+// ================= OLED DISPLAY MODE =================
+// Prinsip: TIDAK PERNAH tampilkan mata + text bersamaan.
+// Mata = full screen. Text = full screen. Exclusive.
+
+enum OledMode {
+  OLED_BOOT_TEXT,    // Boot: text saja
+  OLED_EYES,         // Idle: mata besar (default)
+  OLED_EYES_MOOD,    // Ekspresi sementara (happy/confused/angry), lalu balik ke EYES
+  OLED_TEXT           // Text mission/status, tanpa mata
+};
+
+OledMode oledMode = OLED_BOOT_TEXT;
+
+// Mood sementara (auto-revert ke default)
+enum TempMood { TEMP_MOOD_NONE, TEMP_MOOD_HAPPY, TEMP_MOOD_CONFUSED, TEMP_MOOD_SURPRISED, TEMP_MOOD_ANGRY };
+TempMood currentTempMood = TEMP_MOOD_NONE;
+unsigned long tempMoodStartedAt = 0;
+const unsigned long TEMP_MOOD_DURATION_MS = 2500;
+
+// Text display
+String textLine1 = "";
+String textLine2 = "";
+String textLine3 = "";
 
 // ================= SERVO =================
 Servo servoScan;
@@ -129,21 +154,20 @@ int turnPowerKiri  = 220;
 int turnPowerKanan = 230;
 
 // ================= OBSTACLE — PARAMETER SEDERHANA =================
-// Pola: Kanan → Maju → Kiri → Maju cari garis
 #define JARAK_HALANGAN_CM 25
 const unsigned long OBSTACLE_COOLDOWN_MS = 1200;
 
-int avoidTurnRightMs   = 500;   // durasi putar kanan
-int avoidTurnRightPwm  = 180;   // power putar kanan
+int avoidTurnRightMs   = 500;
+int avoidTurnRightPwm  = 180;
 
-int avoidForward1Ms    = 900;   // maju setelah kanan (lewati halangan)
-int avoidForward1Spd   = 145;   // speed maju 1
+int avoidForward1Ms    = 900;
+int avoidForward1Spd   = 145;
 
-int avoidTurnLeftMs    = 800;   // durasi putar kiri (balik ke arah semula)
-int avoidTurnLeftPwm   = 180;   // power putar kiri
+int avoidTurnLeftMs    = 800;
+int avoidTurnLeftPwm   = 180;
 
-int avoidForward2Ms    = 650;   // maju cari garis setelah kiri
-int avoidForward2Spd   = 145;   // speed maju 2
+int avoidForward2Ms    = 650;
+int avoidForward2Spd   = 145;
 
 int obstacleServoStepDeg   = 10;
 int obstacleServoStepDelayMs = 18;
@@ -198,32 +222,42 @@ const unsigned long BLACKBOX_EXIT_STABLE_MS  = 250;
 const unsigned long BLACKBOX_ENTER_STABLE_MS = 80;
 const unsigned long BLACKBOX_DEBOUNCE_MS     = 250;
 
-// ================= ROBOT EYES - EXPRESSION SYSTEM =================
-enum EyeExpression {
-  EYE_HAPPY,      // Senang - mata senyum lengkung atas
-  EYE_NEUTRAL,    // Netral - mata bulat normal
-  EYE_BLINK,      // Kedip - mata setengah tutup
-  EYE_SLEEPY,     // Ngantuk - mata setengah terpejam, idle lama
-  EYE_CONFUSED,   // Bingung - mata tidak simetris, satu besar satu kecil
-  EYE_ERROR,      // Error - mata X
-  EYE_EXCITED,    // Semangat - mata besar dengan sparkle
-  EYE_WINK,       // Kedip sebelah - playful
-  EYE_LOOK_LEFT,  // Lihat kiri
-  EYE_LOOK_RIGHT  // Lihat kanan
+// ================= ALIVE MODE =================
+// Mode "hidup" — AGV bergerak natural saat idle
+// Trigger: MQTT "alive:on" / "alive:off"
+bool aliveMode = false;
+
+enum AliveState {
+  ALIVE_IDLE,              // Diam, tunggu inisiasi
+  ALIVE_TURN_RIGHT,        // Belok kanan sedikit
+  ALIVE_PAUSE_1,           // Diam 5 detik, servo gerak
+  ALIVE_RETURN_CENTER_1,   // Kembali ke posisi tengah
+  ALIVE_TURN_LEFT,         // Belok kiri sedikit
+  ALIVE_MAJU,              // Maju sedikit
+  ALIVE_PAUSE_2,           // Diam 5 detik, servo gerak
+  ALIVE_RETURN_CENTER_2,   // Kembali ke posisi tengah
+  ALIVE_PAUSE_3,           // Diam 5 detik, servo gerak
+  ALIVE_REST               // Diam sebentar sebelum ulang
 };
 
-EyeExpression currentEyeExpr = EYE_NEUTRAL;
-unsigned long lastEventTime = 0;
-unsigned long lastBlinkTime = 0;
-unsigned long lastEyeAnimTime = 0;
-bool isBlinking = false;
-int eyeAnimPhase = 0;
+AliveState aliveState = ALIVE_IDLE;
+unsigned long aliveStateAt = 0;
+unsigned long aliveServoLastMove = 0;
+int aliveServoTarget = SERVO_DEPAN;
+int aliveServoCurrent = SERVO_DEPAN;
+bool aliveServoDirection = true;  // true = ke kanan, false = ke kiri
+unsigned long aliveServoStepAt = 0;
 
-// Idle detection threshold (ms)
-const unsigned long IDLE_THRESHOLD_NORMAL = 5000;   // 5 detik -> mulai blink
-const unsigned long IDLE_THRESHOLD_SLEEPY  = 15000;  // 15 detik -> sleepy eyes
-const unsigned long BLINK_INTERVAL = 3000;           // Kedip tiap 3 detik
-const unsigned long BLINK_DURATION = 150;            // Durasi kedip 150ms
+const unsigned long ALIVE_TURN_DURATION_MS   = 800;   // Durasi belok
+const int           ALIVE_TURN_PWM           = 100;   // Power belok (pelan)
+const unsigned long ALIVE_MAJU_DURATION_MS   = 600;   // Durasi maju
+const int           ALIVE_MAJU_PWM           = 90;    // Power maju (pelan)
+const unsigned long ALIVE_PAUSE_DURATION_MS  = 5000;  // Diam 5 detik sambil servo gerak
+const unsigned long ALIVE_REST_DURATION_MS   = 3000;  // Diam sebelum ulang
+const unsigned long ALIVE_SERVO_INTERVAL_MS  = 1500;  // Servo gerak tiap 1.5 detik
+const unsigned long ALIVE_SERVO_STEP_MS      = 15;    // Delay antar step servo (non-blocking)
+const int           ALIVE_SERVO_RANGE        = 30;    // Servo belok ±30° dari tengah
+const int           ALIVE_SERVO_STEP_DEG     = 2;     // Derajat per step servo
 
 // ================= FORWARD DECLARATION =================
 void followLine(int vL, int vM, int vR, int irL, int irR);
@@ -235,23 +269,6 @@ void putarKiri(int spd);
 long bacaJarak();
 void servoKe(int sudut, int tunda);
 void scanDanHindari();
-void oledTulis(String b1, String b2, String b3);
-void oledDisplay(EyeExpression expr, String b1, String b2, String b3);
-void oledDisplayWithText(EyeExpression expr, String b1, String b2);
-void drawRobotEyes(EyeExpression expr);
-void drawHappyEyes();
-void drawNeutralEyes();
-void drawBlinkEyes();
-void drawSleepyEyes();
-void drawConfusedEyes();
-void drawErrorEyes();
-void drawExcitedEyes();
-void drawWinkEyes();
-void drawLookLeftEyes();
-void drawLookRightEyes();
-void updateEyeExpression();
-void setEyeExpression(EyeExpression expr);
-void markEvent();
 void buzzerBeep(int durasi);
 bool tareLoadcell(const char* reason);
 void bacaLoadcell();
@@ -274,6 +291,14 @@ bool cargoStableAbsent();
 int durasiBelokPulang();
 void mulaiCariGarisPulangB();
 
+// OLED mode forward declarations
+void setOledMode(OledMode mode);
+void setOledMood(TempMood mood);
+void setOledText(String l1, String l2, String l3);
+void updateTempMood();
+void updateAliveMode();
+void aliveOff();
+
 // ================================================
 void setup() {
   Serial.begin(115200);
@@ -281,8 +306,54 @@ void setup() {
   Serial.println();
   Serial.println("=== XORA AGV BOOT ===");
 
+  // --- OLED init dulu agar WiFi portal bisa tampil ---
+  Wire.begin(OLED_SDA, OLED_SCL);
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("OLED: init failed");
+  } else {
+    display.clearDisplay();
+    display.display();
+    // Init RoboEyes library — mata besar animasi
+    eyes.setFramerate(20);           // 20 FPS untuk animasi smooth
+    eyes.setAutoblinker(ON, 3, 2);  // Auto-blink: ON, interval 3-5 detik
+    eyes.setMood(DEFAULT);           // Mood default = netral
+    eyes.setIdleMode(ON, 2, 4);     // Idle look: ON, interval 2-4 detik
+  }
+
+  // --- WiFi via WiFiManager (AP Portal) ---
+  setOledMode(OLED_BOOT_TEXT);
+  setOledText("XORA AGV", "Connecting WiFi...", "");
+  updateDisplay();
+
+  WiFiManager wm;
+  wm.setConfigPortalTimeout(180);  // Portal timeout 3 menit
+
+  // Callback saat portal aktif
+  wm.setAPCallback([](WiFiManager* mgr) {
+    setOledMode(OLED_BOOT_TEXT);
+    setOledText("WiFi Setup", "Hubungkan ke:", mgr->getConfigPortalSSID().c_str());
+    updateDisplay();
+  });
+
+  // Auto-connect, gagal → buka AP portal
+  if (!wm.autoConnect("XORA-AGV-Setup")) {
+    setOledMode(OLED_BOOT_TEXT);
+    setOledText("WiFi GAGAL", "Restarting...", "");
+    updateDisplay();
+    delay(2000);
+    ESP.restart();
+  }
+
+  // WiFi connected
+  setOledMode(OLED_BOOT_TEXT);
+  setOledText("WiFi OK!", WiFi.localIP().toString().c_str(), "");
+  updateDisplay();
+  delay(1500);
+
+  // --- MQTT ---
   setupJaringan();
 
+  // --- Hardware ---
   servoScan.setPeriodHertz(50);
   servoScan.attach(SERVO_PIN, 500, 2400);
   delay(100);
@@ -309,14 +380,6 @@ void setup() {
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, LOW);
 
-  Wire.begin(OLED_SDA, OLED_SCL);
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println("OLED: init failed");
-  } else {
-    display.clearDisplay();
-    display.display();
-  }
-
   Serial.println("HX711: Init...");
   scale.begin(HX711_DT, HX711_SCK);
   delay(1000);
@@ -331,9 +394,12 @@ void setup() {
   tareLoadcell("BOOT");
 
   stopMotor();
-  oledDisplay(EYE_EXCITED, "SIAP", "Kalibrasi", "sensor...");
-  buzzerBeep(200);
 
+  // Boot: text saja
+  setOledMode(OLED_BOOT_TEXT);
+  setOledText("SIAP", "Kalibrasi sensor...", "");
+  updateDisplay();
+  buzzerBeep(200);
   delay(2000);
 
   for (int i = 0; i < 10; i++) {
@@ -343,8 +409,9 @@ void setup() {
   }
 
   delay(1000);
-  oledDisplay(EYE_HAPPY, "IDLE", "Siap terima", "perintah");
-  markEvent();
+
+  // Boot selesai → masuk mode idle (mata)
+  setOledMode(OLED_EYES);
   kirimState();
 
   Serial.println("=== XORA AGV READY ===");
@@ -368,34 +435,13 @@ void loop() {
 
   bacaLoadcell();
 
-  // Update robot eyes animation - idle detection & blink
-  updateEyeExpression();
+  // Update OLED display
+  updateTempMood();
+  updateDisplay();
 
-  // Refresh OLED display periodically when idle (for eye animations)
-  static unsigned long lastDisplayRefresh = 0;
-  if (missionState == IDLE || missionState == SELESAI) {
-    if (millis() - lastDisplayRefresh >= 200) {  // Refresh 5x per second for smooth animation
-      lastDisplayRefresh = millis();
-      display.clearDisplay();
-      display.setTextColor(SSD1306_WHITE);
-      drawRobotEyes(currentEyeExpr);
-      display.setTextSize(1);
-      display.setCursor(0, 30);
-      if (missionState == IDLE) {
-        display.println("IDLE");
-        display.setCursor(0, 42);
-        display.println("Siap terima");
-        display.setCursor(0, 54);
-        display.println("perintah");
-      } else {
-        display.println("SELESAI");
-        display.setCursor(0, 42);
-        display.println("Sampai base");
-        display.setCursor(0, 54);
-        display.println(":)");
-      }
-      display.display();
-    }
+  // Alive mode (hanya saat idle dan tidak ada misi)
+  if (aliveMode && missionState == IDLE) {
+    updateAliveMode();
   }
 
   // Baca ultrasonik
@@ -430,8 +476,8 @@ void loop() {
     if (jarakTerakhir > 0 && jarakTerakhir <= JARAK_HALANGAN_CM) {
       stopMotor();
       buzzerBeep(300);
-      oledDisplay(EYE_ERROR, "HALANGAN!", String(jarakTerakhir) + " cm", "Menghindar...");
-      markEvent();
+      setOledMood(TEMP_MOOD_SURPRISED);
+      setOledText("HALANGAN!", String(jarakTerakhir) + " cm", "Menghindar...");
       jarakTerakhir = 999;
       scanDanHindari();
       obstacleCooldownUntil = millis() + OBSTACLE_COOLDOWN_MS;
@@ -461,25 +507,30 @@ void loop() {
 
     case IDLE:
       stopMotor();
+      // Saat idle tanpa alive mode → tampilkan mata netral
+      if (!aliveMode && oledMode != OLED_EYES) {
+        setOledMode(OLED_EYES);
+      }
       break;
 
     case MENUNGGU_BARANG:
       stopMotor();
       if (cargoStablePresent()) {
         buzzerBeep(200);
+        // Barang terdeteksi → mata senang dulu, lalu text
         String nama = (missionTarget == 1) ? "A" : (missionTarget == 2) ? "B" : "C";
-        oledDisplay(EYE_EXCITED, "BARANG ADA!", "Ke titik " + nama, "Berangkat!");
-        markEvent();
+        setOledMood(TEMP_MOOD_HAPPY);
+        setOledText("BARANG ADA!", "Ke titik " + nama, "Berangkat!");
         missionState = KEBERANGKATAN;
         kirimState();
       } else {
-        // Refresh display periodically when waiting for cargo
+        // Menunggu barang → mata bingung (full screen eyes, tanpa text)
         static unsigned long lastCargoWaitRefresh = 0;
-        if (millis() - lastCargoWaitRefresh >= 500) {
+        if (millis() - lastCargoWaitRefresh >= 300) {
           lastCargoWaitRefresh = millis();
-          String nama = (missionTarget == 1) ? "A" : (missionTarget == 2) ? "B" : "C";
-          oledDisplay(EYE_CONFUSED, "MISI " + nama, "Tunggu barang...", String(loadcellGram, 0) + "g");
-          markEvent();
+          if (oledMode != OLED_EYES_MOOD) {
+            setOledMood(TEMP_MOOD_CONFUSED);
+          }
         }
       }
       break;
@@ -493,8 +544,8 @@ void loop() {
         missionState  = SAMPAI;
         waitingAtDest = true;
         arrivedTimer  = 0;
-        oledDisplay(EYE_HAPPY, "SAMPAI!", "Tujuan " + String(missionTarget), "Tunggu barang...");
-        markEvent();
+        // Sampai tujuan → mata senang dulu
+        setOledMood(TEMP_MOOD_HAPPY);
         kirimState();
         break;
       }
@@ -507,13 +558,19 @@ void loop() {
 
       if (waitingAtDest) {
         if (!cargoStableAbsent()) {
-          oledDisplay(EYE_CONFUSED, "SAMPAI!", "Barang: " + String(loadcellGram, 0) + "g", "Tunggu diambil...");
-          markEvent();
+          // Menunggu barang diambil → mata netral (menunggu)
+          static unsigned long lastDestRefresh = 0;
+          if (millis() - lastDestRefresh >= 500) {
+            lastDestRefresh = millis();
+            if (oledMode != OLED_EYES_MOOD) {
+              setOledMode(OLED_EYES);  // Mata netral menunggu
+            }
+          }
         } else {
           if (arrivedTimer == 0) {
             arrivedTimer = millis();
-            oledDisplay(EYE_WINK, "BARANG DIAMBIL", "Tunggu 3dtk...", "");
-            markEvent();
+            // Barang diambil → mata senang
+            setOledMood(TEMP_MOOD_HAPPY);
             buzzerBeep(200);
           }
 
@@ -528,8 +585,9 @@ void loop() {
               delay(100);
             }
 
-            oledDisplay((turnDirection == 1) ? EYE_LOOK_RIGHT : EYE_LOOK_LEFT, "BELOK", (turnDirection == 1) ? "Kanan" : "Kiri", "");
-            markEvent();
+            // Text: belok
+            setOledMode(OLED_TEXT);
+            setOledText("BELOK", (turnDirection == 1) ? "Kanan" : "Kiri", "");
 
             if (turnDirection == 1) putarKanan(turnPowerKanan);
             else                    putarKiri(turnPowerKiri);
@@ -548,8 +606,9 @@ void loop() {
 
             missionState = PULANG;
             kirimState();
-            oledDisplay(EYE_LOOK_LEFT, "PULANG", "Ke base...", "");
-            markEvent();
+            // Text: pulang
+            setOledMode(OLED_TEXT);
+            setOledText("PULANG", "Ke base...", "");
           }
         }
       }
@@ -563,8 +622,8 @@ void loop() {
 
         if (!lineSeen && !searchTimeout) {
           setMotors(bReturnSearchLeftPwm, bReturnSearchRightPwm);
-          oledDisplay(EYE_LOOK_RIGHT, "PULANG B", "Cari garis", "kanan...");
-          markEvent();
+          setOledMode(OLED_TEXT);
+          setOledText("PULANG B", "Cari garis", "kanan...");
           break;
         }
 
@@ -582,8 +641,8 @@ void loop() {
         buzzerBeep(200);
         bReturnSearchLine = false;
         missionState = SELESAI;
-        oledDisplay(EYE_HAPPY, "PULANG!", "Sampai base", ":)");
-        markEvent();
+        // Sampai base → mata senang
+        setOledMood(TEMP_MOOD_HAPPY);
         kirimState();
         break;
       }
@@ -593,6 +652,10 @@ void loop() {
 
     case SELESAI:
       stopMotor();
+      // Selesai → mata senang/neutral
+      if (oledMode != OLED_EYES_MOOD) {
+        setOledMode(OLED_EYES);
+      }
       break;
 
     case MANUAL:
@@ -613,70 +676,235 @@ void loop() {
     Serial.print(" MQTT="); Serial.print(mqttClient.connected() ? "OK" : "FAIL");
     Serial.print(" US="); Serial.print(jarakTerakhir);
     Serial.print("cm LC="); Serial.print(loadcellGram, 1);
-    Serial.print("g HX="); Serial.println(scale.is_ready() ? "OK" : "FAIL");
+    Serial.print("g HX="); Serial.print(scale.is_ready() ? "OK" : "FAIL");
+    Serial.print(" Alive="); Serial.println(aliveMode ? "ON" : "OFF");
   }
 
   delay(2);
 }
 
-// ================= OBSTACLE — LOGIC BARU SEDERHANA =================
-// Pola: STOP → Kanan → Maju → Kiri → Maju cari garis → lanjut follow line
-void scanDanHindari() {
-    // Servo sweep dulu sebelum hindari
-  oledDisplay(EYE_CONFUSED, "HALANGAN", "Scan servo", "0->180->90");
-  markEvent();
-  servoKe(SERVO_KANAN, 120);   // ke 0°
-  for (int s = SERVO_KANAN; s <= SERVO_KIRI; s += obstacleServoStepDeg) {
-      servoScan.write(s);
-      delay(obstacleServoStepDelayMs);
+// ================= ALIVE MODE — GERAKAN NATURAL =================
+// AGV bergerak lucu saat idle: belok kanan-diam-belok kiri-diam
+// Trigger dari web: MQTT "alive:on" / "alive:off"
+void updateAliveMode() {
+  unsigned long now = millis();
+
+  // Helper: gerakkan servo satu step non-blocking
+  // Return true jika masih bergerak, false jika sudah sampai target
+  auto servoStepNonBlocking = [&](int target) -> bool {
+    if (now - aliveServoStepAt < ALIVE_SERVO_STEP_MS) return true;
+    aliveServoStepAt = now;
+    aliveServoCurrent = servoScan.read();
+    if (aliveServoCurrent == target) return false;
+    int step = (target > aliveServoCurrent) ? ALIVE_SERVO_STEP_DEG : -ALIVE_SERVO_STEP_DEG;
+    int next = aliveServoCurrent + step;
+    // Clamp ke target
+    if ((step > 0 && next > target) || (step < 0 && next < target)) next = target;
+    servoScan.write(next);
+    return true;
+  };
+
+  switch (aliveState) {
+    case ALIVE_IDLE:
+      // Mulai sekuens: belok kanan sedikit
+      aliveState = ALIVE_TURN_RIGHT;
+      aliveStateAt = now;
+      setMotors(ALIVE_TURN_PWM, -ALIVE_TURN_PWM);  // Belok kanan pelan
+      setOledMode(OLED_EYES);
+      break;
+
+    case ALIVE_TURN_RIGHT:
+      if (now - aliveStateAt >= ALIVE_TURN_DURATION_MS) {
+        stopMotor();
+        aliveState = ALIVE_PAUSE_1;
+        aliveStateAt = now;
+        aliveServoLastMove = 0;
+        aliveServoTarget = SERVO_DEPAN + ALIVE_SERVO_RANGE;
+        aliveServoDirection = true;
+        aliveServoStepAt = now;
+      }
+      break;
+
+    case ALIVE_PAUSE_1:
+      // Diam 5 detik sambil servo gerak natural (NON-BLOCKING)
+      if (now - aliveServoLastMove >= ALIVE_SERVO_INTERVAL_MS && aliveServoLastMove != 0) {
+        // Ganti target servo
+        aliveServoTarget = aliveServoDirection ? (SERVO_DEPAN + ALIVE_SERVO_RANGE) : (SERVO_DEPAN - ALIVE_SERVO_RANGE);
+        aliveServoDirection = !aliveServoDirection;
+        aliveServoLastMove = now;
+        aliveServoStepAt = now;
+      }
+      if (aliveServoLastMove == 0) {
+        // Pertama kali masuk state ini
+        aliveServoLastMove = now;
+        aliveServoStepAt = now;
+      }
+      // Servo gerak satu step (non-blocking)
+      servoStepNonBlocking(aliveServoTarget);
+      if (now - aliveStateAt >= ALIVE_PAUSE_DURATION_MS) {
+        aliveState = ALIVE_RETURN_CENTER_1;
+        aliveStateAt = now;
+      }
+      break;
+
+    case ALIVE_RETURN_CENTER_1:
+      // Kembali ke posisi tengah (NON-BLOCKING)
+      if (!servoStepNonBlocking(SERVO_DEPAN)) {
+        // Servo sudah di tengah, mulai belok kiri
+        aliveState = ALIVE_TURN_LEFT;
+        aliveStateAt = now;
+        setMotors(-ALIVE_TURN_PWM, ALIVE_TURN_PWM);  // Belok kiri pelan
+      }
+      break;
+
+    case ALIVE_TURN_LEFT:
+      // Belok kiri saja
+      if (now - aliveStateAt >= ALIVE_TURN_DURATION_MS) {
+        // Setelah belok, maju lurus
+        aliveState = ALIVE_MAJU;
+        aliveStateAt = now;
+        setMotors(ALIVE_MAJU_PWM, ALIVE_MAJU_PWM);   // Maju pelan
+      }
+      break;
+
+    case ALIVE_MAJU:
+      // Maju sedikit
+      if (now - aliveStateAt >= ALIVE_MAJU_DURATION_MS) {
+        stopMotor();
+        aliveState = ALIVE_PAUSE_2;
+        aliveStateAt = now;
+        aliveServoLastMove = 0;
+        aliveServoDirection = false;
+        aliveServoStepAt = now;
+      }
+      break;
+
+    case ALIVE_PAUSE_2:
+      // Diam 5 detik sambil servo gerak (NON-BLOCKING)
+      if (now - aliveServoLastMove >= ALIVE_SERVO_INTERVAL_MS && aliveServoLastMove != 0) {
+        aliveServoTarget = aliveServoDirection ? (SERVO_DEPAN + ALIVE_SERVO_RANGE) : (SERVO_DEPAN - ALIVE_SERVO_RANGE);
+        aliveServoDirection = !aliveServoDirection;
+        aliveServoLastMove = now;
+        aliveServoStepAt = now;
+      }
+      if (aliveServoLastMove == 0) {
+        aliveServoLastMove = now;
+        aliveServoStepAt = now;
+      }
+      servoStepNonBlocking(aliveServoTarget);
+      if (now - aliveStateAt >= ALIVE_PAUSE_DURATION_MS) {
+        aliveState = ALIVE_RETURN_CENTER_2;
+        aliveStateAt = now;
+      }
+      break;
+
+    case ALIVE_RETURN_CENTER_2:
+      // Kembali ke posisi tengah (NON-BLOCKING)
+      if (!servoStepNonBlocking(SERVO_DEPAN)) {
+        aliveState = ALIVE_PAUSE_3;
+        aliveStateAt = now;
+        aliveServoLastMove = 0;
+        aliveServoDirection = true;
+        aliveServoStepAt = now;
+      }
+      break;
+
+    case ALIVE_PAUSE_3:
+      // Diam 5 detik terakhir sambil servo gerak halus (NON-BLOCKING)
+      if (now - aliveServoLastMove >= ALIVE_SERVO_INTERVAL_MS && aliveServoLastMove != 0) {
+        int halfRange = ALIVE_SERVO_RANGE / 2;
+        aliveServoTarget = aliveServoDirection ? (SERVO_DEPAN + halfRange) : (SERVO_DEPAN - halfRange);
+        aliveServoDirection = !aliveServoDirection;
+        aliveServoLastMove = now;
+        aliveServoStepAt = now;
+      }
+      if (aliveServoLastMove == 0) {
+        aliveServoLastMove = now;
+        aliveServoStepAt = now;
+      }
+      servoStepNonBlocking(aliveServoTarget);
+      if (now - aliveStateAt >= ALIVE_PAUSE_DURATION_MS) {
+        aliveState = ALIVE_REST;
+        aliveStateAt = now;
+      }
+      break;
+
+    case ALIVE_REST:
+      // Diam sebentar sebelum ulang sekuens
+      servoScan.write(SERVO_DEPAN);
+      if (now - aliveStateAt >= ALIVE_REST_DURATION_MS) {
+        aliveState = ALIVE_IDLE;  // Ulang sekuens
+      }
+      break;
   }
-  servoKe(SERVO_KIRI, 80);     // tahan di 180° sebentar
-  servoKe(SERVO_DEPAN, 120);   // balik ke 90°
+}
+
+void aliveOff() {
+  aliveMode = false;
+  aliveState = ALIVE_IDLE;
+  stopMotor();
+  servoScan.write(SERVO_DEPAN);
+}
+
+// ================= OBSTACLE — LOGIC SEDERHANA =================
+void scanDanHindari() {
+  // Servo sweep
+  setOledMode(OLED_TEXT);
+  setOledText("HALANGAN", "Scan servo", "0->180->90");
+  servoKe(SERVO_KANAN, 120);
+  for (int s = SERVO_KANAN; s <= SERVO_KIRI; s += obstacleServoStepDeg) {
+    servoScan.write(s);
+    delay(obstacleServoStepDelayMs);
+  }
+  servoKe(SERVO_KIRI, 80);
+  servoKe(SERVO_DEPAN, 120);
 
   // Step 1: Putar kanan
-  oledDisplay(EYE_LOOK_RIGHT, "HINDARI", "Putar kanan", "");
-  markEvent();
+  setOledMode(OLED_TEXT);
+  setOledText("HINDARI", "Putar kanan", "");
   putarKanan(avoidTurnRightPwm);
   delay(avoidTurnRightMs);
   stopMotor();
   delay(150);
 
-  // Step 2: Maju lurus (lewati halangan)
-  oledDisplay(EYE_NEUTRAL, "HINDARI", "Maju...", "");
-  markEvent();
+  // Step 2: Maju lurus
+  setOledMode(OLED_TEXT);
+  setOledText("HINDARI", "Maju...", "");
   majuLurus(avoidForward1Spd);
   delay(avoidForward1Ms);
   stopMotor();
   delay(150);
 
-  // Step 3: Putar kiri (balik ke arah garis)
-  oledDisplay(EYE_LOOK_LEFT, "HINDARI", "Putar kiri", "");
-  markEvent();
+  // Step 3: Putar kiri
+  setOledMode(OLED_TEXT);
+  setOledText("HINDARI", "Putar kiri", "");
   putarKiri(avoidTurnLeftPwm);
   delay(avoidTurnLeftMs);
   stopMotor();
   delay(150);
 
   // Step 4: Maju cari garis
-  oledDisplay(EYE_LOOK_RIGHT, "HINDARI", "Cari garis...", "");
-  markEvent();
+  setOledMode(OLED_TEXT);
+  setOledText("HINDARI", "Cari garis...", "");
   majuLurus(avoidForward2Spd);
   delay(avoidForward2Ms);
   stopMotor();
   delay(100);
 
-  // Reset state follow line
   lastError    = 0;
   lastLineSide = 0;
   jarakTerakhir = 999;
 
-  oledDisplay(EYE_HAPPY, "LANJUT", "Follow line", "");
-  markEvent();
+  setOledMode(OLED_TEXT);
+  setOledText("LANJUT", "Follow line", "");
   Serial.println("HINDARI selesai, lanjut follow line");
 }
 
 // ================= MISSION CONTROL =================
 void mulaiMisi(int target) {
+  // Matikan alive mode saat ada misi
+  if (aliveMode) aliveOff();
+
   missionTarget  = target;
   resetBlackbox();
   lastError      = 0;
@@ -692,15 +920,16 @@ void mulaiMisi(int target) {
   bacaLoadcell();
   if (!cargoStablePresent()) {
     missionState = MENUNGGU_BARANG;
-    oledDisplay(EYE_CONFUSED, "MISI " + nama, "Tunggu barang", "ditaruh...");
-    markEvent();
+    // Mata bingung (full screen, tanpa text)
+    setOledMood(TEMP_MOOD_CONFUSED);
     kirimState();
     return;
   }
 
   missionState = KEBERANGKATAN;
-  oledDisplay(EYE_EXCITED, "MISI", "Ke titik " + nama, "Berangkat!");
-  markEvent();
+  // Mata senang dulu, lalu text
+  setOledMood(TEMP_MOOD_HAPPY);
+  setOledText("MISI", "Ke titik " + nama, "Berangkat!");
   kirimState();
 }
 
@@ -711,8 +940,9 @@ void mulaiPulang() {
 
   if (turnDirection == 0) turnDirection = (missionTarget == 2) ? 1 : -1;
 
-  oledDisplay((turnDirection == 1) ? EYE_LOOK_RIGHT : EYE_LOOK_LEFT, "BELOK", (turnDirection == 1) ? "Kanan 90" : "Kiri 90", "");
-  markEvent();
+  // Text: belok
+  setOledMode(OLED_TEXT);
+  setOledText("BELOK", (turnDirection == 1) ? "Kanan 90" : "Kiri 90", "");
 
   if (turnDirection == 1) putarKanan(turnPowerKanan);
   else                    putarKiri(turnPowerKiri);
@@ -727,8 +957,9 @@ void mulaiPulang() {
 
   missionState = PULANG;
   kirimState();
-  oledDisplay(EYE_LOOK_LEFT, "PULANG", "Ke base...", "");
-  markEvent();
+  // Text: pulang
+  setOledMode(OLED_TEXT);
+  setOledText("PULANG", "Ke base...", "");
 }
 
 void mulaiCariGarisPulangB() {
@@ -882,349 +1113,111 @@ void servoKe(int sudut, int tunda) {
   if (tunda > 0) delay(tunda);
 }
 
-// ================= OLED - LEGACY =================
-void oledTulis(String b1, String b2, String b3) {
+// ================= OLED DISPLAY SYSTEM =================
+// Menggunakan FluxGarage RoboEyes library.
+// Prinsip: TIDAK PERNAH tampilkan mata + text bersamaan.
+// Mata = full screen. Text = full screen. Exclusive.
+
+void setOledMode(OledMode mode) {
+  oledMode = mode;
+}
+
+void setOledMood(TempMood mood) {
+  // Set mood sementara via RoboEyes library
+  switch (mood) {
+    case TEMP_MOOD_HAPPY:
+      eyes.setMood(HAPPY);
+      break;
+    case TEMP_MOOD_CONFUSED:
+      eyes.setMood(TIRED);
+      break;
+    case TEMP_MOOD_SURPRISED:
+      eyes.setMood(ANGRY);
+      break;
+    case TEMP_MOOD_ANGRY:
+      eyes.setMood(ANGRY);
+      break;
+    default:
+      eyes.setMood(DEFAULT);
+      break;
+  }
+  currentTempMood = mood;
+  tempMoodStartedAt = millis();
+  oledMode = OLED_EYES_MOOD;
+}
+
+void setOledText(String l1, String l2, String l3) {
+  textLine1 = l1;
+  textLine2 = l2;
+  textLine3 = l3;
+  oledMode = OLED_TEXT;
+}
+
+void updateTempMood() {
+  // Auto-revert mood sementara ke default setelah durasi
+  if (currentTempMood != TEMP_MOOD_NONE &&
+      millis() - tempMoodStartedAt >= TEMP_MOOD_DURATION_MS) {
+    currentTempMood = TEMP_MOOD_NONE;
+    eyes.setMood(DEFAULT);
+    if (oledMode == OLED_EYES_MOOD) {
+      oledMode = OLED_EYES;  // Kembali ke mata netral
+    }
+  }
+}
+
+void drawOledText() {
+  // Gambar text full screen (tanpa mata)
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
+
+  // Line 1 — center, font besar
   display.setTextSize(2);
-  display.setCursor(0, 0);
-  display.println(b1);
+  int16_t x1, y1;
+  uint16_t w, h;
+
+  display.getTextBounds(textLine1, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((OLED_WIDTH - w) / 2, 4);
+  display.println(textLine1);
+
+  // Line 2 — center, font kecil
   display.setTextSize(1);
-  display.setCursor(0, 22);
-  display.println(b2);
-  display.setCursor(0, 34);
-  display.println(b3);
-  display.display();
-}
+  display.getTextBounds(textLine2, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((OLED_WIDTH - w) / 2, 28);
+  display.println(textLine2);
 
-// ================= OLED - ROBOT EYES SYSTEM =================
-void oledDisplay(EyeExpression expr, String b1, String b2, String b3) {
-  currentEyeExpr = expr;
-  display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
-
-  // Draw robot eyes di bagian atas (y: 0-28)
-  drawRobotEyes(expr);
-
-  // Text di bagian bawah (y: 30-63)
-  display.setTextSize(1);
-
-  // Baris 1 - bold/size 2 untuk status utama
-  display.setTextSize(1);
-  display.setCursor(0, 30);
-  display.println(b1);
-
-  // Baris 2
-  display.setCursor(0, 42);
-  display.println(b2);
-
-  // Baris 3
-  display.setCursor(0, 54);
-  display.println(b3);
+  // Line 3 — center, font kecil
+  display.getTextBounds(textLine3, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((OLED_WIDTH - w) / 2, 42);
+  display.println(textLine3);
 
   display.display();
 }
 
-void oledDisplayWithText(EyeExpression expr, String b1, String b2) {
-  oledDisplay(expr, b1, b2, "");
-}
+void updateDisplay() {
+  // Refresh display berdasarkan mode
+  // RoboEyes library handle rendering mata + animasi (blink, idle look)
+  // Kita hanya pilih: mata ATAU text, tidak pernah keduanya
 
-void markEvent() {
-  lastEventTime = millis();
-  isBlinking = false;
-}
+  switch (oledMode) {
+    case OLED_BOOT_TEXT:
+      // Text boot — kita handle sendiri (clear + draw + display)
+      drawOledText();
+      break;
 
-void setEyeExpression(EyeExpression expr) {
-  currentEyeExpr = expr;
-  markEvent();
-}
+    case OLED_EYES:
+    case OLED_EYES_MOOD:
+      // Mata full screen via RoboEyes library
+      // Library handle SEMUA: clear, draw, display, framerate, animasi
+      // JANGAN panggil display.clearDisplay() atau display.display() di sini
+      // karena library sudah mengatur sendiri internal rendering cycle-nya
+      eyes.update();
+      break;
 
-void updateEyeExpression() {
-  unsigned long now = millis();
-  unsigned long idleTime = now - lastEventTime;
-
-  // Blink logic - hanya saat idle normal
-  if (idleTime > IDLE_THRESHOLD_NORMAL && idleTime < IDLE_THRESHOLD_SLEEPY) {
-    if (!isBlinking && now - lastBlinkTime >= BLINK_INTERVAL) {
-      isBlinking = true;
-      lastBlinkTime = now;
-      lastEyeAnimTime = now;
-    }
-
-    if (isBlinking && now - lastEyeAnimTime >= BLINK_DURATION) {
-      isBlinking = false;
-      lastEyeAnimTime = now;
-    }
-
-    if (isBlinking) {
-      currentEyeExpr = EYE_BLINK;
-    } else {
-      currentEyeExpr = EYE_HAPPY;
-    }
+    case OLED_TEXT:
+      // Text full screen (tanpa mata) — kita handle sendiri
+      drawOledText();
+      break;
   }
-  // Sleepy eyes - idle sangat lama
-  else if (idleTime >= IDLE_THRESHOLD_SLEEPY) {
-    currentEyeExpr = EYE_SLEEPY;
-  }
-  // Active - jangan override expression yang sudah di-set
-  else if (idleTime < IDLE_THRESHOLD_NORMAL) {
-    // Expression sudah di-set oleh event, jangan override
-  }
-}
-
-// ================= DRAW ROBOT EYES =================
-void drawRobotEyes(EyeExpression expr) {
-  switch (expr) {
-    case EYE_HAPPY:     drawHappyEyes(); break;
-    case EYE_NEUTRAL:   drawNeutralEyes(); break;
-    case EYE_BLINK:     drawBlinkEyes(); break;
-    case EYE_SLEEPY:    drawSleepyEyes(); break;
-    case EYE_CONFUSED:  drawConfusedEyes(); break;
-    case EYE_ERROR:     drawErrorEyes(); break;
-    case EYE_EXCITED:   drawExcitedEyes(); break;
-    case EYE_WINK:      drawWinkEyes(); break;
-    case EYE_LOOK_LEFT: drawLookLeftEyes(); break;
-    case EYE_LOOK_RIGHT:drawLookRightEyes(); break;
-    default:            drawNeutralEyes(); break;
-  }
-}
-
-// Happy eyes - lengkung senyum di atas (U shape inverted)
-void drawHappyEyes() {
-  int leftEyeX = 32;
-  int rightEyeX = 88;
-  int eyeY = 14;
-  int eyeW = 18;
-  int eyeH = 12;
-
-  // Mata kiri - lengkung senyum
-  display.drawRoundRect(leftEyeX - eyeW/2, eyeY - eyeH/2, eyeW, eyeH, 6, SSD1306_WHITE);
-  // Highlight senyum - isi bagian atas
-  display.fillRoundRect(leftEyeX - eyeW/2 + 2, eyeY - eyeH/2 + 2, eyeW - 4, eyeH/2, 4, SSD1306_WHITE);
-
-  // Mata kanan - lengkung senyum
-  display.drawRoundRect(rightEyeX - eyeW/2, eyeY - eyeH/2, eyeW, eyeH, 6, SSD1306_WHITE);
-  display.fillRoundRect(rightEyeX - eyeW/2 + 2, eyeY - eyeH/2 + 2, eyeW - 4, eyeH/2, 4, SSD1306_WHITE);
-
-  // Mulut kecil senyum
-  display.drawPixel(64, 26, SSD1306_WHITE);
-  display.drawPixel(63, 27, SSD1306_WHITE);
-  display.drawPixel(64, 27, SSD1306_WHITE);
-  display.drawPixel(65, 27, SSD1306_WHITE);
-}
-
-// Neutral eyes - bulat normal dengan pupil
-void drawNeutralEyes() {
-  int leftEyeX = 36;
-  int rightEyeX = 88;
-  int eyeY = 14;
-  int eyeR = 10;
-
-  // Lingkaran mata kiri
-  display.drawCircle(leftEyeX, eyeY, eyeR, SSD1306_WHITE);
-  display.fillCircle(leftEyeX, eyeY, eyeR - 1, SSD1306_BLACK);
-  // Pupil
-  display.fillCircle(leftEyeX + 2, eyeY, 4, SSD1306_WHITE);
-  // Highlight
-  display.fillCircle(leftEyeX + 4, eyeY - 3, 2, SSD1306_WHITE);
-
-  // Lingkaran mata kanan
-  display.drawCircle(rightEyeX, eyeY, eyeR, SSD1306_WHITE);
-  display.fillCircle(rightEyeX, eyeY, eyeR - 1, SSD1306_BLACK);
-  // Pupil
-  display.fillCircle(rightEyeX + 2, eyeY, 4, SSD1306_WHITE);
-  // Highlight
-  display.fillCircle(rightEyeX + 4, eyeY - 3, 2, SSD1306_WHITE);
-}
-
-// Blink eyes - garis horizontal (mata setengah tutup)
-void drawBlinkEyes() {
-  int leftEyeX = 36;
-  int rightEyeX = 88;
-  int eyeY = 14;
-  int eyeW = 16;
-
-  // Mata kiri - garis dengan sedikit lengkung
-  display.drawLine(leftEyeX - eyeW/2, eyeY, leftEyeX + eyeW/2, eyeY, SSD1306_WHITE);
-  display.drawLine(leftEyeX - eyeW/2 + 2, eyeY - 1, leftEyeX + eyeW/2 - 2, eyeY - 1, SSD1306_WHITE);
-  display.drawLine(leftEyeX - eyeW/2 + 2, eyeY + 1, leftEyeX + eyeW/2 - 2, eyeY + 1, SSD1306_WHITE);
-
-  // Mata kanan - garis dengan sedikit lengkung
-  display.drawLine(rightEyeX - eyeW/2, eyeY, rightEyeX + eyeW/2, eyeY, SSD1306_WHITE);
-  display.drawLine(rightEyeX - eyeW/2 + 2, eyeY - 1, rightEyeX + eyeW/2 - 2, eyeY - 1, SSD1306_WHITE);
-  display.drawLine(rightEyeX - eyeW/2 + 2, eyeY + 1, rightEyeX + eyeW/2 - 2, eyeY + 1, SSD1306_WHITE);
-}
-
-// Sleepy eyes - setengah terpejam dengan efek Zzz
-void drawSleepyEyes() {
-  int leftEyeX = 36;
-  int rightEyeX = 88;
-  int eyeY = 16;
-  int eyeW = 14;
-
-  // Mata kiri - garis miring ke bawah
-  display.drawLine(leftEyeX - eyeW/2, eyeY - 2, leftEyeX + eyeW/2, eyeY, SSD1306_WHITE);
-  display.drawLine(leftEyeX - eyeW/2 + 1, eyeY - 3, leftEyeX + eyeW/2 - 1, eyeY - 1, SSD1306_WHITE);
-
-  // Mata kanan - garis miring ke bawah
-  display.drawLine(rightEyeX - eyeW/2, eyeY, rightEyeX + eyeW/2, eyeY - 2, SSD1306_WHITE);
-  display.drawLine(rightEyeX - eyeW/2 + 1, eyeY - 1, rightEyeX + eyeW/2 - 1, eyeY - 3, SSD1306_WHITE);
-
-  // Zzz effect
-  display.setTextSize(1);
-  display.setCursor(108, 4);
-  display.print("z");
-  display.setCursor(114, 8);
-  display.print("Z");
-  display.setCursor(118, 2);
-  display.print("z");
-}
-
-// Confused eyes - tidak simetris, satu besar satu kecil, alis miring
-void drawConfusedEyes() {
-  int leftEyeX = 36;
-  int rightEyeX = 88;
-  int eyeY = 14;
-
-  // Mata kiri - lebih besar, normal
-  display.drawCircle(leftEyeX, eyeY, 10, SSD1306_WHITE);
-  display.fillCircle(leftEyeX, eyeY, 9, SSD1306_BLACK);
-  display.fillCircle(leftEyeX, eyeY, 4, SSD1306_WHITE);
-
-  // Mata kanan - lebih kecil, heran
-  display.drawCircle(rightEyeX, eyeY, 7, SSD1306_WHITE);
-  display.fillCircle(rightEyeX, eyeY, 6, SSD1306_BLACK);
-  display.fillCircle(rightEyeX, eyeY, 3, SSD1306_WHITE);
-
-  // Alis kiri - datar
-  display.drawLine(leftEyeX - 12, eyeY - 14, leftEyeX + 12, eyeY - 14, SSD1306_WHITE);
-  display.drawLine(leftEyeX - 12, eyeY - 13, leftEyeX + 12, eyeY - 13, SSD1306_WHITE);
-
-  // Alis kanan - miring ke atas (bingung)
-  display.drawLine(rightEyeX - 10, eyeY - 12, rightEyeX + 10, eyeY - 16, SSD1306_WHITE);
-  display.drawLine(rightEyeX - 10, eyeY - 11, rightEyeX + 10, eyeY - 15, SSD1306_WHITE);
-
-  // Mulut bingung - zigzag kecil
-  display.drawLine(58, 26, 62, 24, SSD1306_WHITE);
-  display.drawLine(62, 24, 66, 26, SSD1306_WHITE);
-  display.drawLine(66, 26, 70, 24, SSD1306_WHITE);
-}
-
-// Error eyes - X mark
-void drawErrorEyes() {
-  int leftEyeX = 36;
-  int rightEyeX = 88;
-  int eyeY = 14;
-  int crossSize = 8;
-
-  // Mata kiri - X
-  display.drawLine(leftEyeX - crossSize, eyeY - crossSize, leftEyeX + crossSize, eyeY + crossSize, SSD1306_WHITE);
-  display.drawLine(leftEyeX + crossSize, eyeY - crossSize, leftEyeX - crossSize, eyeY + crossSize, SSD1306_WHITE);
-  display.drawLine(leftEyeX - crossSize + 1, eyeY - crossSize, leftEyeX + crossSize + 1, eyeY + crossSize, SSD1306_WHITE);
-  display.drawLine(leftEyeX + crossSize - 1, eyeY - crossSize, leftEyeX - crossSize - 1, eyeY + crossSize, SSD1306_WHITE);
-
-  // Mata kanan - X
-  display.drawLine(rightEyeX - crossSize, eyeY - crossSize, rightEyeX + crossSize, eyeY + crossSize, SSD1306_WHITE);
-  display.drawLine(rightEyeX + crossSize, eyeY - crossSize, rightEyeX - crossSize, eyeY + crossSize, SSD1306_WHITE);
-  display.drawLine(rightEyeX - crossSize + 1, eyeY - crossSize, rightEyeX + crossSize + 1, eyeY + crossSize, SSD1306_WHITE);
-  display.drawLine(rightEyeX + crossSize - 1, eyeY - crossSize, rightEyeX - crossSize - 1, eyeY + crossSize, SSD1306_WHITE);
-
-  // Alis marah - miring ke dalam
-  display.drawLine(leftEyeX - 12, eyeY - 12, leftEyeX + 8, eyeY - 16, SSD1306_WHITE);
-  display.drawLine(rightEyeX + 12, eyeY - 12, rightEyeX - 8, eyeY - 16, SSD1306_WHITE);
-}
-
-// Excited eyes - besar dengan sparkle
-void drawExcitedEyes() {
-  int leftEyeX = 36;
-  int rightEyeX = 88;
-  int eyeY = 14;
-
-  // Mata kiri - besar dan cerah
-  display.fillCircle(leftEyeX, eyeY, 11, SSD1306_WHITE);
-  display.fillCircle(leftEyeX, eyeY, 8, SSD1306_BLACK);
-  display.fillCircle(leftEyeX, eyeY, 6, SSD1306_WHITE);
-  // Sparkle
-  display.fillCircle(leftEyeX + 4, eyeY - 4, 2, SSD1306_BLACK);
-  display.fillCircle(leftEyeX - 3, eyeY + 3, 1, SSD1306_BLACK);
-
-  // Mata kanan - besar dan cerah
-  display.fillCircle(rightEyeX, eyeY, 11, SSD1306_WHITE);
-  display.fillCircle(rightEyeX, eyeY, 8, SSD1306_BLACK);
-  display.fillCircle(rightEyeX, eyeY, 6, SSD1306_WHITE);
-  // Sparkle
-  display.fillCircle(rightEyeX + 4, eyeY - 4, 2, SSD1306_BLACK);
-  display.fillCircle(rightEyeX - 3, eyeY + 3, 1, SSD1306_BLACK);
-
-  // Sparkle stars di sekitar mata
-  display.drawPixel(18, 6, SSD1306_WHITE);
-  display.drawPixel(16, 8, SSD1306_WHITE);
-  display.drawPixel(20, 8, SSD1306_WHITE);
-  display.drawPixel(18, 10, SSD1306_WHITE);
-
-  display.drawPixel(106, 6, SSD1306_WHITE);
-  display.drawPixel(104, 8, SSD1306_WHITE);
-  display.drawPixel(108, 8, SSD1306_WHITE);
-  display.drawPixel(106, 10, SSD1306_WHITE);
-}
-
-// Wink eyes - satu terbuka, satu kedip
-void drawWinkEyes() {
-  int leftEyeX = 36;
-  int rightEyeX = 88;
-  int eyeY = 14;
-
-  // Mata kiri - terbuka (normal)
-  display.drawCircle(leftEyeX, eyeY, 10, SSD1306_WHITE);
-  display.fillCircle(leftEyeX, eyeY, 9, SSD1306_BLACK);
-  display.fillCircle(leftEyeX + 2, eyeY, 4, SSD1306_WHITE);
-  display.fillCircle(leftEyeX + 4, eyeY - 3, 2, SSD1306_WHITE);
-
-  // Mata kanan - kedip (garis lengkung)
-  int eyeW = 16;
-  display.drawLine(rightEyeX - eyeW/2, eyeY, rightEyeX + eyeW/2, eyeY, SSD1306_WHITE);
-  display.drawLine(rightEyeX - eyeW/2 + 2, eyeY - 1, rightEyeX + eyeW/2 - 2, eyeY - 1, SSD1306_WHITE);
-  display.drawLine(rightEyeX - eyeW/2 + 2, eyeY + 1, rightEyeX + eyeW/2 - 2, eyeY + 1, SSD1306_WHITE);
-}
-
-// Look left eyes - pupil ke kiri
-void drawLookLeftEyes() {
-  int leftEyeX = 36;
-  int rightEyeX = 88;
-  int eyeY = 14;
-  int eyeR = 10;
-
-  // Mata kiri
-  display.drawCircle(leftEyeX, eyeY, eyeR, SSD1306_WHITE);
-  display.fillCircle(leftEyeX, eyeY, eyeR - 1, SSD1306_BLACK);
-  display.fillCircle(leftEyeX - 4, eyeY, 4, SSD1306_WHITE);
-  display.fillCircle(leftEyeX - 2, eyeY - 3, 2, SSD1306_WHITE);
-
-  // Mata kanan
-  display.drawCircle(rightEyeX, eyeY, eyeR, SSD1306_WHITE);
-  display.fillCircle(rightEyeX, eyeY, eyeR - 1, SSD1306_BLACK);
-  display.fillCircle(rightEyeX - 4, eyeY, 4, SSD1306_WHITE);
-  display.fillCircle(rightEyeX - 2, eyeY - 3, 2, SSD1306_WHITE);
-}
-
-// Look right eyes - pupil ke kanan
-void drawLookRightEyes() {
-  int leftEyeX = 36;
-  int rightEyeX = 88;
-  int eyeY = 14;
-  int eyeR = 10;
-
-  // Mata kiri
-  display.drawCircle(leftEyeX, eyeY, eyeR, SSD1306_WHITE);
-  display.fillCircle(leftEyeX, eyeY, eyeR - 1, SSD1306_BLACK);
-  display.fillCircle(leftEyeX + 4, eyeY, 4, SSD1306_WHITE);
-  display.fillCircle(leftEyeX + 6, eyeY - 3, 2, SSD1306_WHITE);
-
-  // Mata kanan
-  display.drawCircle(rightEyeX, eyeY, eyeR, SSD1306_WHITE);
-  display.fillCircle(rightEyeX, eyeY, eyeR - 1, SSD1306_BLACK);
-  display.fillCircle(rightEyeX + 4, eyeY, 4, SSD1306_WHITE);
-  display.fillCircle(rightEyeX + 6, eyeY - 3, 2, SSD1306_WHITE);
 }
 
 // ================= BUZZER =================
@@ -1348,9 +1341,8 @@ void setupJaringan() {
   mqttTopicTelemetry = String("agv/") + DEVICE_ID + "/telemetry";
   mqttTopicStatus    = String("agv/") + DEVICE_ID + "/status";
 
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
+  // WiFi sudah di-handle oleh WiFiManager di setup()
+  // Di sini hanya setup MQTT
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
   mqttClient.setCallback(mqttCallback);
   mqttClient.setBufferSize(768);
@@ -1358,10 +1350,7 @@ void setupJaringan() {
 
 void jagaJaringan() {
   if (WiFi.status() != WL_CONNECTED) {
-    if (millis() - wifiReconnectTimer >= 10000) {
-      wifiReconnectTimer = millis();
-      WiFi.reconnect();
-    }
+    // WiFi terputus, WiFiManager akan handle reconnect otomatis
     return;
   }
 
@@ -1417,9 +1406,27 @@ void prosesPerintah(String input) {
   if (input == "stop" || input == "emergency_stop") {
     missionState = IDLE; missionTarget = 0;
     waitingAtDest = false; speedBoostKiri = 0; bReturnSearchLine = false;
+    if (aliveMode) aliveOff();
     resetBlackbox(); stopMotor();
-    oledDisplay(EYE_ERROR, "STOP", "Emergency!", "");
-    markEvent();
+    // Emergency stop → mata kaget
+    setOledMood(TEMP_MOOD_SURPRISED);
+    kirimState();
+    return;
+  }
+
+  // Alive mode trigger dari web
+  if (input == "alive:on") {
+    aliveMode = true;
+    aliveState = ALIVE_IDLE;
+    setOledMode(OLED_EYES);
+    Serial.println("ALIVE MODE: ON");
+    kirimState();
+    return;
+  }
+  if (input == "alive:off") {
+    aliveOff();
+    setOledMode(OLED_EYES);
+    Serial.println("ALIVE MODE: OFF");
     kirimState();
     return;
   }
@@ -1427,29 +1434,29 @@ void prosesPerintah(String input) {
   if (input == "forward") {
     missionState = MANUAL; speedBoostKiri = 0;
     majuLurus(baseSpeed);
-    oledDisplay(EYE_NEUTRAL, "MANUAL", "Maju", "");
-    markEvent();
+    setOledMode(OLED_TEXT);
+    setOledText("MANUAL", "Maju", "");
     kirimState(); return;
   }
   if (input == "backward") {
     missionState = MANUAL; speedBoostKiri = 0;
     setMotors(-baseSpeed, -baseSpeed);
-    oledDisplay(EYE_NEUTRAL, "MANUAL", "Mundur", "");
-    markEvent();
+    setOledMode(OLED_TEXT);
+    setOledText("MANUAL", "Mundur", "");
     kirimState(); return;
   }
   if (input == "left") {
     missionState = MANUAL; speedBoostKiri = 0;
     putarKiri(turnPowerKiri);
-    oledDisplay(EYE_LOOK_LEFT, "MANUAL", "Kiri", "");
-    markEvent();
+    setOledMode(OLED_TEXT);
+    setOledText("MANUAL", "Kiri", "");
     kirimState(); return;
   }
   if (input == "right") {
     missionState = MANUAL; speedBoostKiri = 0;
     putarKanan(turnPowerKanan);
-    oledDisplay(EYE_LOOK_RIGHT, "MANUAL", "Kanan", "");
-    markEvent();
+    setOledMode(OLED_TEXT);
+    setOledText("MANUAL", "Kanan", "");
     kirimState(); return;
   }
 
@@ -1505,7 +1512,7 @@ void prosesPerintah(String input) {
 // ================= STATE & TELEMETRY =================
 void kirimState() {
   String payload;
-  payload.reserve(260);
+  payload.reserve(300);
   payload += "{\"device_id\":\""; payload += DEVICE_ID;
   payload += "\",\"state\":\""; payload += namaState(missionState); payload += "\"";
   payload += ",\"mission\":"; payload += missionTarget;
@@ -1519,6 +1526,7 @@ void kirimState() {
   payload += ",\"cargo\":"; payload += (cargoDetected ? "true" : "false");
   payload += ",\"wifi_rssi\":"; payload += (WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0);
   payload += ",\"mqtt\":"; payload += (mqttClient.connected() ? "true" : "false");
+  payload += ",\"alive_mode\":"; payload += (aliveMode ? "true" : "false");
   payload += "}";
 
   if (mqttClient.connected()) mqttClient.publish(mqttTopicState.c_str(), payload.c_str(), true);
@@ -1562,6 +1570,7 @@ void kirimTelemetry(int vL, int vM, int vR, int irL, int irR, bool blackbox) {
   payload += ",\"waiting\":"; payload += (waitingAtDest ? "true" : "false");
   payload += ",\"loadcell_g\":"; payload += String(loadcellGram, 1);
   payload += ",\"cargo\":"; payload += (cargoDetected ? "true" : "false");
+  payload += ",\"alive_mode\":"; payload += (aliveMode ? "true" : "false");
   payload += "}";
 
   if (mqttClient.connected()) mqttClient.publish(mqttTopicTelemetry.c_str(), payload.c_str());
@@ -1595,5 +1604,4 @@ void stopMotor() {
   digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
   ledcWrite(ENA, 0); ledcWrite(ENB, 0);
-  motorKiriTerakhir = 0; motorKananTerakhir = 0;
-}
+  motorKiriTerakhir = 0; motorKananTerakhir
