@@ -199,7 +199,8 @@ enum MissionState {
   SAMPAI,
   PULANG,
   SELESAI,
-  MANUAL
+  MANUAL,
+  MENUNGGU_BARANG_JEMPUT   // Pickup: tunggu barang di titik tujuan
 };
 
 MissionState missionState = IDLE;
@@ -207,6 +208,7 @@ MissionState missionState = IDLE;
 int missionTarget  = 0;
 int blackboxCount  = 0;
 int turnDirection  = 0;
+bool missionIsPickup = false;  // true = penjemputan, false = pengantaran
 
 bool waitingAtDest = false;
 unsigned long arrivedTimer = 0;
@@ -556,6 +558,15 @@ void loop() {
     case SAMPAI:
       stopMotor();
 
+      // Pickup mode: langsung masuk state tunggu barang jemput
+      if (missionIsPickup) {
+        missionState = MENUNGGU_BARANG_JEMPUT;
+        setOledMood(TEMP_MOOD_CONFUSED);
+        kirimState();
+        break;
+      }
+
+      // Delivery mode: tunggu barang diangkat
       if (waitingAtDest) {
         if (!cargoStableAbsent()) {
           // Menunggu barang diambil → mata netral (menunggu)
@@ -648,6 +659,58 @@ void loop() {
       }
 
       followLine(vL, vM, vR, irL, irR);
+      break;
+
+    case MENUNGGU_BARANG_JEMPUT:
+      stopMotor();
+      if (cargoStablePresent()) {
+        buzzerBeep(200);
+        setOledMood(TEMP_MOOD_HAPPY);
+        setOledText("BARANG ADA!", "Pulang ke base", "");
+
+        // Tunggu sebentar lalu pulang
+        delay(WAIT_AT_DEST_MS);
+
+        // Clear station marker jika bukan A
+        if (missionTarget != 1) {
+          majuLurus(baseSpeed);
+          int majuMs = (missionTarget == 3) ? 200 : 400;
+          delay(majuMs);
+          stopMotor();
+          delay(100);
+        }
+
+        // Belok balik
+        setOledMode(OLED_TEXT);
+        setOledText("BELOK", (turnDirection == 1) ? "Kanan" : "Kiri", "");
+        if (turnDirection == 1) putarKanan(turnPowerKanan);
+        else                    putarKiri(turnPowerKiri);
+        delay(durasiBelokPulang());
+        stopMotor();
+        delay(200);
+
+        resetBlackbox();
+        lastError = 0;
+        lastLineSide = 0;
+        speedBoostKiri = 0;
+
+        if (missionTarget == 2) mulaiCariGarisPulangB();
+        else                    bReturnSearchLine = false;
+
+        missionState = PULANG;
+        kirimState();
+        setOledMode(OLED_TEXT);
+        setOledText("PULANG", "Ke base...", "");
+      } else {
+        // Menunggu barang ditaruh → mata bingung
+        static unsigned long lastJemputRefresh = 0;
+        if (millis() - lastJemputRefresh >= 300) {
+          lastJemputRefresh = millis();
+          if (oledMode != OLED_EYES_MOOD) {
+            setOledMood(TEMP_MOOD_CONFUSED);
+          }
+        }
+      }
       break;
 
     case SELESAI:
@@ -906,6 +969,7 @@ void mulaiMisi(int target) {
   if (aliveMode) aliveOff();
 
   missionTarget  = target;
+  missionIsPickup = false;  // Pengantaran mode
   resetBlackbox();
   lastError      = 0;
   lastLineSide   = 0;
@@ -930,6 +994,29 @@ void mulaiMisi(int target) {
   // Mata senang dulu, lalu text
   setOledMood(TEMP_MOOD_HAPPY);
   setOledText("MISI", "Ke titik " + nama, "Berangkat!");
+  kirimState();
+}
+
+// ================= PICKUP MODE =================
+void mulaiMisiJemput(int target) {
+  if (aliveMode) aliveOff();
+
+  missionTarget   = target;
+  missionIsPickup = true;
+  resetBlackbox();
+  lastError      = 0;
+  lastLineSide   = 0;
+  waitingAtDest  = false;
+  bReturnSearchLine = false;
+  turnDirection  = (target == 2) ? 1 : -1;
+  speedBoostKiri = 0;
+
+  String nama = (target == 1) ? "A" : (target == 2) ? "B" : "C";
+
+  // Langsung berangkat — tidak tunggu barang di base
+  missionState = KEBERANGKATAN;
+  setOledMood(TEMP_MOOD_HAPPY);
+  setOledText("JEMPUT", "Ke titik " + nama, "Jalan!");
   kirimState();
 }
 
@@ -1412,6 +1499,11 @@ void prosesPerintah(String input) {
   if (input == "goto:b" || input == "goto_b") { mulaiMisi(2); return; }
   if (input == "goto:c" || input == "goto_c") { mulaiMisi(3); return; }
 
+  // Pickup mode — langsung jemput tanpa tunggu barang di base
+  if (input == "pickup:a" || input == "pickup_a") { mulaiMisiJemput(1); return; }
+  if (input == "pickup:b" || input == "pickup_b") { mulaiMisiJemput(2); return; }
+  if (input == "pickup:c" || input == "pickup_c") { mulaiMisiJemput(3); return; }
+
   if (input == "return" || input == "return_base") {
     if (missionState == SAMPAI) mulaiPulang();
     return;
@@ -1541,6 +1633,7 @@ void kirimState() {
   payload += ",\"wifi_rssi\":"; payload += (WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0);
   payload += ",\"mqtt\":"; payload += (mqttClient.connected() ? "true" : "false");
   payload += ",\"alive_mode\":"; payload += (aliveMode ? "true" : "false");
+  payload += ",\"mission_type\":\""; payload += (missionIsPickup ? "PICKUP" : "DELIVERY"); payload += "\"";
   payload += "}";
 
   if (mqttClient.connected()) mqttClient.publish(mqttTopicState.c_str(), payload.c_str(), true);
@@ -1552,14 +1645,15 @@ bool stateCekHalangan() {
 
 const char* namaState(MissionState s) {
   switch (s) {
-    case IDLE:            return "IDLE";
-    case MENUNGGU_BARANG: return "MENUNGGU_BARANG";
-    case KEBERANGKATAN:   return "KEBERANGKATAN";
-    case SAMPAI:          return "SAMPAI";
-    case PULANG:          return "PULANG";
-    case SELESAI:         return "SELESAI";
-    case MANUAL:          return "MANUAL";
-    default:              return "UNKNOWN";
+    case IDLE:                   return "IDLE";
+    case MENUNGGU_BARANG:        return "MENUNGGU_BARANG";
+    case KEBERANGKATAN:          return "KEBERANGKATAN";
+    case SAMPAI:                 return "SAMPAI";
+    case PULANG:                 return "PULANG";
+    case SELESAI:                return "SELESAI";
+    case MANUAL:                 return "MANUAL";
+    case MENUNGGU_BARANG_JEMPUT: return "MENUNGGU_BARANG_JEMPUT";
+    default:                     return "UNKNOWN";
   }
 }
 
@@ -1585,6 +1679,7 @@ void kirimTelemetry(int vL, int vM, int vR, int irL, int irR, bool blackbox) {
   payload += ",\"loadcell_g\":"; payload += String(loadcellGram, 1);
   payload += ",\"cargo\":"; payload += (cargoDetected ? "true" : "false");
   payload += ",\"alive_mode\":"; payload += (aliveMode ? "true" : "false");
+  payload += ",\"mission_type\":\""; payload += (missionIsPickup ? "PICKUP" : "DELIVERY"); payload += "\"";
   payload += "}";
 
   if (mqttClient.connected()) mqttClient.publish(mqttTopicTelemetry.c_str(), payload.c_str());

@@ -146,6 +146,7 @@ const agvState = {
   state: "IDLE",
   destination: "BASE",
   mode: "AUTO",
+  missionType: "DELIVERY",
   battery: 100,
   blackboxCount: 0,
   waiting: false,
@@ -242,6 +243,7 @@ async function handleStateChange(newState) {
 
   const stateEventCode = {
     MENUNGGU_BARANG: "WAITING_CARGO",
+    MENUNGGU_BARANG_JEMPUT: "WAITING_PICKUP",
     KEBERANGKATAN: "MISSION_STARTED",
     SAMPAI: "ARRIVED",
     PULANG: "RETURNING",
@@ -256,20 +258,23 @@ async function handleStateChange(newState) {
     source: "esp32",
   });
 
-  // New mission starts when AGV waits for cargo, or when it departs
-  // immediately because cargo was already detected.
-  if ((newState === "MENUNGGU_BARANG" || newState === "KEBERANGKATAN") && !currentMission) {
+  // New mission starts when AGV waits for cargo, departs immediately,
+  // or starts a pickup mission (which skips cargo wait at base).
+  if ((newState === "MENUNGGU_BARANG" || newState === "KEBERANGKATAN" || newState === "MENUNGGU_BARANG_JEMPUT") && !currentMission) {
     await startMission(agvState.destination);
   }
 
   // Cargo detected, AGV departing
   if (newState === "KEBERANGKATAN" && currentMission) {
-    await updateMission("cargo_detected_at", new Date().toISOString());
     await updateMission("departed_at", new Date().toISOString());
-    await updateMission("cargo_weight", agvState.sensors.loadcell);
+    // For delivery: cargo is already loaded. For pickup: cargo not yet loaded.
+    if (agvState.missionType !== "PICKUP") {
+      await updateMission("cargo_detected_at", new Date().toISOString());
+      await updateMission("cargo_weight", agvState.sensors.loadcell);
+      currentMission.cargoWeight = agvState.sensors.loadcell;
+    }
     await updateMission("status", "IN_PROGRESS");
     currentMission.status = "IN_PROGRESS";
-    currentMission.cargoWeight = agvState.sensors.loadcell;
   }
 
   // Arrived at destination
@@ -277,10 +282,18 @@ async function handleStateChange(newState) {
     await updateMission("arrived_at", new Date().toISOString());
   }
 
-  // Cargo removed, returning to base
+  // Returning to base
   if (newState === "PULANG" && currentMission) {
-    await updateMission("cargo_removed_at", new Date().toISOString());
     await updateMission("return_departed_at", new Date().toISOString());
+    if (agvState.missionType === "PICKUP") {
+      // Pickup: cargo was just loaded at destination
+      await updateMission("cargo_detected_at", new Date().toISOString());
+      await updateMission("cargo_weight", agvState.sensors.loadcell);
+      currentMission.cargoWeight = agvState.sensors.loadcell;
+    } else {
+      // Delivery: cargo was just removed at destination
+      await updateMission("cargo_removed_at", new Date().toISOString());
+    }
   }
 
   // Mission completed successfully
@@ -413,6 +426,7 @@ mqttClient.on("message", (topic, payload) => {
         if (data.blackbox_count != null) agvState.blackboxCount = data.blackbox_count;
         if (data.distance_cm != null) agvState.sensors.ultrasonic = data.distance_cm;
         if (data.waiting != null) agvState.waiting = data.waiting;
+        if (data.mission_type) agvState.missionType = data.mission_type;
         if (nextState) {
           agvState.state = nextState;
           queueStateChange(nextState);
@@ -437,6 +451,7 @@ mqttClient.on("message", (topic, payload) => {
         if (data.motor_right != null) agvState.motorRight = data.motor_right;
         if (data.waiting != null) agvState.waiting = data.waiting;
         if (data.loadcell_g != null) agvState.sensors.loadcell = data.loadcell_g;
+        if (data.mission_type) agvState.missionType = data.mission_type;
         if (nextState) {
           agvState.state = nextState;
           queueStateChange(nextState);
@@ -824,6 +839,9 @@ wss.on("connection", (ws, req) => {
           "GOTO_A": "goto:A",
           "GOTO_B": "goto:B",
           "GOTO_C": "goto:C",
+          "PICKUP_A": "pickup:A",
+          "PICKUP_B": "pickup:B",
+          "PICKUP_C": "pickup:C",
           "RETURN": "return",
           "EMERGENCY_STOP": "stop",
           "FORWARD": "forward",
@@ -909,6 +927,9 @@ const ALLOWED_COMMANDS = new Set([
   "GOTO_A",
   "GOTO_B",
   "GOTO_C",
+  "PICKUP_A",
+  "PICKUP_B",
+  "PICKUP_C",
   "RETURN",
   "TARE",
   "ALIVE_ON",

@@ -324,6 +324,12 @@
   background: var(--amber-glow);
   box-shadow: 0 0 10px var(--amber-glow);
 }
+.mchip[data-mode="PICKUP"].active {
+  border-color: #f97316;
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.12);
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.25);
+}
 
 /* ── Ctrl body ───────────────────────────────────────────────────────────── */
 .ctrl-body {
@@ -516,6 +522,22 @@
 }
 .btn-dest:disabled::after {
   opacity: 0;
+}
+
+/* Pickup buttons — amber/orange accent */
+.btn-dest.pickup {
+  --dest-hue: 36;
+  --dest-sat: 92%;
+  --dest-light: 50%;
+}
+.btn-dest.pickup .dl {
+  color: hsl(var(--dest-hue), var(--dest-sat), var(--dest-light));
+}
+
+.pickup-section {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 4px;
 }
 
 .qa-row {

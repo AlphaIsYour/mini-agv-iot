@@ -89,9 +89,19 @@ window.applyState = function (raw) {
     beepError();
     toast("ERROR STATE", "AGV entered error state!", "error");
   }
+  if (s === "MENUNGGU_BARANG" && prev !== s) {
+    toast("Menunggu Barang", "Barang belum terdeteksi di loadcell. AGV menunggu di base.", "warning", 4000);
+  }
+  if (s === "KEBERANGKATAN" && prev === "MENUNGGU_BARANG") {
+    beepSuccess();
+    toast("Barang Terdeteksi!", "Loadcell mendeteksi barang. AGV berangkat!", "success", 3500);
+  }
   if (s === "SAMPAI" && prev !== s && alertArrived) {
     beepSuccess();
     toast("Sampai!", "AGV sudah di titik tujuan", "success");
+  }
+  if (s === "MENUNGGU_BARANG_JEMPUT" && prev !== s && alertArrived) {
+    toast("Sampai!", "AGV menunggu barang dijemput", "info");
   }
   if (s === "SELESAI" && prev !== s && alertArrived) {
     beepSuccess();
@@ -102,6 +112,7 @@ window.applyState = function (raw) {
 function stateClass(s) {
   if (s === "ERROR_STATE") return "err";
   if (s === "SAMPAI" || s === "SELESAI") return "ok";
+  if (s === "MENUNGGU_BARANG_JEMPUT") return "amber";
   if (s === "KEBERANGKATAN" || s === "PULANG") return "purple";
   return "";
 }

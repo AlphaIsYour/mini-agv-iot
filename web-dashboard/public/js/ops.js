@@ -87,6 +87,7 @@
     if (data.waiting != null) t.waiting = !!data.waiting;
     if (data.distance_cm != null) t.distance = Number(data.distance_cm);
     if (data.loadcell_g != null) t.loadcell = Number(data.loadcell_g);
+    if (data.mission_type) t.missionType = data.mission_type;
     if (ir.length === 5) t.ir = ir;
     if (Object.keys(data || {}).length) {
       t.lastSeen = Date.now();
@@ -138,29 +139,37 @@
     setCheck("esp", fresh && t.online ? "ok" : "bad", fresh ? "Telemetry AGV masuk." : "Belum ada telemetry terbaru.");
     setCheck("mqtt", t.mqtt ? "ok" : "bad", t.mqtt ? "Firmware terhubung broker." : "MQTT belum terkonfirmasi.");
     setCheck("tare", state.taredSeen ? "ok" : "warn", state.taredSeen ? "Loadcell pernah terbaca nol." : "Tekan Tare saat kosong.");
-    setCheck("cargo", cargo ? "ok" : "bad", cargo ? `${t.loadcell.toFixed(0)} g` : "Barang belum terdeteksi.");
+    setCheck("cargo", cargo ? "ok" : "warn", cargo ? `${t.loadcell.toFixed(0)} g` : "Barang belum terdeteksi — AGV akan menunggu.");
     setCheck("ir", irValid ? "ok" : "bad", irValid ? `Pattern ${t.ir}` : "Pattern IR belum lengkap.");
     setCheck("ultrasonic", ultrasonicOk ? "ok" : ultrasonicWarn ? "warn" : "bad", ultrasonicWarn ? "999 cm: tidak ada pantulan." : "Cek jarak depan.");
     setCheck("base", atBase ? "ok" : "warn", atBase ? "AGV berada di blackbox base." : "Pastikan AGV start dari base.");
 
-    const criticalReady = state.demoActive || (fresh && t.online && t.mqtt && cargo && irValid && (atBase || t.fsm !== "IDLE"));
+    // Semua tombol (pengantaran + pickup) bisa dipencet tanpa cargo
+    const readyToSend = state.demoActive || (fresh && t.online && t.mqtt && irValid && (atBase || t.fsm !== "IDLE"));
+    const inTransit = ["KEBERANGKATAN", "PULANG", "SAMPAI", "MENUNGGU_BARANG_JEMPUT"].includes(t.fsm);
     ["A", "B", "C"].forEach((dest) => {
       const btn = el(`btn-${dest}`);
-      if (!btn) return;
-      btn.disabled = !criticalReady || ["KEBERANGKATAN", "PULANG", "SAMPAI"].includes(t.fsm);
-      btn.title = btn.disabled ? "Pre-flight belum aman untuk mulai misi." : "";
+      if (btn) {
+        btn.disabled = !readyToSend || inTransit;
+        btn.title = btn.disabled ? "Pre-flight belum aman untuk mulai misi." : "";
+      }
+      const pbtn = el(`btn-pickup-${dest}`);
+      if (pbtn) {
+        pbtn.disabled = !readyToSend || inTransit;
+        pbtn.title = pbtn.disabled ? "Pre-flight belum aman untuk pickup." : "";
+      }
     });
 
     const summary = el("preflight-summary");
     if (summary) {
-      summary.className = "preflight-summary " + (criticalReady ? "ok" : cargo ? "warn" : "bad");
+      summary.className = "preflight-summary " + (readyToSend ? (cargo ? "ok" : "warn") : "bad");
       summary.textContent = state.demoActive
         ? "Demo Mode aktif: command disimulasikan di dashboard."
-        : criticalReady
-          ? "Ready: misi bisa dimulai."
-          : cargo
-            ? "Cek koneksi/base sebelum GOTO."
-            : "Tahan GOTO: barang belum terdeteksi.";
+        : readyToSend
+          ? cargo
+            ? "Ready: misi bisa dimulai."
+            : "Siap. Barang belum terdeteksi — AGV akan menunggu di base."
+          : "Cek koneksi/base sebelum mulai misi.";
     }
   }
 
@@ -193,6 +202,9 @@
     } else if (t.fsm === "SAMPAI") {
       decision = "WAITING_UNLOAD";
       sub = "Menunggu barang diambil dari loadcell.";
+    } else if (t.fsm === "MENUNGGU_BARANG_JEMPUT") {
+      decision = "WAITING_PICKUP_CARGO";
+      sub = "Menunggu barang ditaruh di loadcell untuk dijemput.";
     } else if (t.fsm === "PULANG") {
       decision = "RETURNING_TO_BASE";
       sub = `Kembali dari titik ${missionName(t.mission)}.`;
@@ -248,6 +260,7 @@
     if (t.fsm !== state.lastFsm || t.mission !== state.lastMission) {
       if (t.fsm === "KEBERANGKATAN") addTimeline(`Mission ${missionName(t.mission)} started`, "");
       if (t.fsm === "SAMPAI") addTimeline(`Arrived at ${missionName(t.mission)}`, "ok");
+      if (t.fsm === "MENUNGGU_BARANG_JEMPUT") addTimeline(`Menunggu barang di ${missionName(t.mission)}`, "warn");
       if (t.fsm === "PULANG") addTimeline("Returning to base", "");
       if (t.fsm === "SELESAI") addTimeline("Mission completed", "ok");
       if (t.fsm === "ERROR_STATE") addTimeline("Error state entered", "warn");
@@ -433,6 +446,16 @@
         state.demoStep = 2;
         applyDemoFrame({ ...demoFrames[2], mission });
         if (typeof toast === "function") toast("Demo Mission", `Simulasi menuju ${missionName(mission)}`, "success", 1800);
+        return;
+      }
+
+      if (state.demoActive && /^PICKUP_/.test(cmd)) {
+        const mission = cmd.endsWith("_A") ? 1 : cmd.endsWith("_B") ? 2 : 3;
+        state.demoMission = mission;
+        state.timeline = [];
+        state.demoStep = 2;
+        applyDemoFrame({ ...demoFrames[2], mission, mission_type: "PICKUP" });
+        if (typeof toast === "function") toast("Demo Pickup", `Simulasi jemput dari ${missionName(mission)}`, "success", 1800);
         return;
       }
 

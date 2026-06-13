@@ -171,6 +171,7 @@ function handleMessage({ topic, data, api, pong }) {
   switch (topic) {
     case "xora/snapshot":
       applySnapshot(data);
+      if (data?.missionType) window.currentMissionType = data.missionType;
       if (typeof window.opsHandleTelemetry === "function") {
         window.opsHandleTelemetry({
           state: data?.state,
@@ -179,6 +180,7 @@ function handleMessage({ topic, data, api, pong }) {
           waiting: data?.waiting,
           distance_cm: data?.sensors?.ultrasonic,
           loadcell_g: data?.sensors?.loadcell,
+          mission_type: data?.missionType,
           ...(data?.sensors?.ir || {}),
           mqtt_connected: true,
         });
@@ -244,6 +246,9 @@ function handleMessage({ topic, data, api, pong }) {
         }
         if (data.alive_mode != null && typeof updateAliveModeUI === "function") {
           updateAliveModeUI(!!data.alive_mode);
+        }
+        if (data.mission_type) {
+          window.currentMissionType = data.mission_type;
         }
         if (typeof window.opsHandleTelemetry === "function") window.opsHandleTelemetry(data);
       }

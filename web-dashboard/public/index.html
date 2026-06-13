@@ -33,6 +33,7 @@
     <link rel="stylesheet" href="css/xora.css" id="theme-xora" disabled />
     <link rel="stylesheet" href="css/responsive-polish.css" />
     <link rel="stylesheet" href="css/simulation3d.css" />
+    <link rel="stylesheet" href="css/tour.css" />
   </head>
   <body>
     <!-- ══ THEME TRANSITION OVERLAY ══════════════════════════════════════════ -->
@@ -166,7 +167,10 @@
         <div class="sidebar-spacer"></div>
 
         <div class="sidebar-footer">
-          <div class="sf-item">STATE: <span id="sf-state">IDLE</span></div>
+          <div class="sf-item" style="display:flex;align-items:center;gap:6px;">
+            <span>STATE: <span id="sf-state">IDLE</span></span>
+            <button class="tour-help-btn" id="btn-tour-help" title="User Guide — klik untuk mulai tour" onclick="if(window.XORA_TOUR)XORA_TOUR.start()">?</button>
+          </div>
           <div class="sf-item">MISSION: <span id="sf-dest">—</span></div>
           <div class="sf-item">BB: <span id="sf-bb">0</span></div>
           <div class="sf-item" id="sf-uptime">UP: —</div>
@@ -391,10 +395,11 @@
                 </svg>
               </div>
 
-              <!-- Mode chips: hanya AUTO dan MANUAL -->
+              <!-- Mode chips: AUTO, MANUAL, PICKUP -->
               <div class="mode-row" id="mode-chips">
                 <div class="mchip active" data-mode="AUTO">AUTO</div>
                 <div class="mchip" data-mode="MANUAL">MAN</div>
+                <div class="mchip" data-mode="PICKUP">JEMPUT</div>
               </div>
             </div>
 
@@ -446,6 +451,25 @@
                     <span id="waiting-status" style="font-size: 11px">—</span>
                   </div>
                 </div>
+                </section>
+
+                <!-- Penjemputan — pickup barang dari titik -->
+                <section class="command-section pickup-section">
+                  <div class="dest-label"><i class="fa-solid fa-hand-holding icon"></i>Penjemputan</div>
+                  <div class="dest-row">
+                    <button class="btn-dest pickup" id="btn-pickup-A" onclick="sendCmd('PICKUP_A')">
+                      <span class="dl">A</span>
+                      <span class="ds">Jemput A</span>
+                    </button>
+                    <button class="btn-dest pickup" id="btn-pickup-B" onclick="sendCmd('PICKUP_B')">
+                      <span class="dl">B</span>
+                      <span class="ds">Jemput B</span>
+                    </button>
+                    <button class="btn-dest pickup" id="btn-pickup-C" onclick="sendCmd('PICKUP_C')">
+                      <span class="dl">C</span>
+                      <span class="ds">Jemput C</span>
+                    </button>
+                  </div>
                 </section>
 
                 <!-- Manual Control -->
@@ -1730,6 +1754,7 @@
     <script src="js/missions.js"></script>
     <script src="js/controls.js"></script>
     <script src="js/ops.js"></script>
+    <script src="js/tour.js"></script>
     <script type="module" src="js/simulation3d.js"></script>
     <script>
       // FASE 8: 3D Sim — XORA World integration

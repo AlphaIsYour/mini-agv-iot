@@ -125,7 +125,7 @@ window.updateAGVVisual = function (state, mission) {
     if (route && currentRouteKey !== routeKey) {
       animateAGVAlongTrack(route, routeKey);
     }
-  } else if (state === "SAMPAI") {
+  } else if (state === "SAMPAI" || state === "MENUNGGU_BARANG_JEMPUT") {
     marker.classList.add("agv-arrived");
     stopAnimation();
     currentRouteKey = "";
@@ -279,7 +279,8 @@ window.sendCmd = function (cmd) {
     return;
   }
   if (typeof window.wsSend === "function") {
-    if (/^(GOTO_|RETURN)/.test(cmd)) window.setControlMode("AUTO");
+    if (/^PICKUP_/.test(cmd)) window.setControlMode("PICKUP");
+    else if (/^(GOTO_|RETURN)/.test(cmd)) window.setControlMode("AUTO");
     window.wsSend({
       type: "command",
       command: cmd,
