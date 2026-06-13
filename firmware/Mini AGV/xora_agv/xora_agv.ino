@@ -40,7 +40,7 @@
 #include <HX711.h>
 
 // ================= MQTT (WiFi via WiFiManager, tidak hardcoded) =================
-const char* MQTT_HOST     = "156.230.188.87";  // VPS MQTT broker
+const char* MQTT_HOST     = "broker.hivemq.com";  // Public broker (testing lokal)
 const uint16_t MQTT_PORT  = 1883;
 const char* MQTT_USER     = "";
 const char* MQTT_PASSWORD = "";

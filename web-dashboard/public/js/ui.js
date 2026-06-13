@@ -805,6 +805,7 @@ window.loadSystemInfo = function () {
    API RESPONSE ROUTER (called from websocket.js)
 ══════════════════════════════════════════════════════════════════════════════ */
 window.handleAPIResponse = function (api, data) {
+  console.log(`[API] Response ${api}:`, data);
   switch (api) {
     case "stats_summary":
       renderStats(data);

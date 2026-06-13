@@ -117,7 +117,11 @@ window.wsSend = function (payload) {
 };
 
 window.requestAPI = function (api, params = {}) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    console.warn(`[API] Skipped ${api} — WS not connected (state=${ws?.readyState})`);
+    return;
+  }
+  console.log(`[API] Requesting ${api}`, params);
   ws.send(JSON.stringify({ api, params }));
 };
 

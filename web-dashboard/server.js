@@ -214,7 +214,7 @@ async function completeMission(status) {
       `SELECT EXTRACT(EPOCH FROM (NOW() - created_at)) as dur FROM agv_missions WHERE id = $1`,
       [currentMission.id],
     );
-    const duration = durationRes.rows[0]?.dur || null;
+    const duration = parseFloat(durationRes.rows[0]?.dur) || null;
     await db.query(
       `UPDATE agv_missions SET status = $1, duration_seconds = $2, returned_at = NOW() WHERE id = $3`,
       [status, duration, currentMission.id],
@@ -866,7 +866,9 @@ wss.on("connection", (ws, req) => {
       }
 
       if (msg.api) {
+        console.log(`[API] Request: ${msg.api}`, msg.params);
         const resp = await handleAPI(msg.api, msg.params || {});
+        console.log(`[API] Response ${msg.api}:`, resp ? 'OK' : 'NULL');
         ws.send(
           JSON.stringify({
             topic: "xora/api",
@@ -983,17 +985,16 @@ async function handleAPI(api, params) {
 
       const countResult = await db.query(
         `SELECT COUNT(*) as total FROM agv_events
-         WHERE ts > NOW() - INTERVAL $1 ${sourceFilter}`,
-        [since],
+         WHERE ts > NOW() - INTERVAL '${since}' ${sourceFilter}`,
       );
       const total = parseInt(countResult.rows[0]?.total) || 0;
 
       const { rows } = await db.query(
         `SELECT id, code, message, state, destination, mode, source, ts
          FROM agv_events
-         WHERE ts > NOW() - INTERVAL $1 ${sourceFilter}
-         ORDER BY ts DESC LIMIT $2 OFFSET $3`,
-        [since, limit, page * limit],
+         WHERE ts > NOW() - INTERVAL '${since}' ${sourceFilter}
+         ORDER BY ts DESC LIMIT $1 OFFSET $2`,
+        [limit, page * limit],
       );
       return { rows, total };
     }
@@ -1002,13 +1003,12 @@ async function handleAPI(api, params) {
         rows: [ss],
       } = await db.query(
         `SELECT
-           COUNT(*) FILTER (WHERE ts > NOW() - INTERVAL $1) as events_range,
-           COUNT(*) FILTER (WHERE (code IN ('ARRIVED','SAMPAI','CMD_SENT')) AND ts > NOW() - INTERVAL $1) as deliveries_range,
-           COUNT(*) FILTER (WHERE (code LIKE '%ERROR%' OR code LIKE '%FAIL%' OR code LIKE '%LOST%' OR code = 'ESTOP' OR code = 'OBSTACLE_DETECTED') AND ts > NOW() - INTERVAL $1) as errors_range,
+           COUNT(*) FILTER (WHERE ts > NOW() - INTERVAL '${since}') as events_range,
+           COUNT(*) FILTER (WHERE (code IN ('ARRIVED','SAMPAI','CMD_SENT')) AND ts > NOW() - INTERVAL '${since}') as deliveries_range,
+           COUNT(*) FILTER (WHERE (code LIKE '%ERROR%' OR code LIKE '%FAIL%' OR code LIKE '%LOST%' OR code = 'ESTOP' OR code = 'OBSTACLE_DETECTED') AND ts > NOW() - INTERVAL '${since}') as errors_range,
            COUNT(*) as total_events,
            (SELECT COUNT(DISTINCT ts::date) FROM agv_events) as active_days
          FROM agv_events`,
-        [since],
       );
       return ss;
     }
@@ -1016,9 +1016,8 @@ async function handleAPI(api, params) {
       const { rows } = await db.query(
         `SELECT state, COUNT(*) as count
          FROM agv_events
-         WHERE ts > NOW() - INTERVAL $1 AND state IS NOT NULL
+         WHERE ts > NOW() - INTERVAL '${since}' AND state IS NOT NULL
          GROUP BY state ORDER BY count DESC`,
-        [since],
       );
       return rows;
     }
@@ -1093,8 +1092,7 @@ async function handleAPI(api, params) {
 
         const countResult = await db.query(
           `SELECT COUNT(*) as total FROM agv_missions
-           WHERE created_at > NOW() - INTERVAL $1 ${destFilter} ${statusFilter}`,
-          [since],
+           WHERE created_at > NOW() - INTERVAL '${since}' ${destFilter} ${statusFilter}`,
         );
         const total = parseInt(countResult.rows[0]?.total) || 0;
 
@@ -1104,9 +1102,9 @@ async function handleAPI(api, params) {
                   arrived_at, cargo_removed_at, return_departed_at,
                   returned_at, duration_seconds
            FROM agv_missions
-           WHERE created_at > NOW() - INTERVAL $1 ${destFilter} ${statusFilter}
-           ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-          [since, limit, page * limit],
+           WHERE created_at > NOW() - INTERVAL '${since}' ${destFilter} ${statusFilter}
+           ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+          [limit, page * limit],
         );
 
         // Summary stats
@@ -1119,8 +1117,7 @@ async function handleAPI(api, params) {
              AVG(duration_seconds) FILTER (WHERE status = 'COMPLETED') as avg_duration,
              AVG(cargo_weight) FILTER (WHERE cargo_weight IS NOT NULL) as avg_weight
            FROM agv_missions
-           WHERE created_at > NOW() - INTERVAL $1`,
-          [since],
+           WHERE created_at > NOW() - INTERVAL '${since}'`,
         );
 
         console.log(`[API] mission_log: ${total} rows, range=${since}, stats=${JSON.stringify(statsResult.rows[0])}`);
