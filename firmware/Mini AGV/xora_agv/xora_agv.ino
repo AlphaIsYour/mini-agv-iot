@@ -150,21 +150,21 @@ unsigned long bReturnSearchMaxMs = 1800;
 int bReturnSearchLeftPwm  = 150;
 int bReturnSearchRightPwm = -80;
 
-int turnPowerKiri  = 220;
-int turnPowerKanan = 230;
+int turnPowerKiri  = 245;
+int turnPowerKanan = 245;
 
 // ================= OBSTACLE — PARAMETER SEDERHANA =================
 #define JARAK_HALANGAN_CM 25
 const unsigned long OBSTACLE_COOLDOWN_MS = 1200;
 
 int avoidTurnRightMs   = 500;
-int avoidTurnRightPwm  = 180;
+int avoidTurnRightPwm  = 205;
 
 int avoidForward1Ms    = 900;
 int avoidForward1Spd   = 145;
 
 int avoidTurnLeftMs    = 800;
-int avoidTurnLeftPwm   = 180;
+int avoidTurnLeftPwm   = 215;
 
 int avoidForward2Ms    = 650;
 int avoidForward2Spd   = 145;
@@ -175,7 +175,7 @@ int obstacleServoStepDelayMs = 18;
 unsigned long obstacleCooldownUntil = 0;
 
 // ================= RETURN TURN =================
-int returnTurnAms = 600;
+int returnTurnAms = 750;
 int returnTurnBms = 750;
 int returnTurnCms = 650;
 
@@ -251,9 +251,9 @@ bool aliveServoDirection = true;  // true = ke kanan, false = ke kiri
 unsigned long aliveServoStepAt = 0;
 
 const unsigned long ALIVE_TURN_DURATION_MS   = 800;   // Durasi belok
-const int           ALIVE_TURN_PWM           = 100;   // Power belok (pelan)
+int                 ALIVE_TURN_PWM           = 140;   // Power belok alive
 const unsigned long ALIVE_MAJU_DURATION_MS   = 600;   // Durasi maju
-const int           ALIVE_MAJU_PWM           = 90;    // Power maju (pelan)
+int                 ALIVE_MAJU_PWM           = 115;   // Power maju alive
 const unsigned long ALIVE_PAUSE_DURATION_MS  = 5000;  // Diam 5 detik sambil servo gerak
 const unsigned long ALIVE_REST_DURATION_MS   = 3000;  // Diam sebelum ulang
 const unsigned long ALIVE_SERVO_INTERVAL_MS  = 1500;  // Servo gerak tiap 1.5 detik
@@ -419,11 +419,13 @@ void setup() {
   Serial.println("=== XORA AGV READY ===");
   Serial.println("Tuning obstacle baru (jalur lurus):");
   Serial.println("ar500 = avoidTurnRightMs");
-  Serial.println("ap180 = avoidTurnRightPwm");
+  Serial.println("ap205 = avoidTurnRightPwm");
   Serial.println("af700 = avoidForward1Ms");
   Serial.println("al500 = avoidTurnLeftMs");
-  Serial.println("aq180 = avoidTurnLeftPwm");
+  Serial.println("aq215 = avoidTurnLeftPwm");
   Serial.println("ag800 = avoidForward2Ms");
+  Serial.println("au140 = aliveTurnPwm");
+  Serial.println("am115 = aliveMajuPwm");
 }
 
 // ================================================
@@ -1538,6 +1540,7 @@ void prosesPerintah(String input) {
   }
 
   if (input == "forward") {
+    if (aliveMode) aliveOff();
     missionState = MANUAL; speedBoostKiri = 0;
     majuLurus(baseSpeed);
     setOledMode(OLED_TEXT);
@@ -1545,6 +1548,7 @@ void prosesPerintah(String input) {
     kirimState(); return;
   }
   if (input == "backward") {
+    if (aliveMode) aliveOff();
     missionState = MANUAL; speedBoostKiri = 0;
     setMotors(-baseSpeed, -baseSpeed);
     setOledMode(OLED_TEXT);
@@ -1552,6 +1556,7 @@ void prosesPerintah(String input) {
     kirimState(); return;
   }
   if (input == "left") {
+    if (aliveMode) aliveOff();
     missionState = MANUAL; speedBoostKiri = 0;
     putarKiri(turnPowerKiri);
     setOledMode(OLED_TEXT);
@@ -1559,6 +1564,7 @@ void prosesPerintah(String input) {
     kirimState(); return;
   }
   if (input == "right") {
+    if (aliveMode) aliveOff();
     missionState = MANUAL; speedBoostKiri = 0;
     putarKanan(turnPowerKanan);
     setOledMode(OLED_TEXT);
@@ -1588,6 +1594,8 @@ void prosesPerintah(String input) {
   else if (input.startsWith("al"))  avoidTurnLeftMs   = input.substring(2).toInt();
   else if (input.startsWith("aq"))  avoidTurnLeftPwm  = input.substring(2).toInt();
   else if (input.startsWith("ag"))  avoidForward2Ms   = input.substring(2).toInt();
+  else if (input.startsWith("au"))  ALIVE_TURN_PWM    = input.substring(2).toInt();
+  else if (input.startsWith("am"))  ALIVE_MAJU_PWM    = input.substring(2).toInt();
 
   else if (input.startsWith("p"))   Kp             = input.substring(1).toFloat();
   else if (input.startsWith("d"))   Kd             = input.substring(1).toFloat();
@@ -1612,7 +1620,9 @@ void prosesPerintah(String input) {
   Serial.print(" fwd1="); Serial.print(avoidForward1Ms);
   Serial.print("ms avoidL="); Serial.print(avoidTurnLeftMs);
   Serial.print("ms/"); Serial.print(avoidTurnLeftPwm);
-  Serial.print(" fwd2="); Serial.println(avoidForward2Ms);
+  Serial.print(" fwd2="); Serial.print(avoidForward2Ms);
+  Serial.print(" aliveTurn="); Serial.print(ALIVE_TURN_PWM);
+  Serial.print(" aliveMaju="); Serial.println(ALIVE_MAJU_PWM);
 }
 
 // ================= STATE & TELEMETRY =================

@@ -1720,7 +1720,7 @@
             <!-- iframe folio world -->
             <iframe
               id="sim3d-iframe"
-              src="http://localhost:5173"
+              src="about:blank"
               style="width:100%;height:100%;border:none;display:block"
               allowfullscreen
             ></iframe>
@@ -1730,13 +1730,13 @@
               <i class="fa-solid fa-cube" style="font-size:48px;color:var(--accent,#4488ff)"></i>
               <div style="font-size:18px;font-weight:700">3D World Offline</div>
               <div style="font-size:12px;color:#556677;text-align:center;max-width:400px;line-height:1.6">
-                XORA world belum berjalan.<br>
-                Jalankan perintah berikut di terminal:
+                XORA world belum bisa dimuat.<br>
+                Cek URL folio atau jalankan server lokal:
               </div>
               <div style="background:rgba(0,0,0,0.5);border:1px solid rgba(0,220,180,0.3);border-radius:6px;padding:12px 18px;font-size:12px;color:#00e8c0;user-select:all">
                 cd agv-iot/web-dashboard/folio && npm run dev
               </div>
-              <button class="btn-sm" onclick="document.getElementById('sim3d-iframe').src='http://localhost:5173';document.getElementById('sim3d-fallback').style.display='none'" style="margin-top:8px">
+              <button class="btn-sm" id="sim3d-retry" style="margin-top:8px">
                 <i class="fa-solid fa-arrows-rotate icon"></i>Retry Connection
               </button>
             </div>
@@ -1759,20 +1759,41 @@
     <script>
       // FASE 8: 3D Sim — XORA World integration
       (function() {
+        const DEFAULT_FOLIO_URL = 'http://localhost:5173';
         const iframe = document.getElementById('sim3d-iframe');
         const fallback = document.getElementById('sim3d-fallback');
         const openTab = document.getElementById('sim3d-open-tab');
         const reloadFrame = document.getElementById('sim3d-reload-frame');
+        const retryBtn = document.getElementById('sim3d-retry');
+        let folioUrl = DEFAULT_FOLIO_URL;
+
+        function normalizeUrl(url) {
+          return String(url || DEFAULT_FOLIO_URL).replace(/\/+$/, '');
+        }
+
+        async function loadRuntimeConfig() {
+          try {
+            const res = await fetch('/api/runtime-config', { cache: 'no-store' });
+            if (!res.ok) throw new Error('runtime config failed');
+            const config = await res.json();
+            folioUrl = normalizeUrl(config.folioUrl);
+          } catch (err) {
+            console.warn('[3D] Runtime config fallback:', err.message);
+            folioUrl = DEFAULT_FOLIO_URL;
+          }
+        }
+
+        function loadIframe() {
+          if (iframe && normalizeUrl(iframe.src) !== folioUrl) iframe.src = folioUrl;
+        }
 
         // Health check: cek apakah folio server berjalan
         function checkFolioServer() {
-          fetch('http://localhost:5173', { mode: 'no-cors', cache: 'no-store' })
+          fetch(folioUrl, { mode: 'no-cors', cache: 'no-store' })
             .then(() => {
               // Server berjalan — sembunyikan fallback, load iframe
               if (fallback) fallback.style.display = 'none';
-              if (iframe && !iframe.src.includes('localhost:5173')) {
-                iframe.src = 'http://localhost:5173';
-              }
+              loadIframe();
             })
             .catch(() => {
               // Server tidak berjalan — tampilkan fallback
@@ -1782,7 +1803,7 @@
 
         // Cek saat page pertama kali diakses
         if (fallback) fallback.style.display = 'flex'; // tampilkan fallback dulu
-        checkFolioServer();
+        loadRuntimeConfig().then(checkFolioServer);
 
         // Cek ulang setiap 10 detik (auto-reconnect)
         setInterval(checkFolioServer, 10000);
@@ -1790,7 +1811,7 @@
         // Open in new tab
         if (openTab) {
           openTab.addEventListener('click', () => {
-            window.open('http://localhost:5173', '_blank');
+            window.open(folioUrl, '_blank');
           });
         }
 
@@ -1798,7 +1819,14 @@
         if (reloadFrame) {
           reloadFrame.addEventListener('click', () => {
             checkFolioServer();
-            if (iframe) iframe.src = 'http://localhost:5173';
+            loadIframe();
+          });
+        }
+
+        if (retryBtn) {
+          retryBtn.addEventListener('click', () => {
+            if (fallback) fallback.style.display = 'none';
+            checkFolioServer();
           });
         }
 

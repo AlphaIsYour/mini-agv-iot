@@ -42,6 +42,19 @@ const IS_PROD = process.env.NODE_ENV === "production";
 const HTTP_PORT = parseInt(process.env.PORT) || 3000;
 const WS_PORT = parseInt(process.env.WS_PORT) || 3001;
 const SERVER_START = new Date().toISOString();
+const DEFAULT_FOLIO_URL = "http://localhost:5173";
+const FOLIO_URL = (process.env.FOLIO_URL || DEFAULT_FOLIO_URL).replace(/\/+$/, "");
+const FOLIO_PUBLIC_WS_TOKEN = process.env.FOLIO_PUBLIC_WS_TOKEN || "";
+
+function getOrigin(url) {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
+const FOLIO_ORIGIN = getOrigin(FOLIO_URL);
 
 // ─── Database ─────────────────────────────────────────────────────────────────
 const useSSL = process.env.DB_SSL !== "false";
@@ -527,10 +540,11 @@ app.use(
           "http://156.230.188.87:3000",
           "wss:",
           "http://localhost:5173",  // folio dev server (3D world)
+          ...(FOLIO_ORIGIN ? [FOLIO_ORIGIN] : []),
         ],
         scriptSrcAttr: ["'unsafe-inline'"],
         imgSrc: ["'self'", "data:"],
-        frameSrc: ["'self'", "http://localhost:5173"],  // folio 3D world iframe
+        frameSrc: ["'self'", "http://localhost:5173", ...(FOLIO_ORIGIN ? [FOLIO_ORIGIN] : [])],  // folio 3D world iframe
         objectSrc: ["'none'"],
         upgradeInsecureRequests: null,  // Jangan paksa HTTPS (belum ada SSL)
       },
@@ -657,6 +671,12 @@ app.get("/api/csrf-token", csrfProtection, (req, res) => {
 
 // ── GET /api/ws-token ─────────────────────────────────────────────────────────
 // Setelah login, frontend minta WS token untuk auth handshake
+app.get("/api/runtime-config", (_req, res) => {
+  res.json({
+    folioUrl: FOLIO_URL,
+  });
+});
+
 app.get("/api/ws-token", auth.requireAuth, csrfProtection, (req, res) => {
   const token = auth.issueWSToken(req.session.user.username);
   res.json({ token });
@@ -769,6 +789,22 @@ wss.on("connection", (ws, req) => {
           ws.username = "dev";
           ws.role = "admin";
           console.log("[WS] DEV bypass auth (admin)");
+          ws.send(
+            JSON.stringify({
+              topic: "xora/snapshot",
+              data: agvState,
+              ts: new Date().toISOString(),
+            }),
+          );
+          return;
+        }
+
+        if (FOLIO_PUBLIC_WS_TOKEN && msg.folioToken === FOLIO_PUBLIC_WS_TOKEN) {
+          clearTimeout(authTimeout);
+          ws.authenticated = true;
+          ws.username = "folio-public";
+          ws.role = "guest";
+          console.log("[WS] FOLIO public read-only connection");
           ws.send(
             JSON.stringify({
               topic: "xora/snapshot",

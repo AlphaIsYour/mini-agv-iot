@@ -1,12 +1,15 @@
 import { Events } from "./Events.js";
 
 // ─── Konfigurasi ──────────────────────────────────────────────────────────────
-// SESUAIKAN jika port WS agv-iot berbeda
-const AGV_WS_URL = "ws://localhost:3001";
+// Kosongkan VITE_AGV_WS_URL jika folio hanya dipakai sebagai visual 3D statis.
+const AGV_WS_URL = import.meta.env.VITE_AGV_WS_URL || "";
 
-// Mode dev: bypass auth (hanya untuk development lokal)
-// Set ke false saat production / integrasi penuh dengan agv-iot auth
-const DEV_BYPASS_AUTH = true;
+// Untuk folio terpisah di Vercel, gunakan token read-only dari dashboard server.
+// Isi VITE_FOLIO_PUBLIC_WS_TOKEN sama dengan FOLIO_PUBLIC_WS_TOKEN di web-dashboard.
+const FOLIO_PUBLIC_WS_TOKEN = import.meta.env.VITE_FOLIO_PUBLIC_WS_TOKEN || "";
+
+// Hanya aktifkan bypass saat development lokal.
+const DEV_BYPASS_AUTH = import.meta.env.DEV && import.meta.env.VITE_DEV_BYPASS_AUTH === "1";
 
 // ─── AGV State (shared state untuk semua modul) ───────────────────────────────
 export const agvState = {
@@ -56,6 +59,11 @@ export class Server {
   }
 
   connect() {
+    if (!AGV_WS_URL) {
+      console.info("[AGV] WebSocket disabled. Set VITE_AGV_WS_URL to enable live sync.");
+      return;
+    }
+
     try {
       this.ws = new WebSocket(AGV_WS_URL);
 
@@ -66,7 +74,9 @@ export class Server {
         this.events.trigger("connected");
 
         // Auth handshake
-        if (DEV_BYPASS_AUTH) {
+        if (FOLIO_PUBLIC_WS_TOKEN) {
+          this.ws.send(JSON.stringify({ folioToken: FOLIO_PUBLIC_WS_TOKEN }));
+        } else if (DEV_BYPASS_AUTH) {
           // Dev mode: kirim token dummy, agv-iot server.js perlu
           // ditambahkan bypass untuk ini (lihat catatan Fase 2B)
           this.ws.send(JSON.stringify({ wsToken: "__DEV__" }));

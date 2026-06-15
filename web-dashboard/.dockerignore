@@ -1,4 +1,5 @@
 node_modules
+folio
 npm-debug.log*
 .dccache
 .env
