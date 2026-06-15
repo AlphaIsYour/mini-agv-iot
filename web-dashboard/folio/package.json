@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "main": "index.js",
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "vite --mode development",
     "build": "vite build --mode production",
@@ -38,7 +41,6 @@
     "uuid": "^11.1.0",
     "vite": "^7.2.4",
     "vite-plugin-node-polyfills": "^0.24.0",
-    "vite-plugin-restart": "^0.4.1",
     "vite-plugin-top-level-await": "^1.6.0",
     "vite-plugin-wasm": "^3.5.0"
   }
