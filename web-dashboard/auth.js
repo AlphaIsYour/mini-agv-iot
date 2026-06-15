@@ -10,8 +10,10 @@ const SALT_ROUNDS = 12;
 
 // ─── In-memory user store ─────────────────────────────────────────────────────
 // Multi-user: 4 admin + 1 guest
+const ADMIN_USERNAME = (process.env.ADMIN_USERNAME || "alphareno").trim().toLowerCase();
+
 const USER_DEFS = [
-  { username: "alphareno", password: process.env.ADMIN_PASSWORD_PLAIN || "alphareno77", role: "admin" },
+  { username: ADMIN_USERNAME, password: process.env.ADMIN_PASSWORD_PLAIN || "alphareno77", role: "admin" },
   { username: "dzaki",     password: "xoraagv2026", role: "admin" },
   { username: "derby",     password: "xoraagv2026", role: "admin" },
   { username: "ilyas",     password: "xoraagv2026", role: "admin" },
