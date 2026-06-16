@@ -1,734 +1,3338 @@
 <!doctype html>
-<html lang="en" data-theme="cyberpunk">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>XORA — Autonomous Guided Vehicle</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    /* ══ RESET ════════════════════════════════════════════════════════════ */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg: #060a14; --bg2: #0a0f1e; --bg3: #0e1428;
-      --surface: #111830; --border: #1a2444; --border2: #243056;
-      --text: #b8ccee; --text-dim: #556688; --text-bright: #e0eaff;
-      --accent: #00d4ff; --accent-dim: rgba(0,212,255,0.12);
-      --accent-glow: rgba(0,212,255,0.06); --green: #00ff88;
-      --green-dim: rgba(0,255,136,0.12); --amber: #ffb300;
-      --red: #ff3366; --purple: #a855f7; --purple-dim: rgba(168,85,247,0.12);
-      --mono: 'JetBrains Mono', monospace; --sans: 'Inter', sans-serif;
-      --display: 'Rajdhani', sans-serif;
-    }
-    html { scroll-behavior: smooth; }
-    body { font-family: var(--sans); background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
-    a { color: var(--accent); text-decoration: none; }
-
-    /* ══ GRID + NOISE OVERLAY ═══════════════════════════════════════════ */
-    body::before {
-      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
-      background:
-        linear-gradient(90deg, rgba(0,212,255,0.02) 1px, transparent 1px),
-        linear-gradient(rgba(0,212,255,0.02) 1px, transparent 1px);
-      background-size: 80px 80px;
-    }
-    body::after {
-      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
-      background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-      opacity: 0.4;
-    }
-
-    /* ══ PARALLAX STARS ═════════════════════════════════════════════════ */
-    #stars-canvas {
-      position: fixed; inset: 0; z-index: 0; pointer-events: none;
-    }
-
-    /* ══ NAVBAR ═════════════════════════════════════════════════════════ */
-    .nav {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 40px;
-      background: rgba(6,10,20,0.7); backdrop-filter: blur(20px) saturate(1.5);
-      border-bottom: 1px solid rgba(0,212,255,0.08);
-      transition: all 0.4s;
-    }
-    .nav.scrolled { background: rgba(6,10,20,0.92); border-bottom-color: rgba(0,212,255,0.15); }
-    .nav-brand {
-      display: flex; align-items: center; gap: 10px;
-      font-family: var(--display); font-weight: 700; font-size: 22px;
-      color: var(--accent); letter-spacing: 6px;
-    }
-    .nav-links { display: flex; align-items: center; gap: 28px; }
-    .nav-link {
-      font-family: var(--mono); font-size: 10px; color: var(--text-dim);
-      letter-spacing: 2px; text-transform: uppercase; transition: color 0.2s;
-      cursor: pointer; position: relative;
-    }
-    .nav-link::after {
-      content: ''; position: absolute; bottom: -4px; left: 0; width: 0; height: 1px;
-      background: var(--accent); transition: width 0.3s;
-    }
-    .nav-link:hover { color: var(--accent); }
-    .nav-link:hover::after { width: 100%; }
-    .btn-enter {
-      display: flex; align-items: center; gap: 8px;
-      padding: 10px 24px;
-      background: linear-gradient(135deg, rgba(0,212,255,0.1), rgba(0,212,255,0.03));
-      border: 1px solid rgba(0,212,255,0.4); border-radius: 4px;
-      color: var(--accent); font-family: var(--mono); font-size: 10px;
-      font-weight: 600; letter-spacing: 3px; text-transform: uppercase;
-      cursor: pointer; transition: all 0.4s; text-decoration: none;
-      position: relative; overflow: hidden;
-    }
-    .btn-enter::before {
-      content: ''; position: absolute; inset: 0;
-      background: linear-gradient(90deg, transparent, rgba(0,212,255,0.15), transparent);
-      transform: translateX(-100%); transition: transform 0.6s;
-    }
-    .btn-enter:hover::before { transform: translateX(100%); }
-    .btn-enter:hover {
-      border-color: var(--accent);
-      box-shadow: 0 0 30px rgba(0,212,255,0.2), inset 0 0 30px rgba(0,212,255,0.05);
-      transform: translateY(-2px);
-    }
-
-    /* ══ HERO ═══════════════════════════════════════════════════════════ */
-    .hero {
-      position: relative; min-height: 100vh;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      text-align: center; padding: 120px 40px 80px;
-    }
-    .hero-glow {
-      position: absolute; width: 800px; height: 800px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(0,212,255,0.06), rgba(168,85,247,0.03), transparent 70%);
-      top: 50%; left: 50%; transform: translate(-50%, -50%);
-      pointer-events: none; animation: glow-pulse 6s ease-in-out infinite;
-    }
-    @keyframes glow-pulse { 0%, 100% { opacity: 0.6; transform: translate(-50%,-50%) scale(1); } 50% { opacity: 1; transform: translate(-50%,-50%) scale(1.1); } }
-    .hero-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 6px 18px; background: rgba(0,212,255,0.08);
-      border: 1px solid rgba(0,212,255,0.2); border-radius: 20px;
-      font-family: var(--mono); font-size: 10px; color: var(--accent);
-      letter-spacing: 3px; text-transform: uppercase; margin-bottom: 28px;
-      animation: fade-in-up 1s ease-out;
-    }
-    .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse-dot 2s infinite; }
-    @keyframes pulse-dot { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,255,136,0.4); } 50% { opacity: 0.6; box-shadow: 0 0 0 6px rgba(0,255,136,0); } }
-    .hero-title {
-      font-family: var(--display); font-size: clamp(64px, 10vw, 120px);
-      font-weight: 700; letter-spacing: 12px; color: #fff; line-height: 0.9;
-      margin-bottom: 20px; animation: fade-in-up 1s ease-out 0.1s both;
-    }
-    .hero-title .accent {
-      background: linear-gradient(135deg, var(--accent), var(--purple));
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .hero-sub {
-      font-family: var(--mono); font-size: 13px; color: var(--text-dim);
-      letter-spacing: 4px; text-transform: uppercase; margin-bottom: 48px;
-      animation: fade-in-up 1s ease-out 0.2s both;
-    }
-    @keyframes fade-in-up { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-    .hero-stats {
-      display: flex; gap: 56px; margin-top: 56px;
-      animation: fade-in-up 1s ease-out 0.4s both;
-    }
-    .hero-stat { text-align: center; position: relative; }
-    .hero-stat::after {
-      content: ''; position: absolute; right: -28px; top: 50%; transform: translateY(-50%);
-      width: 1px; height: 40px; background: var(--border);
-    }
-    .hero-stat:last-child::after { display: none; }
-    .hero-stat-val {
-      font-family: var(--display); font-size: 42px; font-weight: 700; color: var(--accent);
-      text-shadow: 0 0 30px rgba(0,212,255,0.3);
-    }
-    .hero-stat-label {
-      font-family: var(--mono); font-size: 9px; color: var(--text-dim);
-      letter-spacing: 2px; text-transform: uppercase; margin-top: 4px;
-    }
-
-    /* ══ SCROLL INDICATOR ══════════════════════════════════════════════ */
-    .scroll-indicator {
-      position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
-      display: flex; flex-direction: column; align-items: center; gap: 8px;
-      animation: fade-in-up 1s ease-out 0.6s both;
-    }
-    .scroll-indicator span {
-      font-family: var(--mono); font-size: 9px; color: var(--text-dim);
-      letter-spacing: 3px; text-transform: uppercase;
-    }
-    .scroll-line {
-      width: 1px; height: 40px; background: linear-gradient(to bottom, var(--accent), transparent);
-      animation: scroll-line 2s ease-in-out infinite;
-    }
-    @keyframes scroll-line { 0%, 100% { opacity: 0.3; transform: scaleY(0.5); } 50% { opacity: 1; transform: scaleY(1); } }
-
-    /* ══ SECTIONS ═══════════════════════════════════════════════════════ */
-    section { position: relative; z-index: 1; padding: 120px 40px; }
-    .section-header { text-align: center; margin-bottom: 72px; }
-    .section-tag {
-      font-family: var(--mono); font-size: 10px; color: var(--accent);
-      letter-spacing: 4px; text-transform: uppercase; margin-bottom: 12px;
-    }
-    .section-title {
-      font-family: var(--display); font-size: 40px; font-weight: 700;
-      color: #fff; letter-spacing: 3px;
-    }
-    .section-line {
-      width: 60px; height: 2px; margin: 20px auto 0;
-      background: linear-gradient(90deg, var(--accent), var(--purple));
-      box-shadow: 0 0 15px rgba(0,212,255,0.4);
-    }
-
-    /* ══ REVEAL ANIMATION ══════════════════════════════════════════════ */
-    .reveal {
-      opacity: 0; transform: translateY(40px);
-      transition: opacity 0.8s ease-out, transform 0.8s ease-out;
-    }
-    .reveal.visible { opacity: 1; transform: translateY(0); }
-    .reveal-delay-1 { transition-delay: 0.1s; }
-    .reveal-delay-2 { transition-delay: 0.2s; }
-    .reveal-delay-3 { transition-delay: 0.3s; }
-    .reveal-delay-4 { transition-delay: 0.4s; }
-    .reveal-delay-5 { transition-delay: 0.5s; }
-
-    /* ══ FEATURES GRID ═════════════════════════════════════════════════ */
-    .features-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px; max-width: 1200px; margin: 0 auto;
-    }
-    .feature-card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 12px; padding: 36px 28px; transition: all 0.4s cubic-bezier(0.22,1,0.36,1);
-      position: relative; overflow: hidden; cursor: default;
-    }
-    .feature-card::before {
-      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-      background: linear-gradient(90deg, transparent, var(--accent), var(--purple), transparent);
-      opacity: 0; transition: opacity 0.4s;
-    }
-    .feature-card::after {
-      content: ''; position: absolute; inset: 0;
-      background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(0,212,255,0.06), transparent 60%);
-      opacity: 0; transition: opacity 0.4s; pointer-events: none;
-    }
-    .feature-card:hover { border-color: rgba(0,212,255,0.3); transform: translateY(-6px); }
-    .feature-card:hover::before { opacity: 1; }
-    .feature-card:hover::after { opacity: 1; }
-    .feature-icon {
-      width: 52px; height: 52px; display: flex; align-items: center; justify-content: center;
-      margin-bottom: 20px; border-radius: 12px;
-      background: var(--accent-dim); border: 1px solid rgba(0,212,255,0.15);
-    }
-    .feature-icon svg { width: 24px; height: 24px; }
-    .feature-title {
-      font-family: var(--display); font-size: 18px; font-weight: 600;
-      color: #fff; margin-bottom: 8px; letter-spacing: 1px;
-    }
-    .feature-desc { font-size: 13px; color: var(--text-dim); line-height: 1.7; }
-
-    /* ══ ARENA ══════════════════════════════════════════════════════════ */
-    .arena-section {
-      background: var(--bg2);
-      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
-    }
-    .arena-content {
-      display: flex; align-items: center; justify-content: center;
-      gap: 64px; max-width: 1000px; margin: 0 auto; flex-wrap: wrap;
-    }
-    .arena-svg-wrap {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 12px; padding: 28px;
-      box-shadow: 0 0 60px rgba(0,212,255,0.04);
-      position: relative;
-    }
-    .arena-svg-wrap::before {
-      content: ''; position: absolute; inset: -1px; border-radius: 12px;
-      background: linear-gradient(135deg, rgba(0,212,255,0.15), transparent, rgba(168,85,247,0.1));
-      z-index: -1; opacity: 0; transition: opacity 0.4s;
-    }
-    .arena-svg-wrap:hover::before { opacity: 1; }
-    .arena-info { max-width: 420px; }
-    .arena-info h3 {
-      font-family: var(--display); font-size: 28px; font-weight: 700;
-      color: #fff; margin-bottom: 16px;
-    }
-    .arena-info p { font-size: 14px; color: var(--text-dim); margin-bottom: 16px; line-height: 1.8; }
-    .arena-nodes { display: flex; gap: 10px; flex-wrap: wrap; }
-    .arena-node-chip {
-      display: flex; align-items: center; gap: 6px;
-      padding: 6px 14px; background: var(--bg); border: 1px solid var(--border);
-      border-radius: 6px; font-family: var(--mono); font-size: 11px; color: var(--text);
-      transition: all 0.3s;
-    }
-    .arena-node-chip:hover { border-color: var(--accent); color: var(--accent); }
-    .dot { width: 8px; height: 8px; border-radius: 50%; }
-    .dot-base { background: var(--green); box-shadow: 0 0 8px rgba(0,255,136,0.4); }
-    .dot-a { background: var(--accent); box-shadow: 0 0 8px rgba(0,212,255,0.4); }
-    .dot-b { background: var(--amber); box-shadow: 0 0 8px rgba(255,179,0,0.4); }
-    .dot-c { background: var(--red); box-shadow: 0 0 8px rgba(255,51,102,0.4); }
-
-    /* ══ TECH STACK ═════════════════════════════════════════════════════ */
-    .tech-grid {
-      display: flex; flex-wrap: wrap; justify-content: center;
-      gap: 12px; max-width: 800px; margin: 0 auto;
-    }
-    .tech-chip {
-      display: flex; align-items: center; gap: 8px;
-      padding: 10px 18px; background: var(--surface);
-      border: 1px solid var(--border); border-radius: 8px;
-      font-family: var(--mono); font-size: 12px; color: var(--text);
-      transition: all 0.3s;
-    }
-    .tech-chip:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
-    .tech-chip svg { width: 16px; height: 16px; }
-
-    /* ══ CREATOR ════════════════════════════════════════════════════════ */
-    .creator-section { text-align: center; }
-    .creator-card {
-      display: inline-flex; flex-direction: column; align-items: center;
-      gap: 16px; padding: 48px 64px; background: var(--surface);
-      border: 1px solid var(--border); border-radius: 16px;
-      position: relative; overflow: hidden;
-    }
-    .creator-card::before {
-      content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
-      background: conic-gradient(from 0deg, transparent, rgba(0,212,255,0.05), transparent, rgba(168,85,247,0.05), transparent);
-      animation: rotate-bg 10s linear infinite;
-    }
-    @keyframes rotate-bg { to { transform: rotate(360deg); } }
-    .creator-avatar {
-      width: 80px; height: 80px; border-radius: 50%;
-      background: linear-gradient(135deg, var(--accent), var(--purple));
-      display: flex; align-items: center; justify-content: center;
-      font-family: var(--display); font-size: 32px; font-weight: 700; color: #fff;
-      position: relative; z-index: 1;
-      box-shadow: 0 0 30px rgba(0,212,255,0.3);
-    }
-    .creator-name {
-      font-family: var(--display); font-size: 28px; font-weight: 700; color: #fff;
-      position: relative; z-index: 1;
-    }
-    .creator-role {
-      font-family: var(--mono); font-size: 11px; color: var(--accent);
-      letter-spacing: 2px; text-transform: uppercase;
-      position: relative; z-index: 1;
-    }
-    .creator-team { display: flex; gap: 28px; margin-top: 28px; position: relative; z-index: 1; }
-    .team-member { text-align: center; }
-    .team-avatar {
-      width: 48px; height: 48px; border-radius: 50%; background: var(--bg);
-      border: 2px solid var(--border); display: flex; align-items: center; justify-content: center;
-      font-family: var(--display); font-size: 18px; font-weight: 700; color: var(--text-dim);
-      margin: 0 auto 8px; transition: all 0.3s;
-    }
-    .team-member:hover .team-avatar { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 15px rgba(0,212,255,0.2); }
-    .team-name { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
-
-    /* ══ CTA ════════════════════════════════════════════════════════════ */
-    .cta-section {
-      text-align: center; padding: 140px 40px;
-      position: relative;
-    }
-    .cta-section::before {
-      content: ''; position: absolute; inset: 0;
-      background: radial-gradient(ellipse at center, rgba(0,212,255,0.04), transparent 70%);
-    }
-    .cta-title {
-      font-family: var(--display); font-size: 42px; font-weight: 700;
-      color: #fff; margin-bottom: 16px; position: relative;
-    }
-    .cta-sub {
-      font-size: 14px; color: var(--text-dim); margin-bottom: 36px; position: relative;
-    }
-
-    /* ══ FOOTER ═════════════════════════════════════════════════════════ */
-    footer {
-      text-align: center; padding: 32px 40px;
-      border-top: 1px solid var(--border);
-      font-family: var(--mono); font-size: 10px; color: var(--text-dim); letter-spacing: 1px;
-    }
-    footer span { color: var(--accent); }
-
-    /* ══ PARALLAX ELEMENTS ═════════════════════════════════════════════ */
-    .parallax-layer {
-      position: absolute; pointer-events: none;
-      transition: transform 0.1s linear;
-    }
-    .float-element {
-      position: absolute; border-radius: 50%; pointer-events: none;
-      animation: float 6s ease-in-out infinite;
-    }
-    @keyframes float {
-      0%, 100% { transform: translateY(0) rotate(0deg); }
-      33% { transform: translateY(-15px) rotate(5deg); }
-      66% { transform: translateY(10px) rotate(-3deg); }
-    }
-
-    /* ══ RESPONSIVE ═════════════════════════════════════════════════════ */
-    @media (max-width: 768px) {
-      .nav { padding: 12px 20px; }
-      .nav-links { gap: 16px; }
-      .nav-link { display: none; }
-      .hero { padding: 100px 20px 60px; }
-      .hero-stats { gap: 24px; }
-      .hero-stat-val { font-size: 28px; }
-      .hero-stat::after { display: none; }
-      section { padding: 60px 20px; }
-      .arena-content { flex-direction: column; gap: 32px; }
-    }
-  </style>
-</head>
-<body>
-
-  <!-- ══ STARS CANVAS ══════════════════════════════════════════════════ -->
-  <canvas id="stars-canvas"></canvas>
-
-  <!-- ══ NAVBAR ════════════════════════════════════════════════════════ -->
-  <nav class="nav" id="nav">
-    <div class="nav-brand">
-      <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-        <rect x="1" y="1" width="30" height="30" rx="4" stroke="url(#logo-grad)" stroke-width="1.5" fill="none"/>
-        <path d="M8 8L16 20L24 8" stroke="url(#logo-grad)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-        <path d="M8 24L16 12L24 24" stroke="url(#logo-grad)" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.3"/>
-        <circle cx="16" cy="16" r="2.5" fill="url(#logo-grad)"/>
-        <defs><linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#00d4ff"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs>
-      </svg>
-      XORA
-    </div>
-    <div class="nav-links">
-      <a class="nav-link" href="#features">Features</a>
-      <a class="nav-link" href="#arena">Arena</a>
-      <a class="nav-link" href="#tech">Tech</a>
-      <a class="nav-link" href="#team">Team</a>
-      <a class="btn-enter" href="/login">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M5 3V1.5A2.5 2.5 0 017.5-1h1A2.5 2.5 0 0111 1.5V3" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/></svg>
-        Enter Terminal
-      </a>
-    </div>
-  </nav>
-
-  <!-- ══ HERO ══════════════════════════════════════════════════════════ -->
-  <section class="hero" id="hero">
-    <div class="hero-glow"></div>
-    <!-- Floating elements -->
-    <div class="float-element" style="width:6px;height:6px;background:var(--accent);top:20%;left:15%;animation-delay:0s;opacity:0.4"></div>
-    <div class="float-element" style="width:4px;height:4px;background:var(--purple);top:30%;right:20%;animation-delay:1s;opacity:0.3"></div>
-    <div class="float-element" style="width:8px;height:8px;background:var(--green);bottom:25%;left:10%;animation-delay:2s;opacity:0.2"></div>
-    <div class="float-element" style="width:5px;height:5px;background:var(--amber);top:60%;right:15%;animation-delay:3s;opacity:0.3"></div>
-    <div class="float-element" style="width:3px;height:3px;background:var(--red);bottom:40%;right:30%;animation-delay:1.5s;opacity:0.2"></div>
-
-    <div class="hero-badge"><div class="dot"></div>System Online — v4.0</div>
-    <h1 class="hero-title"><span class="accent">X</span>ORA</h1>
-    <p class="hero-sub">Autonomous Guided Vehicle — Mission Control System</p>
-    <a class="btn-enter" href="/login" style="font-size:12px;padding:14px 40px;">
-      <svg width="16" height="16" viewBox="0 0 18 18" fill="none"><path d="M7 3L13 9L7 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      Launch Terminal
-    </a>
-    <div class="hero-stats">
-      <div class="hero-stat"><div class="hero-stat-val" data-count="3">0</div><div class="hero-stat-label">Destinations</div></div>
-      <div class="hero-stat"><div class="hero-stat-val" data-count="5">0</div><div class="hero-stat-label">Sensors</div></div>
-      <div class="hero-stat"><div class="hero-stat-val">24/7</div><div class="hero-stat-label">Autonomous</div></div>
-    </div>
-    <div class="scroll-indicator">
-      <span>Scroll</span>
-      <div class="scroll-line"></div>
-    </div>
-  </section>
-
-  <!-- ══ FEATURES ═════════════════════════════════════════════════════ -->
-  <section id="features">
-    <div class="section-header reveal">
-      <div class="section-tag">// capabilities</div>
-      <h2 class="section-title">System Features</h2>
-      <div class="section-line"></div>
-    </div>
-    <div class="features-grid">
-
-      <div class="feature-card reveal reveal-delay-1">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"><rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="8" r="3"/><path d="M8 16h8M8 19h5"/><path d="M18 8l3-3M18 8l3 3" stroke="var(--green)"/></svg>
-        </div>
-        <div class="feature-title">Mission Control</div>
-        <div class="feature-desc">Assign destinations (A, B, C) with one click. AGV autonomously navigates, handles intersections, and returns to base.</div>
-      </div>
-
-      <div class="feature-card reveal reveal-delay-2">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l5 3"/><circle cx="12" cy="12" r="2" fill="var(--accent)" stroke="none"/></svg>
-        </div>
-        <div class="feature-title">Real-time Telemetry</div>
-        <div class="feature-desc">Live sensor data streaming: ultrasonic, IR line follower, load cell, motor PWM — all at 2Hz via MQTT.</div>
-      </div>
-
-      <div class="feature-card reveal reveal-delay-3">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M2 10h20" opacity="0.3"/><path d="M6 16l3-4 3 2 3-5 3 3" stroke="var(--green)"/><rect x="8" y="1" width="8" height="3" rx="1" stroke="var(--amber)"/></svg>
-        </div>
-        <div class="feature-title">Analytics Dashboard</div>
-        <div class="feature-desc">Historical event charts, mission success rates, sensor trends, and error tracking — unified dashboard.</div>
-      </div>
-
-      <div class="feature-card reveal reveal-delay-1">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"><circle cx="9" cy="10" r="4"/><circle cx="15" cy="10" r="4"/><circle cx="9" cy="10" r="1.5" fill="var(--accent)" stroke="none"/><circle cx="15" cy="10" r="1.5" fill="var(--accent)" stroke="none"/><path d="M6 18c0-3 3-5 6-5s6 2 6 5" stroke="var(--purple)"/></svg>
-        </div>
-        <div class="feature-title">RoboEyes Expressions</div>
-        <div class="feature-desc">OLED with animated robot eyes — happy, confused, surprised, angry. AGV shows emotions based on state.</div>
-      </div>
-
-      <div class="feature-card reveal reveal-delay-2">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"><path d="M12 2l10 5v8l-10 5L2 15V7z"/><path d="M12 2v8l10-2M12 10L2 8" opacity="0.3"/><circle cx="12" cy="12" r="3" stroke="var(--green)"/><path d="M11 12l1 1 2-2" stroke="var(--green)"/></svg>
-        </div>
-        <div class="feature-title">3D Simulation</div>
-        <div class="feature-desc">Interactive 3D arena with Three.js. Visualize AGV movement, tracks, and missions in real-time 3D world.</div>
-      </div>
-
-      <div class="feature-card reveal reveal-delay-3">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M2 10h20M10 2v20" opacity="0.2"/><circle cx="17" cy="17" r="4" stroke="var(--red)"/><path d="M17 15v4M15 17h4" stroke="var(--red)"/><path d="M5 5l3 3M5 5h3M5 5v3" stroke="var(--green)"/></svg>
-        </div>
-        <div class="feature-title">Obstacle Avoidance</div>
-        <div class="feature-desc">Ultrasonic detects obstacles at 25cm. Servo scans, AGV navigates around and re-finds the line automatically.</div>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- ══ ARENA ════════════════════════════════════════════════════════ -->
-  <section id="arena" class="arena-section">
-    <div class="section-header reveal">
-      <div class="section-tag">// navigation</div>
-      <h2 class="section-title">Arena Map</h2>
-      <div class="section-line"></div>
-    </div>
-    <div class="arena-content">
-      <div class="arena-svg-wrap reveal">
-        <svg width="160" height="400" viewBox="0 0 120 360" fill="none">
-          <!-- Border -->
-          <rect x="1" y="1" width="118" height="358" rx="2" stroke="var(--border)" stroke-width="1" fill="rgba(6,10,20,0.8)"/>
-          <!-- Grid lines -->
-          <line x1="70" y1="18" x2="70" y2="340" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4 4"/>
-          <line x1="1" y1="180" x2="119" y2="180" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4 4"/>
-
-          <!-- Track lurus: BASE → A → B → C -->
-          <path d="M70,332 L70,28" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
-
-          <!-- Return tracks (curved secondary paths) -->
-          <path d="M70,332 C34,332 24,316 24,286 L24,62 C24,36 40,28 70,28" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 4" opacity="0.25"/>
-          <path d="M70,248 C42,248 24,260 24,286" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 4" opacity="0.25"/>
-          <path d="M70,150 C104,150 106,176 106,190 L106,294 C106,320 96,332 70,332" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 4" opacity="0.25"/>
-
-          <!-- Blackbox intersection markers -->
-          <rect x="66" y="280" width="8" height="8" rx="1" fill="var(--bg)" stroke="var(--border2)" stroke-width="0.5"/>
-          <rect x="66" y="190" width="8" height="8" rx="1" fill="var(--bg)" stroke="var(--border2)" stroke-width="0.5"/>
-          <rect x="66" y="90" width="8" height="8" rx="1" fill="var(--bg)" stroke="var(--border2)" stroke-width="0.5"/>
-
-          <!-- Zone BASE -->
-          <rect x="60" y="322" width="20" height="20" rx="2" stroke="var(--green)" stroke-width="1" fill="rgba(0,255,136,0.06)"/>
-          <rect x="62" y="324" width="16" height="16" rx="2" stroke="var(--green)" stroke-width="0.5" fill="rgba(0,255,136,0.1)"/>
-          <text x="70" y="336" text-anchor="middle" fill="var(--green)" font-family="JetBrains Mono" font-size="8" font-weight="600">BASE</text>
-
-          <!-- Zone A -->
-          <rect x="60" y="238" width="20" height="20" rx="2" stroke="var(--accent)" stroke-width="1" fill="rgba(0,212,255,0.06)"/>
-          <rect x="62" y="240" width="16" height="16" rx="2" stroke="var(--accent)" stroke-width="0.5" fill="rgba(0,212,255,0.1)"/>
-          <text x="70" y="252" text-anchor="middle" fill="var(--accent)" font-family="JetBrains Mono" font-size="9" font-weight="600">A</text>
-
-          <!-- Zone B -->
-          <rect x="60" y="140" width="20" height="20" rx="2" stroke="var(--amber)" stroke-width="1" fill="rgba(255,179,0,0.06)"/>
-          <rect x="62" y="142" width="16" height="16" rx="2" stroke="var(--amber)" stroke-width="0.5" fill="rgba(255,179,0,0.1)"/>
-          <text x="70" y="154" text-anchor="middle" fill="var(--amber)" font-family="JetBrains Mono" font-size="9" font-weight="600">B</text>
-
-          <!-- Zone C -->
-          <rect x="60" y="18" width="20" height="20" rx="2" stroke="var(--red)" stroke-width="1" fill="rgba(255,51,102,0.06)"/>
-          <rect x="62" y="20" width="16" height="16" rx="2" stroke="var(--red)" stroke-width="0.5" fill="rgba(255,51,102,0.1)"/>
-          <text x="70" y="32" text-anchor="middle" fill="var(--red)" font-family="JetBrains Mono" font-size="9" font-weight="600">C</text>
-
-          <!-- AGV marker -->
-          <g transform="translate(70,332)">
-            <circle r="12" fill="rgba(0,212,255,0.08)" stroke="var(--accent)" stroke-width="1" opacity="0.6">
-              <animate attributeName="r" values="12;14;12" dur="2s" repeatCount="indefinite"/>
-              <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
-            </circle>
-            <circle r="5" fill="var(--accent)" opacity="0.9"/>
-            <circle r="2" fill="#fff" opacity="0.8"/>
-          </g>
-        </svg>
-      </div>
-      <div class="arena-info reveal reveal-delay-2">
-        <h3>Straight-Line Track</h3>
-        <p>The arena features a straight track with 3 delivery destinations and 3 blackbox intersection markers. AGV follows the line from BASE to assigned destination, waits for cargo pickup, then autonomously returns.</p>
-        <p>Each blackbox marker increments a counter, allowing the AGV to determine when it has reached the correct destination.</p>
-        <div class="arena-nodes">
-          <div class="arena-node-chip"><div class="dot dot-base"></div>BASE — Start</div>
-          <div class="arena-node-chip"><div class="dot dot-a"></div>A — Nearest</div>
-          <div class="arena-node-chip"><div class="dot dot-b"></div>B — Mid-range</div>
-          <div class="arena-node-chip"><div class="dot dot-c"></div>C — Farthest</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══ TECH STACK ═══════════════════════════════════════════════════ -->
-  <section id="tech">
-    <div class="section-header reveal">
-      <div class="section-tag">// technology</div>
-      <h2 class="section-title">Tech Stack</h2>
-      <div class="section-line"></div>
-    </div>
-    <div class="tech-grid reveal">
-      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="14" rx="2" stroke="var(--accent)" stroke-width="1.2"/><path d="M6 6h6M6 9h6M6 12h4" stroke="var(--accent)" stroke-width="1" stroke-linecap="round"/></svg>ESP32</div>
-      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="var(--green)" stroke-width="1.2"/><path d="M9 5v4l3 2" stroke="var(--green)" stroke-width="1.2" stroke-linecap="round"/></svg>Arduino</div>
-      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><rect x="3" y="6" width="12" height="8" rx="1.5" stroke="var(--amber)" stroke-width="1.2"/><path d="M6 6V4.5A3 3 0 0112 4.5V6" stroke="var(--amber)" stroke-width="1.2"/></svg>MQTT</div>
-      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><path d="M9 2l7 4v6l-7 4-7-4V6z" stroke="var(--purple)" stroke-width="1.2" fill="none"/></svg>Node.js</div>
-      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="14" rx="7" stroke="var(--accent)" stroke-width="1.2"/><path d="M6 9h6M9 6v6" stroke="var(--accent)" stroke-width="1.2" stroke-linecap="round"/></svg>WebSocket</div>
-      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="10" rx="2" stroke="var(--green)" stroke-width="1.2"/><path d="M5 8h8M5 11h5" stroke="var(--green)" stroke-width="1" stroke-linecap="round"/></svg>PostgreSQL</div>
-      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="var(--red)" stroke-width="1.2"/><path d="M6 9c1-3 5-3 6 0s-3 5-6 0" stroke="var(--red)" stroke-width="1.2" fill="none"/></svg>RoboEyes</div>
-      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><path d="M3 14l4-10 4 6 4-8" stroke="var(--accent)" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>Three.js</div>
-      <div class="tech-chip"><svg viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="14" rx="2" stroke="var(--amber)" stroke-width="1.2"/><rect x="5" y="5" width="8" height="8" rx="1" stroke="var(--amber)" stroke-width="1"/></svg>Docker</div>
-    </div>
-  </section>
-
-  <!-- ══ CREATOR ══════════════════════════════════════════════════════ -->
-  <section id="team" class="creator-section">
-    <div class="section-header reveal">
-      <div class="section-tag">// team</div>
-      <h2 class="section-title">Built By</h2>
-      <div class="section-line"></div>
-    </div>
-    <div class="creator-card reveal">
-      <div class="creator-avatar">A</div>
-      <div class="creator-name">Alpha</div>
-      <div class="creator-role">Lead Developer & System Architect</div>
-      <div class="creator-team">
-        <div class="team-member"><div class="team-avatar">D</div><div class="team-name">Dzaki</div></div>
-        <div class="team-member"><div class="team-avatar">D</div><div class="team-name">Derby</div></div>
-        <div class="team-member"><div class="team-avatar">I</div><div class="team-name">Ilyas</div></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══ CTA ══════════════════════════════════════════════════════════ -->
-  <section class="cta-section">
-    <h2 class="cta-title reveal">Ready to Control?</h2>
-    <p class="cta-sub reveal reveal-delay-1">Access the mission control terminal to start autonomous deliveries.</p>
-    <a class="btn-enter reveal reveal-delay-2" href="/login" style="font-size:12px;padding:14px 40px;position:relative;">
-      <svg width="16" height="16" viewBox="0 0 18 18" fill="none"><path d="M7 3L13 9L7 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      Enter Terminal
-    </a>
-  </section>
-
-  <!-- ══ FOOTER ════════════════════════════════════════════════════════ -->
-  <footer><span>XORA</span> AGV System v4.0.0 &middot; ESP32 + Node.js + MQTT + PostgreSQL &middot; 2026</footer>
-
-  <!-- ══ SCRIPTS ═══════════════════════════════════════════════════════ -->
-  <script>
-    // ── Stars Canvas (Parallax Background) ─────────────────────────────
-    (function() {
-      const canvas = document.getElementById('stars-canvas');
-      const ctx = canvas.getContext('2d');
-      let w, h, stars = [], mouseX = 0, mouseY = 0;
-
-      function resize() {
-        w = canvas.width = window.innerWidth;
-        h = canvas.height = window.innerHeight;
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>XORA - Autonomous Guided Vehicle</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
       }
-      resize();
-      window.addEventListener('resize', resize);
+      :root {
+        --app-bg: #0a0a0a;
+        --sidebar-bg: #141414;
+        --panel-bg: #0a0a0a;
+        --panel-header-bg: #0a0a0a;
+        --card-bg: #1a1a1a;
+        --card-bg-soft: rgba(26, 26, 26, 0.85);
+        --input-bg: rgba(255, 255, 255, 0.06);
+        --text-main: #ffffff;
+        --text-muted: #8a8a8a;
+        --border-soft: rgba(207, 207, 207, 0.1);
+        --dot-color: rgba(207, 207, 207, 0.08);
+        --hover-bg: rgba(255, 255, 255, 0.04);
+        --active-bg: rgba(255, 255, 255, 0.08);
+        --blue: #60a5fa;
+        --green: #10b981;
+        --cyan: #22d3ee;
+        --amber: #f59e0b;
+        --red: #f43f5e;
+        --sidebar-w: 240px;
+        --sidebar-col: 80px;
+        --mono:
+          "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+        --sans:
+          "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+      [data-theme="light"] {
+        --app-bg: #f4f4f5;
+        --sidebar-bg: #eaeaec;
+        --panel-bg: #fafafa;
+        --panel-header-bg: #eaeaec;
+        --card-bg: #ffffff;
+        --card-bg-soft: rgba(255, 255, 255, 0.85);
+        --input-bg: rgba(0, 0, 0, 0.04);
+        --text-main: #171717;
+        --text-muted: #71717a;
+        --border-soft: rgba(23, 23, 23, 0.12);
+        --dot-color: rgba(23, 23, 23, 0.1);
+        --hover-bg: rgba(0, 0, 0, 0.04);
+        --active-bg: rgba(0, 0, 0, 0.06);
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        height: 100vh;
+        overflow: hidden;
+        font-family: var(--sans);
+        color: var(--text-main);
+        background: var(--sidebar-bg);
+        letter-spacing: 0;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+      }
+      .app-shell {
+        height: 100vh;
+        display: flex;
+        overflow: hidden;
+        background: var(--sidebar-bg);
+      }
+      .sidebar {
+        width: var(--sidebar-w);
+        flex: 0 0 var(--sidebar-w);
+        background: var(--sidebar-bg);
+        padding: 0 8px 12px;
+        transition:
+          width 500ms cubic-bezier(0.22, 1, 0.36, 1),
+          flex-basis 500ms cubic-bezier(0.22, 1, 0.36, 1),
+          transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+        overflow: hidden;
+      }
+      .app-shell.collapsed .sidebar {
+        width: var(--sidebar-col);
+        flex-basis: var(--sidebar-col);
+        padding-left: 8px;
+        padding-right: 8px;
+        overflow: visible;
+        position: relative;
+        z-index: 80;
+      }
+      .brand-row {
+        height: 48px;
+        padding: 0 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        white-space: nowrap;
+        transition: justify-content 500ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .app-shell.collapsed .brand-row {
+        justify-content: center;
+        padding: 0;
+      }
+      .app-shell.collapsed .brand-row {
+        height: 64px;
+        margin-bottom: 18px;
+      }
+      .app-shell.collapsed .brand-mark {
+        width: 36px;
+        height: 36px;
+        border-radius: 11px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .brand-mark {
+        margin-top: 10px;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        flex: 0 0 auto;
+        object-fit: contain;
+      }
+      .brand-copy {
+        margin-top: 18px;
+        min-width: 0;
+        transition: opacity 180ms ease;
+      }
+      .brand-copy strong {
+        display: block;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.1;
+      }
+      .brand-copy span {
+        display: block;
+        color: var(--text-muted);
+        font-family: var(--mono);
+        font-size: 10px;
+        margin-top: 2px;
+      }
+      .app-shell.collapsed .brand-copy,
+      .app-shell.collapsed .nav-label,
+      .app-shell.collapsed .sidebar-status {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .app-shell.collapsed .brand-copy {
+        display: none;
+      }
+      .app-shell.collapsed .nav-label {
+        display: none;
+      }
+      .app-shell.collapsed .section-label,
+      .app-shell.collapsed .sidebar-status {
+        display: none;
+      }
+      .section-label {
+        margin: 18px 10px 8px;
+        color: var(--text-muted);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        transition: opacity 160ms ease;
+      }
+      .nav-item {
+        height: 36px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 10px;
+        margin: 2px 0;
+        border-radius: 8px;
+        color: var(--text-muted);
+        font-size: 13px;
+        font-weight: 500;
+        position: relative;
+        transition:
+          background 160ms ease,
+          color 160ms ease;
+      }
+      .nav-item:hover {
+        background: var(--hover-bg);
+        color: var(--text-main);
+      }
+      .nav-item.active {
+        background: var(--active-bg);
+        color: var(--text-main);
+        box-shadow: inset 0 0 0 1px var(--border-soft);
+      }
+      .nav-item.active::before {
+        content: "";
+        position: absolute;
+        left: 4px;
+        top: 9px;
+        bottom: 9px;
+        width: 2px;
+        border-radius: 999px;
+        background: var(--cyan);
+      }
+      .nav-icon {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+        display: grid;
+        place-items: center;
+      }
+      .nav-icon svg {
+        width: 16px;
+        height: 16px;
+        stroke-width: 1.8;
+      }
+      .nav-label {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: opacity 160ms ease;
+      }
+      .app-shell.collapsed .nav-item {
+        width: 48px;
+        height: 48px;
+        padding: 0;
+        display: grid;
+        place-items: center;
+        gap: 0;
+        margin: 9px auto;
+        border-radius: 12px;
+      }
+      .app-shell.collapsed .nav-icon {
+        width: 16px;
+        height: 16px;
+        margin: 0;
+        transition: transform 160ms ease;
+      }
+      .app-shell.collapsed .nav-item.active .nav-icon {
+        transform: translateY(-4px);
+      }
+      .app-shell.collapsed .nav-item.active::before {
+        left: 50%;
+        top: auto;
+        bottom: 8px;
+        width: 14px;
+        height: 2px;
+        transform: translateX(-50%);
+      }
+      .app-shell.collapsed .nav-item:hover::after {
+        content: attr(data-tip);
+        position: absolute;
+        left: calc(100% + 14px);
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 500;
+        pointer-events: none;
+        background: var(--card-bg);
+        border: 1px solid var(--border-soft);
+        color: var(--text-main);
+        border-radius: 8px;
+        padding: 7px 9px;
+        font-size: 12px;
+        white-space: nowrap;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+      .sidebar-status {
+        margin: 18px 0 0;
+        border: 1px solid var(--border-soft);
+        border-radius: 10px;
+        background: var(--card-bg-soft);
+        padding: 10px;
+        transition: opacity 160ms ease;
+      }
+      .status-line {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-muted);
+        font-size: 11px;
+        margin: 7px 0;
+      }
+      .status-value {
+        color: var(--text-main);
+        font-family: var(--mono);
+        font-size: 11px;
+      }
+      .main-wrap {
+        flex: 1;
+        min-width: 0;
+        padding-top: 16px;
+        background: var(--sidebar-bg);
+      }
+      .panel {
+        height: calc(100vh - 16px);
+        position: relative;
+        overflow: hidden;
+        border-left: 1px solid var(--border-soft);
+        border-top: 1px solid var(--border-soft);
+        border-top-left-radius: 14px;
+        background:
+          radial-gradient(
+            circle at 1px 1px,
+            var(--dot-color) 1px,
+            transparent 0
+          ),
+          var(--panel-bg);
+        background-size:
+          24px 24px,
+          auto;
+      }
+      .panel-header {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 48px;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--border-soft);
+        background: var(--panel-header-bg);
+      }
+      .header-left,
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+      .icon-btn {
+        width: 32px;
+        height: 32px;
+        border: 0;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition:
+          background 160ms ease,
+          color 160ms ease;
+      }
+      .icon-btn:hover {
+        background: var(--hover-bg);
+        color: var(--text-main);
+      }
+      .icon-btn svg {
+        width: 16px;
+        height: 16px;
+        stroke-width: 1.8;
+      }
+      .theme-switch {
+        position: relative;
+        width: 72px;
+        height: 30px;
+        flex: 0 0 auto;
+        display: inline-flex;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+      }
+      .theme-switch input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .theme-track {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        border: 1px solid var(--border-soft);
+        border-radius: 999px;
+        background: linear-gradient(180deg, #151515, #242424);
+        box-shadow:
+          inset 0 2px 8px rgba(0, 0, 0, 0.8),
+          inset 0 -1px 2px rgba(255, 255, 255, 0.08);
+        transition:
+          transform 160ms ease,
+          border-color 180ms ease;
+      }
+      .theme-switch:active .theme-track {
+        transform: scale(0.97);
+      }
+      .theme-slot {
+        position: absolute;
+        left: 9px;
+        right: 9px;
+        top: 50%;
+        height: 3px;
+        transform: translateY(-50%);
+        overflow: hidden;
+        border-radius: 999px;
+        background: #06070a;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9);
+      }
+      .theme-slot-fill {
+        width: 0%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #d99a2b, #f5c76a);
+        box-shadow: 0 0 8px rgba(217, 154, 43, 0.72);
+        transition:
+          width 900ms cubic-bezier(0.4, 0, 0.2, 1),
+          background 240ms ease,
+          box-shadow 240ms ease;
+      }
+      .theme-core {
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        z-index: 3;
+        width: 22px;
+        height: 22px;
+        display: grid;
+        place-items: center;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #363636, #181818);
+        box-shadow:
+          0 3px 8px rgba(0, 0, 0, 0.7),
+          inset 0 1px 2px rgba(255, 255, 255, 0.15);
+        transition: none;
+      }
+      .theme-core-gear {
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        border: 1px dashed #6d6d6d;
+        border-radius: inherit;
+        animation: theme-core-spin 4s linear infinite;
+        transition: border-color 240ms ease;
+      }
+      .theme-core-inner {
+        z-index: 1;
+        width: 10px;
+        height: 10px;
+        border: 1px solid #1a1c28;
+        border-radius: inherit;
+        background: #f5c76a;
+        box-shadow:
+          0 0 8px rgba(245, 199, 106, 0.8),
+          inset 0 1px 2px rgba(255, 255, 255, 0.8);
+        transition:
+          background 240ms ease,
+          box-shadow 240ms ease;
+      }
+      .theme-claw {
+        position: absolute;
+        top: 0;
+        left: 100%;
+        z-index: 4;
+        width: 60px;
+        height: 100%;
+        transform: translateX(0);
+      }
+      .theme-claw-arm {
+        position: absolute;
+        top: 13px;
+        left: 16px;
+        width: 24px;
+        height: 4px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #777777, #3a3a3a);
+      }
+      .theme-claw-joint {
+        position: absolute;
+        top: 9px;
+        left: 10px;
+        width: 12px;
+        height: 12px;
+        border: 1px solid #151515;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #606060, #2c2c2c);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+      }
+      .theme-pincer {
+        position: absolute;
+        left: 0;
+        width: 16px;
+        height: 9px;
+        border: 2px solid #8a8a8a;
+        box-sizing: border-box;
+      }
+      .theme-pincer.top {
+        top: 7px;
+        border-right: 0;
+        border-bottom: 0;
+        border-radius: 9px 0 0;
+        transform: rotate(38deg);
+        transform-origin: 100% 100%;
+      }
+      .theme-pincer.bottom {
+        bottom: 7px;
+        border-top: 0;
+        border-right: 0;
+        border-radius: 0 0 0 9px;
+        transform: rotate(-38deg);
+        transform-origin: 100% 0;
+      }
+      .theme-switch input:checked ~ .theme-track {
+        border-color: rgba(72, 187, 120, 0.34);
+      }
+      .theme-switch input:checked ~ .theme-track .theme-slot-fill {
+        width: 100%;
+        background: linear-gradient(90deg, #63d29b, #b8f3cf);
+        box-shadow: 0 0 8px rgba(99, 210, 155, 0.78);
+      }
+      .theme-switch input:checked ~ .theme-track .theme-core {
+        transform: translateX(42px);
+      }
+      .theme-switch input:checked ~ .theme-track .theme-core-gear {
+        border-color: #b8f3cf;
+      }
+      .theme-switch input:checked ~ .theme-track .theme-core-inner {
+        background: #b8f3cf;
+        box-shadow:
+          0 0 8px rgba(184, 243, 207, 0.9),
+          inset 0 1px 2px rgba(255, 255, 255, 0.8);
+      }
+      .theme-switch.moving-on .theme-core {
+        animation: theme-core-on 1.15s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      }
+      .theme-switch.moving-off .theme-core {
+        animation: theme-core-off 1.15s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      }
+      .theme-switch.moving-on .theme-claw {
+        animation: theme-claw-on 1.15s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      }
+      .theme-switch.moving-off .theme-claw {
+        animation: theme-claw-off 1.15s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      }
+      .theme-switch.moving-on .theme-pincer.top,
+      .theme-switch.moving-off .theme-pincer.top {
+        animation: theme-pincer-top 1.15s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      }
+      .theme-switch.moving-on .theme-pincer.bottom,
+      .theme-switch.moving-off .theme-pincer.bottom {
+        animation: theme-pincer-bottom 1.15s cubic-bezier(0.4, 0, 0.2, 1)
+          forwards;
+      }
+      @keyframes theme-core-on {
+        0%,
+        34% {
+          transform: translateX(0);
+        }
+        66%,
+        100% {
+          transform: translateX(42px);
+        }
+      }
+      @keyframes theme-core-off {
+        0%,
+        34% {
+          transform: translateX(42px);
+        }
+        66%,
+        100% {
+          transform: translateX(0);
+        }
+      }
+      @keyframes theme-claw-on {
+        0% {
+          transform: translateX(0);
+        }
+        22%,
+        34% {
+          transform: translateX(-68px);
+        }
+        66% {
+          transform: translateX(-26px);
+        }
+        100% {
+          transform: translateX(0);
+        }
+      }
+      @keyframes theme-claw-off {
+        0% {
+          transform: translateX(0);
+        }
+        22%,
+        34% {
+          transform: translateX(-26px);
+        }
+        66% {
+          transform: translateX(-68px);
+        }
+        100% {
+          transform: translateX(0);
+        }
+      }
+      @keyframes theme-pincer-top {
+        0%,
+        18% {
+          transform: rotate(38deg);
+        }
+        28%,
+        70% {
+          transform: rotate(0deg);
+        }
+        82%,
+        100% {
+          transform: rotate(38deg);
+        }
+      }
+      @keyframes theme-pincer-bottom {
+        0%,
+        18% {
+          transform: rotate(-38deg);
+        }
+        28%,
+        70% {
+          transform: rotate(0deg);
+        }
+        82%,
+        100% {
+          transform: rotate(-38deg);
+        }
+      }
+      @keyframes theme-core-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .search-btn {
+        width: min(320px, 42vw);
+        height: 32px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 10px;
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        background: var(--input-bg);
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 13px;
+        text-align: left;
+        transition:
+          background 160ms ease,
+          border-color 160ms ease;
+      }
+      .search-btn:hover {
+        background: var(--hover-bg);
+        border-color: rgba(207, 207, 207, 0.18);
+      }
+      .search-btn svg {
+        width: 14px;
+        height: 14px;
+        flex: 0 0 auto;
+      }
+      .search-btn span {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      kbd {
+        display: inline-flex;
+        align-items: center;
+        min-height: 18px;
+        padding: 1px 6px;
+        border: 1px solid var(--border-soft);
+        border-radius: 6px;
+        background: var(--card-bg);
+        color: var(--text-muted);
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 500;
+      }
+      .content {
+        height: 100%;
+        overflow-y: auto;
+        padding: 64px 24px 24px;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(207, 207, 207, 0.2) transparent;
+      }
+      .content::-webkit-scrollbar {
+        width: 6px;
+      }
+      .content::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .content::-webkit-scrollbar-thumb {
+        background: rgba(207, 207, 207, 0.15);
+        border-radius: 999px;
+      }
+      .content::-webkit-scrollbar-thumb:hover {
+        background: rgba(207, 207, 207, 0.25);
+      }
+      .content-inner {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: grid;
+        gap: 32px;
+        padding-bottom: 24px;
+        transition: max-width 500ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .app-shell.collapsed .content-inner {
+        max-width: min(1360px, calc(100vw - 128px));
+      }
+      .section-focus {
+        animation: section-slide 420ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      @keyframes section-slide {
+        from {
+          opacity: 0.72;
+          transform: translateX(14px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+      .content-inner > *,
+      .hero-grid > *,
+      .arena-layout > *,
+      .team-grid > *,
+      .tool-grid > *,
+      .category-grid > * {
+        min-width: 0;
+      }
+      .welcome-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 20px;
+        padding-top: 4px;
+      }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 24px;
+        color: var(--text-muted);
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 500;
+        margin-bottom: 10px;
+      }
+      .live-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: var(--green);
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+      }
+      .welcome-title {
+        margin: 0;
+        font-size: clamp(24px, 4vw, 36px);
+        line-height: 1.05;
+        letter-spacing: 0;
+        font-weight: 800;
+      }
+      .welcome-copy {
+        max-width: 660px;
+        margin: 12px 0 0;
+        color: var(--text-muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+      .quick-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px 18px;
+        margin-top: 18px;
+      }
+      .quick-stat {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .quick-stat svg {
+        width: 14px;
+        height: 14px;
+      }
+      .quick-stat strong {
+        color: var(--text-main);
+        font-weight: 600;
+      }
+      .avatar-stack {
+        display: flex;
+        align-items: center;
+        padding-top: 8px;
+        margin-right: 8px;
+      }
+      .avatar {
+        width: 32px;
+        height: 32px;
+        border: 2px solid var(--panel-bg);
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        margin-left: -8px;
+        background: var(--card-bg);
+        color: var(--text-main);
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+        gap: 12px;
+      }
+      .overview-card,
+      .visual-card,
+      .tool-card,
+      .category-card,
+      .info-card,
+      .team-card {
+        border: 1px solid var(--border-soft);
+        border-radius: 12px;
+        background: var(--card-bg-soft);
+        transition:
+          border-color 180ms ease,
+          background 180ms ease,
+          transform 180ms ease;
+      }
+      .overview-card:hover,
+      .visual-card:hover,
+      .tool-card:hover,
+      .category-card:hover,
+      .info-card:hover,
+      .team-card:hover {
+        border-color: rgba(207, 207, 207, 0.18);
+        background: var(--hover-bg);
+      }
+      .overview-card {
+        padding: 20px;
+        display: grid;
+        gap: 18px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .metric {
+        min-height: 92px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px;
+        border: 1px solid var(--border-soft);
+        border-radius: 10px;
+        background: var(--card-bg);
+      }
+      .metric-label {
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .metric-value {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        font-family: var(--mono);
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text-main);
+      }
+      .metric-value span {
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .visual-card {
+        padding: 18px;
+        min-height: 236px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .visual-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .visual-title {
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 22px;
+        padding: 2px 7px;
+        border: 1px solid var(--border-soft);
+        border-radius: 6px;
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .badge.green {
+        border-color: rgba(16, 185, 129, 0.24);
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--green);
+      }
+      .agv-visual {
+        flex: 1;
+        min-height: 160px;
+        display: grid;
+        grid-template-columns: 130px minmax(0, 1fr);
+        gap: 16px;
+        align-items: center;
+      }
+      .agv-img {
+        width: 128px;
+        height: 128px;
+        object-fit: contain;
+        border-radius: 12px;
+        border: 1px solid var(--border-soft);
+        background: var(--input-bg);
+        padding: 12px;
+      }
+      .mini-feed {
+        display: grid;
+        gap: 8px;
+      }
+      .feed-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 10px;
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        background: var(--card-bg);
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+      .feed-row strong {
+        color: var(--text-main);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      .section-block {
+        scroll-margin-top: 70px;
+      }
+      #tech,
+      #team {
+        min-height: 360px;
+      }
+      #terminal {
+        min-height: 128px;
+      }
+      .section-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 16px;
+      }
+      .section-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .section-title svg {
+        width: 16px;
+        height: 16px;
+        color: var(--text-muted);
+      }
+      .section-note {
+        color: var(--text-muted);
+        font-size: 12px;
+        line-height: 1.5;
+        text-align: right;
+      }
+      .tool-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .tool-card {
+        min-height: 150px;
+        padding: 20px;
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+      }
+      .icon-box {
+        width: 36px;
+        height: 36px;
+        flex: 0 0 auto;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--hover-bg);
+        color: var(--text-muted);
+      }
+      .icon-box svg {
+        width: 16px;
+        height: 16px;
+      }
+      .tool-content {
+        min-width: 0;
+        flex: 1;
+      }
+      .tool-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .tool-title {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .tool-desc {
+        min-height: 42px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        color: var(--text-muted);
+        font-size: 12px;
+        line-height: 1.7;
+        margin: 0;
+      }
+      .tool-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 14px;
+      }
+      .category-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .category-card {
+        min-height: 74px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 8px;
+        background: var(--card-bg);
+        color: var(--text-muted);
+        font-size: 14px;
+      }
+      .category-card strong {
+        color: var(--text-main);
+        font-size: 13px;
+      }
+      .category-card span {
+        font-family: var(--mono);
+        font-size: 11px;
+      }
+      .arena-layout {
+        display: grid;
+        grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1fr);
+        gap: 12px;
+        align-items: stretch;
+      }
+      .arena-card {
+        min-height: 420px;
+        display: grid;
+        place-items: center;
+        padding: 18px;
+        border: 1px solid var(--border-soft);
+        border-radius: 12px;
+        background: var(--card-bg-soft);
+      }
+      .arena-card svg {
+        width: min(220px, 100%);
+        height: auto;
+        max-height: 430px;
+      }
+      .info-grid {
+        display: grid;
+        gap: 12px;
+      }
+      .info-card {
+        padding: 18px;
+      }
+      .info-card h3 {
+        margin: 0 0 10px;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .info-card p {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 13px;
+        line-height: 1.7;
+      }
+      .route-list {
+        display: grid;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .route-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 36px;
+        padding: 8px 10px;
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        background: var(--card-bg);
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+      .route-item strong {
+        color: var(--text-main);
+      }
+      .tech-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .tech-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
+        gap: 12px;
+      }
+      .tech-panel {
+        border: 1px solid var(--border-soft);
+        border-radius: 12px;
+        background: var(--card-bg-soft);
+        padding: 18px;
+      }
+      .tech-panel h3 {
+        margin: 0 0 12px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .tech-panel p {
+        margin: 0 0 14px;
+        color: var(--text-muted);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+      .tech-chip {
+        min-height: 34px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 11px;
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        background: var(--card-bg);
+        color: var(--text-muted);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .tech-chip i {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: var(--cyan);
+      }
+      .team-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        row-gap: 32px;
+        column-gap: 54px;
+      }
+      .team-card {
+        --photo-x: -18px;
+        --photo-scale: 1;
+        --photo-overlap: 24px;
+        --photo-text-safe: 76px;
+        min-height: 210px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 138px;
+        align-items: stretch;
+        gap: 0;
+        position: relative;
+        overflow: visible;
+        border: 0;
+        background: transparent;
+      }
+      .team-card:hover {
+        background: transparent;
+        border-color: transparent;
+      }
+      .team-copy {
+        min-width: 0;
+        min-height: 210px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 18px;
+        border: 1px solid var(--border-soft);
+        border-radius: 12px;
+        background: var(--card-bg-soft);
+        position: relative;
+        overflow: hidden;
+        transition:
+          border-color 180ms ease,
+          background 180ms ease;
+      }
+      .team-card:hover .team-copy {
+        border-color: rgba(207, 207, 207, 0.22);
+        background: var(--hover-bg);
+      }
+      .team-main {
+        position: relative;
+        z-index: 1;
+        padding-right: calc(
+          var(--photo-overlap) + var(--photo-text-safe) - 22px
+        );
+        transform: translateY(0);
+        transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .team-card:hover .team-main {
+        transform: translateY(0);
+      }
+      .team-details {
+        position: absolute;
+        left: 18px;
+        right: calc(var(--photo-overlap) + var(--photo-text-safe));
+        bottom: 14px;
+        z-index: 2;
+        display: grid;
+        gap: 9px;
+        min-height: 78px;
+        padding: 12px;
+        border: 1px solid var(--border-soft);
+        border-radius: 10px;
+        background: rgba(10, 10, 10, 0.4);
+        opacity: 0;
+        transform: translateY(26px);
+        transition:
+          opacity 220ms ease,
+          transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .team-card:hover .team-details {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .detail-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0;
+        color: var(--text-muted);
+        font-size: 12px;
+        line-height: 1.5;
+        min-width: 0;
+      }
+      .detail-row span {
+        min-width: 0;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        overflow: hidden;
+      }
+      .social-row {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: 1px;
+      }
+      .social-btn {
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        background: var(--input-bg);
+        color: var(--text-muted);
+        transition:
+          background 160ms ease,
+          color 160ms ease,
+          border-color 160ms ease,
+          transform 160ms ease;
+      }
+      .social-btn:hover {
+        background: var(--hover-bg);
+        color: var(--text-main);
+        border-color: rgba(207, 207, 207, 0.26);
+        transform: translateY(-1px);
+      }
+      .social-btn svg {
+        width: 14px;
+        height: 14px;
+        stroke-width: 1.9;
+      }
+      .team-photo {
+        height: 100%;
+        min-height: 210px;
+        position: relative;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        border-radius: 0 12px 12px 0;
+        overflow: visible;
+        z-index: 3;
+        margin-left: calc(var(--photo-overlap) * -1);
+        pointer-events: none;
+      }
+      .team-photo::before {
+        display: none;
+      }
+      .team-card:hover .team-photo::before {
+        display: none;
+      }
+      .team-photo img {
+        height: 100%;
+        max-height: 210px;
+        width: auto;
+        object-fit: contain;
+        object-position: bottom center;
+        position: relative;
+        z-index: 1;
+        filter: grayscale(1) contrast(1.08) brightness(0.92);
+        opacity: 0.86;
+        transform: translate(var(--photo-x), 2px) scale(var(--photo-scale));
+        transform-origin: bottom center;
+        transition:
+          filter 220ms ease,
+          opacity 220ms ease,
+          transform 220ms ease;
+      }
+      .team-card:hover .team-photo img {
+        opacity: 1;
+        transform: translate(var(--photo-x), 0) scale(var(--photo-scale));
+        filter: grayscale(0) drop-shadow(2px 0 0 rgba(255, 255, 255, 0.9))
+          drop-shadow(-2px 0 0 rgba(255, 255, 255, 0.9))
+          drop-shadow(0 -2px 0 rgba(255, 255, 255, 0.9))
+          drop-shadow(1px -1px 0 rgba(255, 255, 255, 0.78))
+          drop-shadow(-1px -1px 0 rgba(255, 255, 255, 0.78))
+          drop-shadow(0 10px 20px rgba(0, 0, 0, 0.32));
+      }
+      .team-card h3 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .team-card p {
+        margin: 5px 0 0;
+        color: var(--text-muted);
+        font-size: 12px;
+        line-height: 1.6;
+        transition:
+          opacity 180ms ease,
+          transform 180ms ease;
+      }
+      .cta-strip {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        min-height: 132px;
+        padding: 18px 20px;
+        border: 1px solid var(--border-soft);
+        border-radius: 12px;
+        background:
+          linear-gradient(
+            90deg,
+            var(--card-bg-soft) 0%,
+            rgba(26, 26, 26, 0.9) 58%,
+            rgba(26, 26, 26, 0.38) 100%
+          ),
+          var(--card-bg-soft);
+        overflow: hidden;
+        isolation: isolate;
+        transition:
+          border-color 180ms ease,
+          background 180ms ease;
+      }
+      .cta-strip:hover {
+        border-color: rgba(207, 207, 207, 0.24);
+        background:
+          linear-gradient(
+            90deg,
+            var(--hover-bg) 0%,
+            rgba(26, 26, 26, 0.92) 56%,
+            rgba(26, 26, 26, 0.34) 100%
+          ),
+          var(--hover-bg);
+      }
+      .cta-copy,
+      .cta-strip .primary-btn {
+        position: relative;
+        z-index: 2;
+      }
+      .cta-copy {
+        max-width: 560px;
+      }
+      .cta-strip h2 {
+        margin: 0;
+        font-size: 17px;
+      }
+      .cta-strip p {
+        margin: 6px 0 0;
+        color: var(--text-muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .gearbox {
+        position: absolute;
+        top: 50%;
+        right: -28px;
+        z-index: 1;
+        width: 210px;
+        height: 150px;
+        transform: translateY(-50%);
+        border-radius: 10px;
+        opacity: 0.48;
+        overflow: hidden;
+        pointer-events: none;
+        box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.72);
+      }
+      .gearbox::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        background:
+          radial-gradient(
+            circle at 72% 40%,
+            rgba(0, 212, 255, 0.13),
+            transparent 42%
+          ),
+          linear-gradient(90deg, rgba(26, 26, 26, 0.8), rgba(26, 26, 26, 0.12));
+      }
+      .gear {
+        position: absolute;
+        width: 60px;
+        height: 60px;
+        border-radius: 999px;
+        box-shadow:
+          0 -1px 0 rgba(255, 255, 255, 0.45),
+          0 1px 0 rgba(0, 0, 0, 0.9);
+      }
+      .gear.large {
+        width: 120px;
+        height: 120px;
+      }
+      .gear.one {
+        top: 12px;
+        left: 10px;
+      }
+      .gear.two {
+        top: 61px;
+        left: 60px;
+      }
+      .gear.three {
+        top: 110px;
+        left: 10px;
+      }
+      .gear.four {
+        top: 13px;
+        left: 128px;
+      }
+      .gear::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        z-index: 3;
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        background: #111;
+        transform: translate(-50%, -50%);
+        box-shadow:
+          0 0 10px rgba(255, 255, 255, 0.1),
+          inset 0 2px 0 #090909,
+          inset 0 -1px 0 rgba(255, 255, 255, 0.45);
+      }
+      .gear.large::after {
+        width: 96px;
+        height: 96px;
+      }
+      .gear-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: inherit;
+        background: linear-gradient(135deg, #686868, #3f3f3f);
+      }
+      .gear.one .gear-inner,
+      .gear.three .gear-inner {
+        animation: counter-clockwise 3s infinite linear;
+      }
+      .gear.two .gear-inner {
+        animation: clockwise 3s infinite linear;
+      }
+      .gear.four .gear-inner {
+        animation: counter-clockwise 6s infinite linear;
+      }
+      .gear-inner .bar {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 76px;
+        height: 16px;
+        margin: -8px 0 0 -38px;
+        border-radius: 3px;
+        border-left: 1px solid rgba(255, 255, 255, 0.12);
+        border-right: 1px solid rgba(255, 255, 255, 0.12);
+        background: linear-gradient(135deg, #5e5e5e, #424242);
+      }
+      .gear.large .bar {
+        width: 136px;
+        margin-left: -68px;
+      }
+      .gear-inner .bar:nth-child(2) {
+        transform: rotate(60deg);
+      }
+      .gear-inner .bar:nth-child(3) {
+        transform: rotate(120deg);
+      }
+      .gear-inner .bar:nth-child(4) {
+        transform: rotate(90deg);
+      }
+      .gear-inner .bar:nth-child(5) {
+        transform: rotate(30deg);
+      }
+      .gear-inner .bar:nth-child(6) {
+        transform: rotate(150deg);
+      }
+      @keyframes clockwise {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes counter-clockwise {
+        to {
+          transform: rotate(-360deg);
+        }
+      }
+      .primary-btn {
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 8px 13px;
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        background: var(--text-main);
+        color: var(--panel-bg);
+        font-size: 13px;
+        font-weight: 700;
+        white-space: nowrap;
+        transition:
+          opacity 160ms ease,
+          transform 160ms ease;
+      }
+      .primary-btn:hover {
+        opacity: 0.88;
+        transform: translateY(-1px);
+      }
+      .footer {
+        padding: 4px 0 0;
+        color: var(--text-muted);
+        font-family: var(--mono);
+        font-size: 11px;
+        text-align: center;
+      }
+      .modal {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: none;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(6px);
+        padding: 12vh 16px 16px;
+      }
+      .modal.open {
+        display: block;
+        animation: fade-in 200ms ease;
+      }
+      @keyframes fade-in {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      .command {
+        max-width: 512px;
+        margin: 0 auto;
+        border: 1px solid var(--border-soft);
+        border-radius: 12px;
+        background: var(--panel-bg);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+        transform-origin: top center;
+        animation: scale-in 150ms ease;
+      }
+      @keyframes scale-in {
+        from {
+          transform: scale(0.98);
+        }
+        to {
+          transform: scale(1);
+        }
+      }
+      .command-input {
+        height: 56px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 12px;
+        border-bottom: 1px solid var(--border-soft);
+      }
+      .command-input input {
+        width: 100%;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--text-main);
+        font-size: 14px;
+      }
+      .command-results {
+        max-height: 330px;
+        overflow-y: auto;
+        padding: 8px;
+      }
+      .result-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 10px;
+        border-radius: 8px;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition:
+          background 160ms ease,
+          color 160ms ease;
+      }
+      .result-item:hover,
+      .result-item.selected {
+        background: var(--active-bg);
+        color: var(--text-main);
+      }
+      .result-item strong {
+        display: block;
+        color: var(--text-main);
+        font-size: 13px;
+      }
+      .result-item span {
+        display: block;
+        margin-top: 3px;
+        font-size: 12px;
+      }
+      .command-footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        border-top: 1px solid var(--border-soft);
+        color: var(--text-muted);
+        font-size: 11px;
+      }
+      .mobile-open {
+        display: none;
+      }
+      @media (max-width: 980px) {
+        html,
+        body {
+          max-width: 100%;
+          overflow-x: hidden;
+        }
+        body {
+          overflow-y: auto;
+        }
+        .app-shell {
+          display: block;
+          width: 100%;
+          min-height: 100vh;
+          height: auto;
+          overflow-x: hidden;
+        }
+        .sidebar {
+          position: fixed;
+          inset: 0 auto 0 0;
+          z-index: 70;
+          transform: translateX(-100%);
+          width: 240px;
+          flex-basis: 240px;
+          border-right: 1px solid var(--border-soft);
+        }
+        .sidebar.open {
+          transform: translateX(0);
+        }
+        .app-shell.collapsed .sidebar {
+          width: 240px;
+          flex-basis: 240px;
+        }
+        .app-shell.collapsed .brand-copy,
+        .app-shell.collapsed .section-label,
+        .app-shell.collapsed .nav-label,
+        .app-shell.collapsed .sidebar-status {
+          opacity: 1;
+          pointer-events: auto;
+        }
+        .app-shell.collapsed .nav-item {
+          width: auto;
+          padding: 0 10px;
+          justify-content: flex-start;
+        }
+        .main-wrap {
+          width: 100%;
+          min-width: 0;
+          padding-top: 0;
+        }
+        .panel {
+          width: 100%;
+          min-width: 0;
+          min-height: 100vh;
+          height: auto;
+          border-left: 0;
+          border-top: 0;
+          border-radius: 0;
+        }
+        .panel-header {
+          position: sticky;
+        }
+        .content {
+          min-height: calc(100vh - 48px);
+          height: auto;
+          padding: 24px 16px;
+          overflow: visible;
+        }
+        .content-inner {
+          width: 100%;
+          max-width: 100%;
+        }
+        .section-block,
+        .hero-grid,
+        .overview-card,
+        .visual-card,
+        .tool-card,
+        .category-card,
+        .arena-card,
+        .info-card,
+        .team-card,
+        .cta-strip {
+          max-width: 100%;
+          min-width: 0;
+        }
+        .welcome-title {
+          overflow-wrap: anywhere;
+        }
+        .welcome-copy {
+          max-width: 100%;
+        }
+        .header-left {
+          flex: 1;
+        }
+        .header-right {
+          flex: 0 0 auto;
+        }
+        .mobile-open {
+          display: grid;
+        }
+        .desktop-collapse {
+          display: none;
+        }
+        .search-btn {
+          width: min(100%, 260px);
+        }
+        .hero-grid,
+        .arena-layout,
+        .tech-layout,
+        .team-grid {
+          grid-template-columns: 1fr;
+        }
+        .tool-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .overview-card {
+          grid-template-columns: 1fr;
+        }
+        .avatar-stack {
+          display: none;
+        }
+      }
+      @media (max-width: 640px) {
+        .panel-header {
+          padding: 0 10px;
+        }
+        .header-right .icon-btn:first-child {
+          display: none;
+        }
+        .search-btn {
+          width: 100%;
+          min-width: 0;
+        }
+        .search-btn kbd {
+          display: none;
+        }
+        .welcome-row {
+          display: block;
+        }
+        .welcome-title {
+          max-width: 330px;
+          line-height: 1.12;
+        }
+        .quick-stats {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+        .quick-stat {
+          min-width: 0;
+          overflow-wrap: anywhere;
+        }
+        .visual-top {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .visual-top .badge {
+          align-self: flex-start;
+        }
+        .tool-grid,
+        .category-grid {
+          grid-template-columns: 1fr;
+        }
+        .tool-card {
+          min-height: 0;
+          padding: 16px;
+        }
+        .team-card {
+          --photo-overlap: 16px;
+          min-height: 180px;
+          grid-template-columns: minmax(0, 1fr) 104px;
+        }
+        .team-copy {
+          min-height: 180px;
+          padding: 16px;
+        }
+        .team-details {
+          left: 16px;
+          right: 16px;
+          bottom: 12px;
+          z-index: 4;
+          min-height: 76px;
+          padding: 10px;
+          background: rgba(10, 10, 10, 0.74);
+        }
+        .team-card:hover .team-main {
+          transform: translateY(0);
+        }
+        .team-photo {
+          min-height: 180px;
+        }
+        .team-photo img {
+          max-height: 180px;
+        }
+        .agv-visual {
+          grid-template-columns: 1fr;
+        }
+        .agv-img {
+          width: 112px;
+          height: 112px;
+        }
+        .cta-strip {
+          align-items: flex-start;
+          flex-direction: column;
+          min-height: 150px;
+          padding-right: 18px;
+        }
+        .cta-copy {
+          max-width: calc(100% - 72px);
+        }
+        .gearbox {
+          right: -112px;
+          width: 190px;
+          opacity: 0.28;
+        }
+        .section-heading {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .section-note {
+          text-align: left;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell" id="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand-row">
+          <img
+            class="brand-mark"
+            src="/images/logo-light.png"
+            alt="XORA logo"
+          />
+          <div class="brand-copy">
+            <strong>XORA</strong>
+            <span>AGV system v4</span>
+          </div>
+        </div>
 
-      // Create stars
-      for (let i = 0; i < 120; i++) {
-        stars.push({
-          x: Math.random() * w,
-          y: Math.random() * h,
-          size: Math.random() * 1.5 + 0.3,
-          speed: Math.random() * 0.3 + 0.05,
-          opacity: Math.random() * 0.5 + 0.1,
-          parallax: Math.random() * 0.5 + 0.1,
-        });
+        <div class="section-label">Home</div>
+        <a class="nav-item active" href="#overview" data-tip="Overview">
+          <span class="nav-icon"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M3 11l9-8 9 8" />
+              <path d="M5 10v10h14V10" />
+              <path d="M9 20v-6h6v6" /></svg
+          ></span>
+          <span class="nav-label">Overview</span>
+        </a>
+        <a class="nav-item" href="#features" data-tip="Features">
+          <span class="nav-icon"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="4" y="4" width="7" height="7" rx="2" />
+              <rect x="13" y="4" width="7" height="7" rx="2" />
+              <rect x="4" y="13" width="7" height="7" rx="2" />
+              <rect x="13" y="13" width="7" height="7" rx="2" /></svg
+          ></span>
+          <span class="nav-label">System Features</span>
+        </a>
+        <a class="nav-item" href="#arena" data-tip="Arena">
+          <span class="nav-icon"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M4 6c5-3 11 3 16 0v12c-5 3-11-3-16 0z" />
+              <path d="M4 6v12" /></svg
+          ></span>
+          <span class="nav-label">Arena Map</span>
+        </a>
+
+        <div class="section-label">All Tools</div>
+        <a class="nav-item" href="#tech" data-tip="Tech">
+          <span class="nav-icon"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="7" y="7" width="10" height="10" rx="2" />
+              <path
+                d="M3 10h4M3 14h4M17 10h4M17 14h4M10 3v4M14 3v4M10 17v4M14 17v4"
+              /></svg
+          ></span>
+          <span class="nav-label">Tech Stack</span>
+        </a>
+        <a class="nav-item" href="#team" data-tip="Team">
+          <span class="nav-icon"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M16 11a4 4 0 1 0-8 0" />
+              <path d="M4 21a8 8 0 0 1 16 0" />
+              <path d="M19 8a3 3 0 0 1 2 5" /></svg
+          ></span>
+          <span class="nav-label">Team</span>
+        </a>
+        <a class="nav-item" href="/login" data-tip="Terminal">
+          <span class="nav-icon"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M4 17l6-5-6-5" />
+              <path d="M12 19h8" /></svg
+          ></span>
+          <span class="nav-label">Enter Terminal</span>
+        </a>
+
+        <div class="section-label">Recent</div>
+        <a class="nav-item" href="#features" data-tip="Telemetry">
+          <span class="nav-icon"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M4 19V5" />
+              <path d="M4 19h16" />
+              <path d="M7 15l4-4 3 3 5-7" /></svg
+          ></span>
+          <span class="nav-label">Telemetry</span>
+        </a>
+        <a class="nav-item" href="#arena" data-tip="Navigation">
+          <span class="nav-icon"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M12 2l7 19-7-4-7 4z" /></svg
+          ></span>
+          <span class="nav-label">Navigation</span>
+        </a>
+
+        <div class="section-label">Status</div>
+        <div class="sidebar-status">
+          <div class="status-line">
+            <span>Page</span><span class="status-value">PUBLIC</span>
+          </div>
+          <div class="status-line">
+            <span>Modes</span><span class="status-value">AUTO/MAN</span>
+          </div>
+          <div class="status-line">
+            <span>Stack</span><span class="status-value">ESP32</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-wrap">
+        <div class="panel">
+          <header class="panel-header">
+            <div class="header-left">
+              <button
+                class="icon-btn mobile-open"
+                id="btn-mobile-menu"
+                aria-label="Open navigation"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <button
+                class="icon-btn desktop-collapse"
+                id="btn-collapse"
+                aria-label="Collapse sidebar"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+              <button class="search-btn" id="btn-search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M20 20l-3.5-3.5" />
+                </svg>
+                <span>Search XORA modules...</span>
+                <kbd>Ctrl K</kbd>
+              </button>
+            </div>
+            <div class="header-right">
+              <a
+                class="icon-btn"
+                href="https://github.com/AlphaIsYour/mini-agv-iot"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="GitHub"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M9 19c-5 1.5-5-2.5-7-3" />
+                  <path
+                    d="M15 22v-3.5c0-1 .2-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.2 12.2 0 0 0-6.2 0C6.5 3.8 5.4 4.1 5.4 4.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 10.5c0 4.6 2.7 5.7 5.5 6-.7.6-.7 1.2-.5 2V22"
+                  />
+                </svg>
+              </a>
+              <label class="theme-switch" aria-label="Toggle theme">
+                <input id="theme-toggle" type="checkbox" />
+                <span class="theme-track">
+                  <span class="theme-slot">
+                    <span class="theme-slot-fill"></span>
+                  </span>
+                  <span class="theme-core">
+                    <span class="theme-core-gear"></span>
+                    <span class="theme-core-inner"></span>
+                  </span>
+                  <span class="theme-claw">
+                    <span class="theme-claw-arm"></span>
+                    <span class="theme-claw-joint"></span>
+                    <span class="theme-pincer top"></span>
+                    <span class="theme-pincer bottom"></span>
+                  </span>
+                </span>
+              </label>
+            </div>
+          </header>
+
+          <div class="content">
+            <div class="content-inner">
+              <section class="section-block" id="overview">
+                <div class="welcome-row">
+                  <div>
+                    <div class="eyebrow">
+                      <span class="live-dot"></span>Public overview - XORA v4.0
+                    </div>
+                    <h1 class="welcome-title">
+                      XORA Autonomous Guided Vehicle
+                    </h1>
+                    <p class="welcome-copy">
+                      A compact mission control system for ESP32-based AGV
+                      delivery, line following, obstacle avoidance, load
+                      monitoring, telemetry, analytics, and 3D simulation.
+                    </p>
+                    <div class="quick-stats">
+                      <div class="quick-stat">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="var(--blue)"
+                        >
+                          <path d="M4 7h16M4 12h16M4 17h16" /></svg
+                        ><strong>3</strong> destinations
+                      </div>
+                      <div class="quick-stat">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="var(--green)"
+                        >
+                          <path d="M12 2v20M2 12h20" /></svg
+                        ><strong>5</strong> sensor channels
+                      </div>
+                      <div class="quick-stat">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="var(--cyan)"
+                        >
+                          <path
+                            d="M4 12a8 8 0 0 1 16 0M7 12a5 5 0 0 1 10 0M10 12a2 2 0 0 1 4 0"
+                          /></svg
+                        ><strong>MQTT</strong> live bridge
+                      </div>
+                    </div>
+                  </div>
+                  <div class="avatar-stack" aria-hidden="true">
+                    <div class="avatar">A</div>
+                    <div class="avatar">D</div>
+                    <div class="avatar">D</div>
+                    <div class="avatar">I</div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="hero-grid">
+                <div class="overview-card">
+                  <div class="metric">
+                    <div class="metric-label">Delivery Nodes</div>
+                    <div class="metric-value">BASE <span>A/B/C</span></div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">Sensor Suite</div>
+                    <div class="metric-value">IR5 <span>+ HX/US</span></div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">Operation Modes</div>
+                    <div class="metric-value">AUTO <span>MANUAL</span></div>
+                  </div>
+                </div>
+                <div class="visual-card">
+                  <div class="visual-top">
+                    <div class="visual-title">AGV system profile</div>
+                    <span class="badge green">Reference</span>
+                  </div>
+                  <div class="agv-visual">
+                    <img
+                      class="agv-img"
+                      src="/images/agv.png"
+                      alt="XORA AGV robot preview"
+                    />
+                    <div class="mini-feed">
+                      <div class="feed-row">
+                        <span>Controller</span><strong>ESP32</strong>
+                      </div>
+                      <div class="feed-row">
+                        <span>Bridge</span><strong>Node MQTT</strong>
+                      </div>
+                      <div class="feed-row">
+                        <span>Storage</span><strong>PostgreSQL</strong>
+                      </div>
+                      <div class="feed-row">
+                        <span>Simulation</span><strong>Three.js</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="section-block" id="features">
+                <div class="section-heading">
+                  <h2 class="section-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <rect x="4" y="4" width="16" height="16" rx="3" />
+                      <path d="M8 12h8M12 8v8" /></svg
+                    >System Features
+                  </h2>
+                  <div class="section-note">
+                    Core modules exposed from the XORA terminal and AGV
+                    firmware.
+                  </div>
+                </div>
+                <div class="tool-grid">
+                  <article
+                    class="tool-card"
+                    data-search="mission control assign destination route blackbox"
+                  >
+                    <div class="icon-box">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
+                        <path d="M4 6h16M4 12h10M4 18h7" />
+                        <path d="M17 15l3 3-3 3" />
+                      </svg>
+                    </div>
+                    <div class="tool-content">
+                      <div class="tool-top">
+                        <div class="tool-title">Mission Control</div>
+                        <span class="badge">Popular</span>
+                      </div>
+                      <p class="tool-desc">
+                        Assign destinations A, B, and C while the AGV handles
+                        intersections, cargo checks, and base return.
+                      </p>
+                      <div class="tool-meta">
+                        <span class="badge">AUTO</span
+                        ><span class="badge">A/B/C</span>
+                      </div>
+                    </div>
+                  </article>
+                  <article
+                    class="tool-card"
+                    data-search="telemetry mqtt websocket sensor live"
+                  >
+                    <div class="icon-box">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
+                        <path d="M4 19V5" />
+                        <path d="M4 19h16" />
+                        <path d="M7 15l4-4 3 3 5-7" />
+                      </svg>
+                    </div>
+                    <div class="tool-content">
+                      <div class="tool-top">
+                        <div class="tool-title">Real-time Telemetry</div>
+                        <span class="badge green">Live</span>
+                      </div>
+                      <p class="tool-desc">
+                        Live ultrasonic, IR, load cell, state, and mission data
+                        streamed through MQTT and WebSocket.
+                      </p>
+                      <div class="tool-meta">
+                        <span class="badge">MQTT</span
+                        ><span class="badge">WS</span>
+                      </div>
+                    </div>
+                  </article>
+                  <article
+                    class="tool-card"
+                    data-search="analytics dashboard event mission logs"
+                  >
+                    <div class="icon-box">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
+                        <path d="M5 19V5" />
+                        <path d="M5 19h14" />
+                        <path d="M9 16V9M13 16V6M17 16v-4" />
+                      </svg>
+                    </div>
+                    <div class="tool-content">
+                      <div class="tool-top">
+                        <div class="tool-title">Analytics Dashboard</div>
+                        <span class="badge">DB</span>
+                      </div>
+                      <p class="tool-desc">
+                        Mission duration, success rate, event history, error
+                        counters, and sensor trends for evaluation.
+                      </p>
+                      <div class="tool-meta">
+                        <span class="badge">PostgreSQL</span>
+                      </div>
+                    </div>
+                  </article>
+                  <article
+                    class="tool-card"
+                    data-search="roboeyes oled expression alive"
+                  >
+                    <div class="icon-box">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
+                        <path
+                          d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z"
+                        />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    </div>
+                    <div class="tool-content">
+                      <div class="tool-top">
+                        <div class="tool-title">RoboEyes Expressions</div>
+                        <span class="badge">OLED</span>
+                      </div>
+                      <p class="tool-desc">
+                        Animated robot eyes communicate idle, confused, happy,
+                        warning, and mission states.
+                      </p>
+                      <div class="tool-meta">
+                        <span class="badge">Alive</span>
+                      </div>
+                    </div>
+                  </article>
+                  <article
+                    class="tool-card"
+                    data-search="3d simulation threejs vercel arena"
+                  >
+                    <div class="icon-box">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
+                        <path d="M12 2l9 5-9 5-9-5z" />
+                        <path d="M3 7v10l9 5 9-5V7" />
+                        <path d="M12 12v10" />
+                      </svg>
+                    </div>
+                    <div class="tool-content">
+                      <div class="tool-top">
+                        <div class="tool-title">3D Simulation</div>
+                        <span class="badge green">New</span>
+                      </div>
+                      <p class="tool-desc">
+                        Interactive Three.js scene for testing AGV behavior,
+                        arena movement, and visual demo flows.
+                      </p>
+                      <div class="tool-meta">
+                        <span class="badge">Three.js</span>
+                      </div>
+                    </div>
+                  </article>
+                  <article
+                    class="tool-card"
+                    data-search="obstacle avoidance ultrasonic servo scan"
+                  >
+                    <div class="icon-box">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
+                        <path d="M12 3v18" />
+                        <path d="M5 8a7 7 0 0 1 14 0" />
+                        <path d="M7 16a5 5 0 0 0 10 0" />
+                      </svg>
+                    </div>
+                    <div class="tool-content">
+                      <div class="tool-top">
+                        <div class="tool-title">Obstacle Avoidance</div>
+                        <span class="badge">Safety</span>
+                      </div>
+                      <p class="tool-desc">
+                        HC-SR04 detects front obstacles, servo scans, and AGV
+                        performs recovery to find the line again.
+                      </p>
+                      <div class="tool-meta">
+                        <span class="badge">HC-SR04</span>
+                      </div>
+                    </div>
+                  </article>
+                </div>
+              </section>
+
+              <section class="section-block">
+                <div class="section-heading">
+                  <h2 class="section-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path d="M4 7h16M4 12h16M4 17h10" /></svg
+                    >Categories
+                  </h2>
+                  <div class="section-note">
+                    Quick access groups for the public overview.
+                  </div>
+                </div>
+                <div class="category-grid">
+                  <a class="category-card" href="#features"
+                    ><strong>Control</strong><span>3 modules</span></a
+                  >
+                  <a class="category-card" href="#features"
+                    ><strong>Monitoring</strong><span>4 panels</span></a
+                  >
+                  <a class="category-card" href="#arena"
+                    ><strong>Navigation</strong><span>4 nodes</span></a
+                  >
+                  <a class="category-card" href="#tech"
+                    ><strong>Integration</strong><span>9 tools</span></a
+                  >
+                </div>
+              </section>
+
+              <section class="section-block" id="arena">
+                <div class="section-heading">
+                  <h2 class="section-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path d="M4 6c5-3 11 3 16 0v12c-5 3-11-3-16 0z" />
+                      <path d="M4 6v12" /></svg
+                    >Arena Map
+                  </h2>
+                  <div class="section-note">
+                    Physical route abstraction used by the firmware mission
+                    counter.
+                  </div>
+                </div>
+                <div class="arena-layout">
+                  <div class="arena-card">
+                    <svg
+                      viewBox="0 0 170 440"
+                      fill="none"
+                      aria-label="XORA arena track with base, A, B, and C"
+                    >
+                      <rect
+                        x="18"
+                        y="12"
+                        width="134"
+                        height="416"
+                        rx="8"
+                        fill="var(--card-bg)"
+                        stroke="var(--border-soft)"
+                      />
+                      <path
+                        d="M98 400 C54 400 38 380 38 340 L38 94 C38 52 56 38 98 38"
+                        stroke="var(--text-main)"
+                        stroke-width="8"
+                        stroke-linecap="round"
+                        opacity="0.62"
+                      />
+                      <path
+                        d="M98 400 L98 38"
+                        stroke="var(--text-main)"
+                        stroke-width="8"
+                        stroke-linecap="round"
+                      />
+                      <path
+                        d="M98 250 C62 250 58 276 58 294 L58 382"
+                        stroke="var(--text-main)"
+                        stroke-width="8"
+                        stroke-linecap="round"
+                      />
+                      <path
+                        d="M98 145 C132 145 138 174 138 195 L138 352 C138 382 126 400 98 400"
+                        stroke="var(--text-main)"
+                        stroke-width="8"
+                        stroke-linecap="round"
+                      />
+                      <rect
+                        x="88"
+                        y="28"
+                        width="20"
+                        height="20"
+                        rx="3"
+                        fill="var(--text-main)"
+                      />
+                      <rect
+                        x="88"
+                        y="137"
+                        width="20"
+                        height="20"
+                        rx="3"
+                        fill="var(--text-main)"
+                      />
+                      <rect
+                        x="88"
+                        y="242"
+                        width="20"
+                        height="20"
+                        rx="3"
+                        fill="var(--text-main)"
+                      />
+                      <rect
+                        x="88"
+                        y="390"
+                        width="20"
+                        height="20"
+                        rx="3"
+                        fill="var(--text-main)"
+                      />
+                      <text
+                        x="116"
+                        y="43"
+                        fill="var(--red)"
+                        font-family="JetBrains Mono"
+                        font-size="14"
+                        font-weight="700"
+                      >
+                        C
+                      </text>
+                      <text
+                        x="116"
+                        y="153"
+                        fill="var(--amber)"
+                        font-family="JetBrains Mono"
+                        font-size="14"
+                        font-weight="700"
+                      >
+                        B
+                      </text>
+                      <text
+                        x="116"
+                        y="258"
+                        fill="var(--cyan)"
+                        font-family="JetBrains Mono"
+                        font-size="14"
+                        font-weight="700"
+                      >
+                        A
+                      </text>
+                      <text
+                        x="114"
+                        y="407"
+                        fill="var(--green)"
+                        font-family="JetBrains Mono"
+                        font-size="12"
+                        font-weight="700"
+                      >
+                        BASE
+                      </text>
+                    </svg>
+                  </div>
+                  <div class="info-grid">
+                    <div class="info-card">
+                      <h3>Route model</h3>
+                      <p>
+                        The AGV starts at BASE, follows the center line, counts
+                        blackbox markers, stops at the selected destination,
+                        waits for cargo removal, then returns to BASE.
+                      </p>
+                      <div class="route-list">
+                        <div class="route-item">
+                          <strong>BASE</strong
+                          ><span>Start and finish node</span>
+                        </div>
+                        <div class="route-item">
+                          <strong>A</strong><span>Left return branch</span>
+                        </div>
+                        <div class="route-item">
+                          <strong>B</strong><span>Right return branch</span>
+                        </div>
+                        <div class="route-item">
+                          <strong>C</strong><span>Farthest delivery point</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="info-card">
+                      <h3>Mission checkpoints</h3>
+                      <p>
+                        Load cell validates cargo, line sensors maintain path
+                        tracking, ultrasonic pauses for obstacles, and the
+                        dashboard records mission timeline events.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="section-block" id="tech">
+                <div class="section-heading">
+                  <h2 class="section-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <rect x="7" y="7" width="10" height="10" rx="2" />
+                      <path
+                        d="M3 10h4M17 10h4M10 3v4M10 17v4M14 3v4M14 17v4M3 14h4M17 14h4"
+                      /></svg
+                    >Tech Stack
+                  </h2>
+                  <div class="section-note">
+                    Embedded, sensors, control logic, storage, and visualization
+                    layers.
+                  </div>
+                </div>
+                <div class="tech-layout">
+                  <div class="tech-panel">
+                    <h3>Software and communication</h3>
+                    <p>
+                      Bridge server, live monitoring, database logging, and 3D
+                      simulation layer used by the XORA dashboard.
+                    </p>
+                    <div class="tech-grid">
+                      <span class="tech-chip"><i></i>ESP32</span>
+                      <span class="tech-chip"><i></i>Arduino</span>
+                      <span class="tech-chip"><i></i>MQTT</span>
+                      <span class="tech-chip"><i></i>Node.js</span>
+                      <span class="tech-chip"><i></i>WebSocket</span>
+                      <span class="tech-chip"><i></i>PostgreSQL</span>
+                      <span class="tech-chip"><i></i>RoboEyes</span>
+                      <span class="tech-chip"><i></i>Three.js</span>
+                      <span class="tech-chip"><i></i>Docker</span>
+                    </div>
+                  </div>
+                  <div class="tech-panel">
+                    <h3>Sensor and hardware layer</h3>
+                    <p>
+                      Physical modules used for line reading, cargo validation,
+                      obstacle detection, motion, display, and power
+                      distribution.
+                    </p>
+                    <div class="tech-grid">
+                      <span class="tech-chip"><i></i>TCRT5000 x5</span>
+                      <span class="tech-chip"><i></i>HC-SR04</span>
+                      <span class="tech-chip"><i></i>HX711</span>
+                      <span class="tech-chip"><i></i>Load Cell</span>
+                      <span class="tech-chip"><i></i>Servo SG90</span>
+                      <span class="tech-chip"><i></i>L298N</span>
+                      <span class="tech-chip"><i></i>4 DC Motors</span>
+                      <span class="tech-chip"><i></i>OLED Display</span>
+                      <span class="tech-chip"><i></i>Buck Converter</span>
+                    </div>
+                  </div>
+                  <div class="tech-panel">
+                    <h3>Control algorithms</h3>
+                    <p>
+                      Decision logic used by the embedded controller to keep the
+                      AGV stable, responsive, and mission-aware.
+                    </p>
+                    <div class="tech-grid">
+                      <span class="tech-chip"><i></i>PID Line Following</span>
+                      <span class="tech-chip"><i></i>Blackbox Counter</span>
+                      <span class="tech-chip"><i></i>State Machine</span>
+                      <span class="tech-chip"><i></i>Obstacle Recovery</span>
+                      <span class="tech-chip"><i></i>Load Thresholding</span>
+                      <span class="tech-chip"><i></i>Telemetry Filtering</span>
+                    </div>
+                  </div>
+                  <div class="tech-panel">
+                    <h3>Research extension</h3>
+                    <p>
+                      Prepared as future study space for intelligent behavior
+                      and anomaly classification during AGV operation.
+                    </p>
+                    <div class="tech-grid">
+                      <span class="tech-chip"><i></i>TinyML-ready</span>
+                      <span class="tech-chip"><i></i>Anomaly Detection</span>
+                      <span class="tech-chip"><i></i>Sensor Fusion</span>
+                      <span class="tech-chip"><i></i>Mission Analytics</span>
+                      <span class="tech-chip"><i></i>Error Pattern Logs</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="section-block" id="team">
+                <div class="section-heading">
+                  <h2 class="section-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path d="M16 11a4 4 0 1 0-8 0" />
+                      <path d="M4 21a8 8 0 0 1 16 0" /></svg
+                    >Built By
+                  </h2>
+                  <div class="section-note">Mini AGV XORA project team.</div>
+                </div>
+                <div class="team-grid">
+                  <div
+                    class="team-card"
+                    style="
+                      --photo-x: -64px;
+                      --photo-scale: 1.03;
+                      --photo-text-safe: 104px;
+                    "
+                  >
+                    <div class="team-copy">
+                      <div class="team-main">
+                        <h3>Alpha</h3>
+                        <p>
+                          Lead Developer and System Architect for dashboard,
+                          firmware integration, and deployment.
+                        </p>
+                      </div>
+                      <div class="team-details">
+                        <div class="detail-row">
+                          <span
+                            >Dashboard, firmware logic, deployment, and system
+                            integration.</span
+                          >
+                        </div>
+                        <div class="social-row">
+                          <a
+                            class="social-btn"
+                            href="#"
+                            aria-label="Alpha Instagram"
+                            ><svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                            >
+                              <rect x="4" y="4" width="16" height="16" rx="5" />
+                              <circle cx="12" cy="12" r="3" />
+                              <path d="M17.5 6.5h.01" /></svg
+                          ></a>
+                          <a
+                            class="social-btn"
+                            href="#"
+                            aria-label="Alpha GitHub"
+                            ><svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                            >
+                              <path d="M9 19c-4 1-4-2-6-3" />
+                              <path
+                                d="M15 22v-3.5c0-1 .2-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.2 12.2 0 0 0-6.2 0C6.5 3.8 5.4 4.1 5.4 4.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 10.5c0 4.6 2.7 5.7 5.5 6-.7.6-.7 1.2-.5 2V22"
+                              /></svg
+                          ></a>
+                          <a
+                            class="social-btn"
+                            href="#"
+                            aria-label="Alpha LinkedIn"
+                            ><svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                            >
+                              <path d="M8 11v7" />
+                              <path d="M8 8v.01" />
+                              <path d="M12 18v-7" />
+                              <path d="M12 14a3 3 0 0 1 6 0v4" />
+                              <rect
+                                x="4"
+                                y="4"
+                                width="16"
+                                height="16"
+                                rx="2"
+                              /></svg
+                          ></a>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="team-photo">
+                      <img
+                        src="/images/alphareno.png"
+                        alt="Alpha portrait"
+                        loading="lazy"
+                      />
+                    </div>
+                  </div>
+                  <div
+                    class="team-card"
+                    style="
+                      --photo-x: -64px;
+                      --photo-scale: 1;
+                      --photo-text-safe: 86px;
+                    "
+                  >
+                    <div class="team-copy">
+                      <div class="team-main">
+                        <h3>Dzaki</h3>
+                        <p>Project team member.</p>
+                      </div>
+                      <div class="team-details">
+                        <div class="detail-row">
+                          <span
+                            >Hardware validation, sensor assembly, and mission
+                            testing support.</span
+                          >
+                        </div>
+                        <div class="social-row">
+                          <a
+                            class="social-btn"
+                            href="#"
+                            aria-label="Dzaki Instagram"
+                            ><svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                            >
+                              <rect x="4" y="4" width="16" height="16" rx="5" />
+                              <circle cx="12" cy="12" r="3" />
+                              <path d="M17.5 6.5h.01" /></svg
+                          ></a>
+                          <a
+                            class="social-btn"
+                            href="#"
+                            aria-label="Dzaki GitHub"
+                            ><svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                            >
+                              <path d="M9 19c-4 1-4-2-6-3" />
+                              <path
+                                d="M15 22v-3.5c0-1 .2-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.2 12.2 0 0 0-6.2 0C6.5 3.8 5.4 4.1 5.4 4.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 10.5c0 4.6 2.7 5.7 5.5 6-.7.6-.7 1.2-.5 2V22"
+                              /></svg
+                          ></a>
+                          <a
+                            class="social-btn"
+                            href="#"
+                            aria-label="Dzaki LinkedIn"
+                            ><svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                            >
+                              <path d="M8 11v7" />
+                              <path d="M8 8v.01" />
+                              <path d="M12 18v-7" />
+                              <path d="M12 14a3 3 0 0 1 6 0v4" />
+                              <rect
+                                x="4"
+                                y="4"
+                                width="16"
+                                height="16"
+                                rx="2"
+                              /></svg
+                          ></a>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="team-photo">
+                      <img
+                        src="/images/dzaki.png"
+                        alt="Dzaki portrait"
+                        loading="lazy"
+                      />
+                    </div>
+                  </div>
+                  <div
+                    class="team-card"
+                    style="
+                      --photo-x: -70px;
+                      --photo-scale: 1;
+                      --photo-text-safe: 116px;
+                    "
+                  >
+                    <div class="team-copy">
+                      <div class="team-main">
+                        <h3>Derby</h3>
+                        <p>Project team member.</p>
+                      </div>
+                      <div class="team-details">
+                        <div class="detail-row">
+                          <span
+                            >Arena preparation, route observation, and delivery
+                            scenario testing.</span
+                          >
+                        </div>
+                        <div class="social-row">
+                          <a
+                            class="social-btn"
+                            href="#"
+                            aria-label="Derby Instagram"
+                            ><svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                            >
+                              <rect x="4" y="4" width="16" height="16" rx="5" />
+                              <circle cx="12" cy="12" r="3" />
+                              <path d="M17.5 6.5h.01" /></svg
+                          ></a>
+                          <a
+                            class="social-btn"
+                            href="#"
+                            aria-label="Derby GitHub"
+                            ><svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                            >
+                              <path d="M9 19c-4 1-4-2-6-3" />
+                              <path
+                                d="M15 22v-3.5c0-1 .2-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.2 12.2 0 0 0-6.2 0C6.5 3.8 5.4 4.1 5.4 4.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 10.5c0 4.6 2.7 5.7 5.5 6-.7.6-.7 1.2-.5 2V22"
+                              /></svg
+                          ></a>
+                          <a
+                            class="social-btn"
+                            href="#"
+                            aria-label="Derby LinkedIn"
+                            ><svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                            >
+                              <path d="M8 11v7" />
+                              <path d="M8 8v.01" />
+                              <path d="M12 18v-7" />
+                              <path d="M12 14a3 3 0 0 1 6 0v4" />
+                              <rect
+                                x="4"
+                                y="4"
+                                width="16"
+                                height="16"
+                                rx="2"
+                              /></svg
+                          ></a>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="team-photo">
+                      <img
+                        src="/images/derby.png"
+                        alt="Derby portrait"
+                        loading="lazy"
+                      />
+                    </div>
+                  </div>
+                  <div
+                    class="team-card"
+                    style="
+                      --photo-x: -64px;
+                      --photo-scale: 1.02;
+                      --photo-text-safe: 86px;
+                    "
+                  >
+                    <div class="team-copy">
+                      <div class="team-main">
+                        <h3>Ilyas</h3>
+                        <p>Project team member.</p>
+                      </div>
+                      <div class="team-details">
+                        <div class="detail-row">
+                          <span
+                            >Documentation support, presentation flow, and
+                            testing notes.</span
+                          >
+                        </div>
+                        <div class="social-row">
+                          <a
+                            class="social-btn"
+                            href="#"
+                            aria-label="Ilyas Instagram"
+                            ><svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                            >
+                              <rect x="4" y="4" width="16" height="16" rx="5" />
+                              <circle cx="12" cy="12" r="3" />
+                              <path d="M17.5 6.5h.01" /></svg
+                          ></a>
+                          <a
+                            class="social-btn"
+                            href="#"
+                            aria-label="Ilyas GitHub"
+                            ><svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                            >
+                              <path d="M9 19c-4 1-4-2-6-3" />
+                              <path
+                                d="M15 22v-3.5c0-1 .2-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.2 12.2 0 0 0-6.2 0C6.5 3.8 5.4 4.1 5.4 4.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 10.5c0 4.6 2.7 5.7 5.5 6-.7.6-.7 1.2-.5 2V22"
+                              /></svg
+                          ></a>
+                          <a
+                            class="social-btn"
+                            href="#"
+                            aria-label="Ilyas LinkedIn"
+                            ><svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                            >
+                              <path d="M8 11v7" />
+                              <path d="M8 8v.01" />
+                              <path d="M12 18v-7" />
+                              <path d="M12 14a3 3 0 0 1 6 0v4" />
+                              <rect
+                                x="4"
+                                y="4"
+                                width="16"
+                                height="16"
+                                rx="2"
+                              /></svg
+                          ></a>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="team-photo">
+                      <img
+                        src="/images/illyas.png"
+                        alt="Ilyas portrait"
+                        loading="lazy"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="section-block cta-strip" id="terminal">
+                <div class="cta-copy">
+                  <h2>Ready to control XORA?</h2>
+                  <p>
+                    Open the authenticated terminal to operate missions, monitor
+                    sensors, and inspect system logs.
+                  </p>
+                </div>
+                <div class="gearbox" aria-hidden="true">
+                  <div class="gear one">
+                    <div class="gear-inner">
+                      <div class="bar"></div>
+                      <div class="bar"></div>
+                      <div class="bar"></div>
+                    </div>
+                  </div>
+                  <div class="gear two">
+                    <div class="gear-inner">
+                      <div class="bar"></div>
+                      <div class="bar"></div>
+                      <div class="bar"></div>
+                    </div>
+                  </div>
+                  <div class="gear three">
+                    <div class="gear-inner">
+                      <div class="bar"></div>
+                      <div class="bar"></div>
+                      <div class="bar"></div>
+                    </div>
+                  </div>
+                  <div class="gear four large">
+                    <div class="gear-inner">
+                      <div class="bar"></div>
+                      <div class="bar"></div>
+                      <div class="bar"></div>
+                      <div class="bar"></div>
+                      <div class="bar"></div>
+                      <div class="bar"></div>
+                    </div>
+                  </div>
+                </div>
+                <a class="primary-btn" href="/login">Enter Terminal</a>
+              </section>
+
+              <footer class="footer">
+                XORA AGV System v4.0.0 - ESP32 + Node.js + MQTT + PostgreSQL -
+                2026
+              </footer>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <div class="modal" id="search-modal" aria-hidden="true">
+      <div
+        class="command"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search XORA modules"
+      >
+        <div class="command-input">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--text-muted)"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3.5-3.5" />
+          </svg>
+          <input
+            id="search-input"
+            autocomplete="off"
+            placeholder="Search features, routes, tech stack..."
+          />
+        </div>
+        <div class="command-results" id="search-results"></div>
+        <div class="command-footer">
+          <span><kbd>Enter</kbd> open result</span
+          ><span><kbd>Esc</kbd> close</span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const shell = document.getElementById("app-shell");
+      const sidebar = document.getElementById("sidebar");
+      const modal = document.getElementById("search-modal");
+      const input = document.getElementById("search-input");
+      const results = document.getElementById("search-results");
+
+      const items = [
+        {
+          title: "Mission Control",
+          desc: "Assign destination A, B, or C.",
+          href: "#features",
+        },
+        {
+          title: "Real-time Telemetry",
+          desc: "MQTT and WebSocket sensor stream.",
+          href: "#features",
+        },
+        {
+          title: "Analytics Dashboard",
+          desc: "Mission, event, and sensor history.",
+          href: "#features",
+        },
+        {
+          title: "Arena Map",
+          desc: "BASE, A, B, C route overview.",
+          href: "#arena",
+        },
+        {
+          title: "Tech Stack",
+          desc: "ESP32, Node.js, MQTT, PostgreSQL.",
+          href: "#tech",
+        },
+        {
+          title: "Team",
+          desc: "Mini AGV XORA project members.",
+          href: "#team",
+        },
+        {
+          title: "Enter Terminal",
+          desc: "Open authenticated dashboard.",
+          href: "/login",
+        },
+      ];
+
+      function renderResults(query = "") {
+        const q = query.trim().toLowerCase();
+        const filtered = items.filter(
+          (item) =>
+            !q ||
+            item.title.toLowerCase().includes(q) ||
+            item.desc.toLowerCase().includes(q),
+        );
+        results.innerHTML =
+          filtered
+            .map(
+              (item, index) => `
+        <a class="result-item ${index === 0 ? "selected" : ""}" href="${item.href}">
+          <span class="icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></span>
+          <span><strong>${item.title}</strong><span>${item.desc}</span></span>
+        </a>
+      `,
+            )
+            .join("") ||
+          '<div class="result-item"><span><strong>No results</strong><span>Try another keyword.</span></span></div>';
       }
 
-      document.addEventListener('mousemove', e => {
-        mouseX = (e.clientX / w - 0.5) * 2;
-        mouseY = (e.clientY / h - 0.5) * 2;
+      function openSearch() {
+        renderResults(input.value);
+        modal.classList.add("open");
+        modal.setAttribute("aria-hidden", "false");
+        setTimeout(() => input.focus(), 30);
+      }
+
+      function closeSearch() {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+        input.value = "";
+      }
+
+      document.getElementById("btn-collapse").addEventListener("click", () => {
+        shell.classList.toggle("collapsed");
       });
 
-      function draw() {
-        ctx.clearRect(0, 0, w, h);
-        stars.forEach(s => {
-          const px = s.x + mouseX * s.parallax * 30;
-          const py = s.y + mouseY * s.parallax * 20;
-          ctx.beginPath();
-          ctx.arc(px, py, s.size, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(0, 212, 255, ${s.opacity})`;
-          ctx.fill();
-          // Subtle glow
-          if (s.size > 1) {
-            ctx.beginPath();
-            ctx.arc(px, py, s.size * 3, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(0, 212, 255, ${s.opacity * 0.1})`;
-            ctx.fill();
-          }
+      document
+        .getElementById("btn-mobile-menu")
+        .addEventListener("click", () => {
+          sidebar.classList.add("open");
         });
-        requestAnimationFrame(draw);
+
+      const navItems = [...document.querySelectorAll(".nav-item")];
+      const contentScroller = document.querySelector(".content");
+      const sectionIds = [
+        "overview",
+        "features",
+        "arena",
+        "tech",
+        "team",
+        "terminal",
+      ];
+      const sections = sectionIds
+        .map((id) => document.getElementById(id))
+        .filter(Boolean);
+      let manualNavLock = false;
+
+      function setActiveNav(sectionId) {
+        let matched = false;
+        navItems.forEach((item) => {
+          const href = item.getAttribute("href") || "";
+          const isActive = !matched && href === `#${sectionId}`;
+          item.classList.toggle("active", isActive);
+          if (isActive) matched = true;
+        });
       }
-      draw();
-    })();
 
-    // ── Nav Scroll Effect ──────────────────────────────────────────────
-    window.addEventListener('scroll', () => {
-      document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 50);
-    });
+      function focusSection(section) {
+        if (!section) return;
+        section.classList.remove("section-focus");
+        void section.offsetWidth;
+        section.classList.add("section-focus");
+      }
 
-    // ── Reveal on Scroll ──────────────────────────────────────────────
-    const revealObserver = new IntersectionObserver((entries) => {
-      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
-    }, { threshold: 0.1 });
-    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+      navItems.forEach((nav) => {
+        nav.addEventListener("click", (event) => {
+          const href = nav.getAttribute("href") || "";
+          if (!href.startsWith("#")) return;
 
-    // ── Counter Animation ─────────────────────────────────────────────
-    const counterObserver = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          const el = e.target;
-          const target = parseInt(el.dataset.count);
+          const target = document.querySelector(href);
           if (!target) return;
-          let current = 0;
-          const step = Math.max(1, Math.floor(target / 30));
-          const interval = setInterval(() => {
-            current += step;
-            if (current >= target) { current = target; clearInterval(interval); }
-            el.textContent = current;
-          }, 50);
-          counterObserver.unobserve(el);
+
+          event.preventDefault();
+          manualNavLock = true;
+          setActiveNav(href.slice(1));
+          focusSection(target);
+          sidebar.classList.remove("open");
+
+          target.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+
+          window.setTimeout(() => {
+            manualNavLock = false;
+          }, 620);
+        });
+      });
+
+      function updateActiveFromScroll() {
+        if (manualNavLock) return;
+
+        const isDesktop = window.innerWidth > 980;
+        const scrollEl = isDesktop ? contentScroller : document.body;
+        const scrollTop = isDesktop
+          ? contentScroller.scrollTop
+          : document.documentElement.scrollTop || document.body.scrollTop;
+        const scrollHeight = isDesktop
+          ? contentScroller.scrollHeight
+          : document.body.scrollHeight;
+        const clientHeight = isDesktop
+          ? contentScroller.clientHeight
+          : window.innerHeight;
+
+        const scrollerRect = contentScroller.getBoundingClientRect();
+        const anchorY = isDesktop
+          ? scrollerRect.top +
+            Math.min(240, contentScroller.clientHeight * 0.32)
+          : Math.min(360, window.innerHeight * 0.48);
+
+        const terminal = document.getElementById("terminal");
+        if (
+          terminal &&
+          scrollTop + clientHeight >= scrollHeight - 36 &&
+          terminal.getBoundingClientRect().top <= anchorY
+        ) {
+          setActiveNav("terminal");
+          return;
+        }
+
+        let current = sections[0]?.id || "overview";
+        for (const section of sections) {
+          const rect = section.getBoundingClientRect();
+          if (rect.top <= anchorY) current = section.id;
+        }
+        setActiveNav(current);
+      }
+
+      contentScroller.addEventListener("scroll", updateActiveFromScroll, {
+        passive: true,
+      });
+      window.addEventListener("scroll", updateActiveFromScroll, {
+        passive: true,
+      });
+      window.addEventListener("resize", updateActiveFromScroll);
+      updateActiveFromScroll();
+
+      const themeToggle = document.getElementById("theme-toggle");
+      const themeSwitch = document.querySelector(".theme-switch");
+      function setTheme(next, animate = false) {
+        if (themeSwitch && animate) {
+          themeSwitch.classList.remove("moving-on", "moving-off");
+          void themeSwitch.offsetWidth;
+          themeSwitch.classList.add(
+            next === "light" ? "moving-on" : "moving-off",
+          );
+          window.setTimeout(() => {
+            themeSwitch.classList.remove("moving-on", "moving-off");
+          }, 1200);
+        }
+        document.documentElement.dataset.theme = next;
+        if (themeToggle) themeToggle.checked = next === "light";
+        const logo = document.querySelector(".brand-mark");
+        if (logo)
+          logo.src =
+            next === "dark"
+              ? "/images/logo-light.png"
+              : "/images/logo-dark.png";
+        try {
+          localStorage.setItem("xora-landing-theme", next);
+        } catch {}
+      }
+      themeToggle?.addEventListener("change", () => {
+        setTheme(themeToggle.checked ? "light" : "dark", true);
+      });
+
+      document
+        .getElementById("btn-search")
+        .addEventListener("click", openSearch);
+      input.addEventListener("input", () => renderResults(input.value));
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) closeSearch();
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (
+          (event.ctrlKey || event.metaKey) &&
+          event.key.toLowerCase() === "k"
+        ) {
+          event.preventDefault();
+          openSearch();
+        }
+        if (event.key === "Escape") closeSearch();
+        if (event.key === "Enter" && modal.classList.contains("open")) {
+          const selected = results.querySelector(".result-item.selected");
+          if (selected && selected.getAttribute("href")) selected.click();
         }
       });
-    }, { threshold: 0.5 });
-    document.querySelectorAll('[data-count]').forEach(el => counterObserver.observe(el));
 
-    // ── Feature Card Mouse Glow ───────────────────────────────────────
-    document.querySelectorAll('.feature-card').forEach(card => {
-      card.addEventListener('mousemove', e => {
-        const rect = card.getBoundingClientRect();
-        card.style.setProperty('--mx', ((e.clientX - rect.left) / rect.width * 100) + '%');
-        card.style.setProperty('--my', ((e.clientY - rect.top) / rect.height * 100) + '%');
-      });
-    });
-
-    // ── Parallax on Hero ──────────────────────────────────────────────
-    window.addEventListener('scroll', () => {
-      const scrollY = window.scrollY;
-      const hero = document.getElementById('hero');
-      if (!hero) return;
-      const glow = hero.querySelector('.hero-glow');
-      if (glow) glow.style.transform = `translate(-50%, calc(-50% + ${scrollY * 0.3}px))`;
-    });
-  </script>
-
-</body>
+      try {
+        const savedTheme = localStorage.getItem("xora-landing-theme");
+        if (savedTheme) {
+          setTheme(savedTheme);
+        } else if (themeToggle) {
+          themeToggle.checked =
+            document.documentElement.dataset.theme === "light";
+        }
+      } catch {}
+    </script>
+  </body>
 </html>
