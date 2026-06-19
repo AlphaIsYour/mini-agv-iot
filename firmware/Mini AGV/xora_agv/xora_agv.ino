@@ -166,7 +166,7 @@ int avoidTurnRightPwm  = 205;
 int avoidForward1Ms    = 900;
 int avoidForward1Spd   = 145;
 
-int avoidTurnLeftMs    = 800;
+int avoidTurnLeftMs    = 600;
 int avoidTurnLeftPwm   = 215;
 
 int avoidForward2Ms    = 650;
