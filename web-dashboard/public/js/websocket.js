@@ -3,7 +3,15 @@
 ══════════════════════════════════════════════════════════════════════════════ */
 
 const WS_PROTOCOL = window.location.protocol === "https:" ? "wss:" : "ws:";
-const WS_PORT = window.location.port ? `:${window.location.port}` : "";
+const WS_NEEDS_PROVIDER_PORT =
+  window.location.protocol === "http:" &&
+  !window.location.port &&
+  /(^|\.)xora\.web\.id$/i.test(window.location.hostname);
+const WS_PORT = WS_NEEDS_PROVIDER_PORT
+  ? ":11170"
+  : window.location.port
+    ? `:${window.location.port}`
+    : "";
 const WS_URL = `${WS_PROTOCOL}//${window.location.hostname}${WS_PORT}/ws`;
 
 let ws = null;
