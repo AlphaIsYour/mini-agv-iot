@@ -40,7 +40,10 @@
 #include <HX711.h>
 
 // ================= MQTT (WiFi via WiFiManager, tidak hardcoded) =================
-const char* MQTT_HOST     = "broker.hivemq.com";  // Public broker (testing lokal)
+// Domain xora.web.id dipakai untuk web dashboard. MQTT tetap lewat public broker
+// karena port 1883 VPS tidak dibuka oleh provider/panel.
+// IPv4 test.mosquitto.org dipakai agar VPS tidak nyangkut di resolusi IPv6.
+const char* MQTT_HOST     = "54.36.178.49";
 const uint16_t MQTT_PORT  = 1883;
 const char* MQTT_USER     = "";
 const char* MQTT_PASSWORD = "";

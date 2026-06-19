@@ -1,0 +1,117 @@
+<mxfile host="65bd71144e">
+    <diagram id="xora-architecture" name="Mini AGV XORA Architecture">
+        <mxGraphModel dx="2480" dy="1528" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="agvBoundary" value="AGV Device / Embedded System" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#2563eb;fillColor=#eff6ff;arcSize=12;fontStyle=1;fontColor=#1e3a8a;verticalAlign=top;align=center;spacingTop=12;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="120" width="520" height="640" as="geometry"/>
+                </mxCell>
+                <mxCell id="cloudBoundary" value="Cloud / Server Layer" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#7c3aed;fillColor=#f5f3ff;arcSize=12;fontStyle=1;fontColor=#4c1d95;verticalAlign=top;align=center;spacingTop=12;" parent="1" vertex="1">
+                    <mxGeometry x="650" y="120" width="530" height="690" as="geometry"/>
+                </mxCell>
+                <mxCell id="clientBoundary" value="Client / Operator Layer" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#059669;fillColor=#ecfdf5;arcSize=12;fontStyle=1;fontColor=#064e3b;verticalAlign=top;align=center;spacingTop=12;" parent="1" vertex="1">
+                    <mxGeometry x="1240" y="120" width="300" height="640" as="geometry"/>
+                </mxCell>
+                <mxCell id="sensors" value="Sensor AGV&#xa;&#xa;• TCRT5000 IR line follower x5&#xa;• HC-SR04 ultrasonic obstacle sensor&#xa;• Load cell + HX711 weight sensor" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#1d4ed8;fillColor=#dbeafe;arcSize=10;fontColor=#111827;align=left;spacing=14;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="170" width="190" height="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="esp32" value="ESP32 Main Controller&#xa;&#xa;• Membaca sensor&#xa;• State machine misi&#xa;• PID line following&#xa;• Obstacle avoidance&#xa;• Publish telemetry MQTT&#xa;• Subscribe command MQTT" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#1e40af;fillColor=#bfdbfe;arcSize=10;fontStyle=1;fontColor=#111827;align=left;spacing=14;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="335" y="280" width="205" height="230" as="geometry"/>
+                </mxCell>
+                <mxCell id="actuators" value="Aktuator &amp; Output&#xa;&#xa;• L298N motor driver&#xa;• 4 motor DC kuning&#xa;• Servo scanner obstacle&#xa;• OLED display / RoboEyes&#xa;• Buzzer indicator" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#1d4ed8;fillColor=#dbeafe;arcSize=10;fontColor=#111827;align=left;spacing=14;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="515" width="190" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="power" value="Power System&#xa;&#xa;• Baterai 18650&#xa;• Buck converter 5V&#xa;• ESP32 expansion board&#xa;• Common ground untuk sensor &amp; driver" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#0369a1;fillColor=#e0f2fe;arcSize=10;fontColor=#111827;align=left;spacing=14;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="335" y="550" width="205" height="145" as="geometry"/>
+                </mxCell>
+                <mxCell id="wifi" value="Wi-Fi Network&#xa;ESP32 terhubung ke internet/LAN" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#0f766e;fillColor=#ccfbf1;arcSize=10;fontColor=#111827;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="370" y="170" width="135" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="mqtt" value="MQTT Broker&#xa;&#xa;Contoh: broker.hivemq.com:1883&#xa;&#xa;Topic utama:&#xa;• agv/agv-01/telemetry&#xa;• agv/agv-01/state&#xa;• agv/agv-01/status&#xa;• agv/agv-01/command" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#6d28d9;fillColor=#ede9fe;arcSize=10;fontStyle=1;fontColor=#111827;align=left;spacing=14;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="690" y="185" width="205" height="210" as="geometry"/>
+                </mxCell>
+                <mxCell id="backend" value="Backend Node.js / Express&#xa;&#xa;• HTTP server &amp; static dashboard&#xa;• REST/API endpoint&#xa;• MQTT client bridge&#xa;• WebSocket server&#xa;• Event &amp; telemetry logger&#xa;• Session middleware" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#5b21b6;fillColor=#ddd6fe;arcSize=10;fontStyle=1;fontColor=#111827;align=left;spacing=14;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="950" y="185" width="190" height="235" as="geometry"/>
+                </mxCell>
+                <mxCell id="auth" value="Login / Authentication&#xa;&#xa;• Operator login&#xa;• bcrypt password hash&#xa;• express-session&#xa;• CSRF protection&#xa;• rate limit + Helmet" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#9333ea;fillColor=#f3e8ff;arcSize=10;fontColor=#111827;align=left;spacing=14;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="698" y="600" width="205" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="db" value="PostgreSQL / NeonDB&#xa;&#xa;Menyimpan:&#xa;• users / operators&#xa;• sensor logs&#xa;• AGV events&#xa;• mission history&#xa;• telemetry snapshots" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#047857;fillColor=#d1fae5;arcSize=10;fontStyle=1;fontColor=#111827;align=left;spacing=14;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="950" y="550" width="190" height="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="deploy" value="Deployment / Cloud&#xa;&#xa;• VPS / server Node.js&#xa;• Docker / docker-compose opsional&#xa;• GitHub Actions untuk automation&#xa;• Vercel untuk folio/simulasi 3D jika dipisah" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#a16207;fillColor=#fef3c7;arcSize=10;fontColor=#111827;align=left;spacing=14;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="698" y="420" width="205" height="155" as="geometry"/>
+                </mxCell>
+                <mxCell id="dashboard" value="Web Dashboard&#xa;&#xa;• Mission control A/B/C&#xa;• Manual control / D-pad&#xa;• Sensor monitor realtime&#xa;• Arena map &amp; route progress&#xa;• Mission timeline&#xa;• Event log&#xa;• Demo / simulation mode" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#059669;fillColor=#bbf7d0;arcSize=10;fontStyle=1;fontColor=#111827;align=left;spacing=14;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="1280" y="250" width="220" height="245" as="geometry"/>
+                </mxCell>
+                <mxCell id="operator" value="Operator / Pengguna&#xa;&#xa;• Login ke dashboard&#xa;• Memilih misi&#xa;• Memantau kondisi AGV&#xa;• Emergency stop" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#047857;fillColor=#dcfce7;arcSize=10;fontColor=#111827;align=left;spacing=14;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="1280" y="545" width="220" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="note" value="Catatan alur utama: ESP32 mengirim telemetry ke MQTT broker. Backend Node.js membaca topic MQTT, menyimpan data penting ke PostgreSQL/NeonDB, lalu meneruskan status realtime ke Web Dashboard melalui WebSocket. Perintah operator dari dashboard dikirim ke backend dan diteruskan ke ESP32 melalui MQTT command topic." style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#64748b;fillColor=#f8fafc;arcSize=8;fontColor=#334155;align=left;spacing=12;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="190" y="860" width="1220" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="edgeSensorsEsp" value="sensor input" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1d4ed8;fontColor=#1d4ed8;endArrow=block;endFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" source="sensors" target="esp32" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edgeEspActuators" value="PWM / control output" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1d4ed8;fontColor=#1d4ed8;endArrow=block;endFill=1;" parent="1" source="esp32" target="actuators" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="195" y="420"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="edgePowerEsp" value="5V / GND" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0369a1;fontColor=#0369a1;endArrow=block;endFill=1;" parent="1" source="power" target="esp32" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edgeEspWifi" value="Wi-Fi" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0f766e;fontColor=#0f766e;endArrow=block;endFill=1;" parent="1" source="esp32" target="wifi" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edgeWifiMqtt" value="MQTT publish / subscribe" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6d28d9;fontColor=#6d28d9;endArrow=block;endFill=1;" parent="1" source="wifi" target="mqtt" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edgeMqttBackend" value="MQTT bridge" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6d28d9;fontColor=#6d28d9;endArrow=block;endFill=1;startArrow=block;startFill=1;entryX=0;entryY=0.75;entryDx=0;entryDy=0;exitX=1;exitY=0.25;exitDx=0;exitDy=0;" parent="1" source="mqtt" target="backend" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edgeBackendDb" value="insert / query logs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#047857;fontColor=#047857;endArrow=block;endFill=1;entryX=0.555;entryY=0.008;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="backend" target="db" edge="1">
+                    <mxGeometry x="-0.3156" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="edgeAuthBackend" value="session &amp; access control" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9333ea;fontColor=#9333ea;endArrow=block;endFill=1;entryX=0.75;entryY=1;entryDx=0;entryDy=0;exitX=1;exitY=0.25;exitDx=0;exitDy=0;" parent="1" source="auth" target="backend" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="920" y="640"/>
+                            <mxPoint x="920" y="520"/>
+                            <mxPoint x="1092" y="520"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="edgeDeployBackend" value="host / run service" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#a16207;fontColor=#a16207;endArrow=block;endFill=1;entryX=0.105;entryY=0.998;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="deploy" target="backend" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="970" y="490"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="edgeBackendDashboard" value="HTTP + WebSocket realtime" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#059669;fontColor=#059669;endArrow=block;endFill=1;startArrow=block;startFill=1;" parent="1" source="backend" target="dashboard" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edgeOperatorDashboard" value="login, monitor, command" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#047857;fontColor=#047857;endArrow=block;endFill=1;startArrow=block;startFill=1;" parent="1" source="operator" target="dashboard" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edgeDashboardAuth" value="/login" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9333ea;fontColor=#9333ea;endArrow=block;endFill=1;exitX=0;exitY=0.75;exitDx=0;exitDy=0;" parent="1" source="dashboard" target="auth" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="911.9749999999999" y="744.3199999999999" as="targetPoint"/>
+                        <mxPoint x="1289.9999999999998" y="433.7499999999999" as="sourcePoint"/>
+                        <Array as="points">
+                            <mxPoint x="1160" y="434"/>
+                            <mxPoint x="1160" y="744"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

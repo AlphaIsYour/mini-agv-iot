@@ -453,10 +453,11 @@ mqttClient.on("message", (topic, payload) => {
         if (data.mission != null) agvState.destination = missionToDestination(data.mission);
         if (data.blackbox_count != null) agvState.blackboxCount = data.blackbox_count;
         if (data.distance_cm != null) agvState.sensors.ultrasonic = data.distance_cm;
+        const lineMiddle = data.line_middle ?? data.line_mid ?? 0;
         if (data.line_left != null) agvState.sensors.ir = {
           s1: data.ir_left || 0,
           s2: data.line_left || 0,
-          s3: data.line_middle || 0,
+          s3: lineMiddle,
           s4: data.line_right || 0,
           s5: data.ir_right || 0,
         };
@@ -485,9 +486,10 @@ mqttClient.on("message", (topic, payload) => {
     if (c.readyState === 1 && c.authenticated) c.send(wsMsg);
   });
   if (topic === `agv/${DEVICE_ID}/telemetry` && typeof data === "object") {
+    const lineMiddle = data.line_middle ?? data.line_mid ?? 0;
     console.log(
       `[MQTT→WS] ${topic}: distance=${data.distance_cm}cm loadcell=${data.loadcell_g}g ` +
-        `ir=${data.ir_left}${data.line_left}${data.line_middle}${data.line_right}${data.ir_right} ` +
+        `ir=${data.ir_left}${data.line_left}${lineMiddle}${data.line_right}${data.ir_right} ` +
         `mqtt=${data.mqtt_connected}`,
     );
   } else {
@@ -537,7 +539,11 @@ app.use(
           "ws://localhost:3000",
           "ws://127.0.0.1:3000",
           "ws://156.230.188.87:3000",
+          "ws://xora.web.id",
+          "ws://xora.web.id:11170",
           "http://156.230.188.87:3000",
+          "http://xora.web.id",
+          "http://xora.web.id:11170",
           "wss:",
           "http://localhost:5173",  // folio dev server (3D world)
           ...(FOLIO_ORIGIN ? [FOLIO_ORIGIN] : []),

@@ -2,9 +2,9 @@
    WEBSOCKET.JS — WS connect, auth handshake, message router
 ══════════════════════════════════════════════════════════════════════════════ */
 
-const WS_HOST = window.location.hostname;
-const WS_PORT = window.location.port; // WS server sharing port dengan HTTP
-const WS_URL = `ws://${WS_HOST}:${WS_PORT}/ws`;
+const WS_PROTOCOL = window.location.protocol === "https:" ? "wss:" : "ws:";
+const WS_PORT = window.location.port ? `:${window.location.port}` : "";
+const WS_URL = `${WS_PROTOCOL}//${window.location.hostname}${WS_PORT}/ws`;
 
 let ws = null;
 let reconnectT = null;
